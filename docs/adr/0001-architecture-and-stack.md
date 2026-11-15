@@ -195,9 +195,17 @@ Each outside system sits behind an adapter that is chosen in configuration.
 | Sign-in       | Local users; OIDC; SAML; CS:S (as an OIDC provider, once CS:S supports it)                  |
 | Card reader   | USB reader on the kiosk box; ToolGuard over MQTT when CS:S is present                       |
 | Training      | Local flags on each user; identity-provider groups or claims; CS:S                          |
-| Notifications | CS:S notification plumbing when present; a Discord webhook directly when POP runs on its own |
+| Group notices | CS:S notification plumbing when present; a Discord webhook directly when POP runs on its own |
+| Personal messages | CS:S's notification relay when present; email over SMTP when POP runs on its own; web push from POP's phone app either way |
 | Inventory     | BAM!, required: a REST client plus a webhook receiver                                       |
 | Funding       | Throne: a signed-webhook receiver, with manual marking as the fallback                      |
+
+Personal messages (your print is done, needs a hand, it's your turn) go to one
+member. When CS:S is present, POP hands them to CS:S's notification relay
+(CS:S issue #226), addressed only by the member's identifier. CS:S delivers
+each one however that member has chosen in CS:S, so POP never knows or stores
+where a member's notifications go. Web push from POP's own phone app is offered
+alongside it, for members who want alerts on their phone.
 
 Sign-in, card reader and training are separate settings. A space could, for
 example, sign in through Google while keeping its card list in POP.
