@@ -193,9 +193,9 @@ Each outside system sits behind an adapter that is chosen in configuration.
 | Concern       | Adapters                                                                                    |
 | ------------- | ------------------------------------------------------------------------------------------- |
 | Sign-in       | Local users; OIDC; SAML; CS:S (as an OIDC provider, once CS:S supports it)                  |
-| Card reader   | USB reader on the kiosk box; ToolGuard over MQTT when CS:S is present                       |
+| Card reader   | USB reader on the kiosk box; ToolGuard over MQTT when CS:S is present, with the member named in the scan reply (CS:S #228) |
 | Training      | Local flags on each user; identity-provider groups or claims; CS:S                          |
-| Group notices | CS:S notification plumbing when present; a Discord webhook directly when POP runs on its own |
+| Group notices | A Discord webhook, directly, as BAM! does, whether or not CS:S is present |
 | Personal messages | CS:S's notification relay when present; email over SMTP when POP runs on its own; web push from POP's phone app either way |
 | Inventory     | BAM!, required: a REST client plus a webhook receiver                                       |
 | Funding       | Throne: a signed-webhook receiver, with manual marking as the fallback                      |
@@ -246,6 +246,14 @@ otherwise
   dropped.
 - **No money passes through POP.** The kiosk only shows a QR code that links to
   the wishlist.
+
+### Guides live in POP, and are public
+
+Guides (steps and yes/no flowcharts) are stored and edited in POP. Published
+guides can be read without signing in, at stable URLs and through a public
+JSON API, so CS:S and anyone else can link to them. POP does not read guides
+from CS:S. Those public routes are read-only, like every other route reachable
+from outside the space.
 
 ### Repository layout
 
