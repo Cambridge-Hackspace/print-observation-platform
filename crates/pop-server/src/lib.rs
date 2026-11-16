@@ -11,7 +11,9 @@ pub mod config;
 pub mod db;
 pub mod events;
 pub mod health;
+pub mod pins;
 pub mod printers;
+pub mod run;
 pub mod secrets;
 pub mod tower;
 pub mod users;
@@ -52,6 +54,10 @@ pub struct AppState {
     pub secrets: secrets::Secrets,
     /// The printer category as BAM! last said, kept in sync (#22).
     pub bam_view: Option<tokio::sync::watch::Receiver<pop_integrations::sync::View>>,
+    /// The tower's printers, as every screen is sent them (#49).
+    pub tower: tokio::sync::watch::Receiver<Vec<api::TowerPrinter>>,
+    /// Told when an admin decides about a printer, so the runner looks again.
+    pub decided: Arc<tokio::sync::Notify>,
 }
 
 impl AppState {
@@ -65,7 +71,18 @@ impl AppState {
             bam: None,
             secrets: secrets::Secrets::none(),
             bam_view: None,
+            tower: tokio::sync::watch::channel(Vec::new()).1,
+            decided: Arc::new(tokio::sync::Notify::new()),
         }
+    }
+
+    /// Show the tower's printers as this runner runs them (#49).
+    pub fn with_tower(
+        mut self,
+        tower: tokio::sync::watch::Receiver<Vec<api::TowerPrinter>>,
+    ) -> Self {
+        self.tower = tower;
+        self
     }
 
     /// Follow BAM!'s printer category through this sync (#22), and check its

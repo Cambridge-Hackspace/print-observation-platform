@@ -23,6 +23,7 @@ futures-util = { version = "0.3", default-features = false, features = ["std"] }
 hex = "0.4"
 ipnet = { version = "2", features = ["serde"] }
 pop-integrations = { version = "0.1.0", path = "../pop-integrations" }
+pop-printers = { version = "0.1.0", path = "../pop-printers" }
 rand = "0.8"
 rpassword = "7"
 rust-embed = { version = "8", features = ["mime-guess"] }
@@ -44,7 +45,7 @@ ts-rs = "11"
 [dev-dependencies]
 http-body-util = "0.1"
 pop-integrations = { path = "../pop-integrations", features = ["fakes"] }
-pop-printers = { path = "../pop-printers" }
+pop-printers = { path = "../pop-printers", features = ["fakes"] }
 tempfile = "3"
 tower = { version = "0.5", features = ["util"] }
 
