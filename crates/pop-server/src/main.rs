@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand};
 use pop_server::{
     AppState,
     assets::Embedded,
+    backup,
     config::{Config, LogFormat},
     db, router,
 };
@@ -27,6 +28,18 @@ enum Command {
     /// Work with the configuration.
     #[command(subcommand)]
     Config(ConfigCommand),
+    /// Write the database and the stored print files to one archive. Safe
+    /// while the server is running.
+    Backup {
+        /// The archive to write. It must not exist yet.
+        file: PathBuf,
+    },
+    /// Restore a backup into the configured data directory, which must not
+    /// already hold a database.
+    Restore {
+        /// The archive `pop backup` wrote.
+        file: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -51,6 +64,37 @@ async fn main() -> ExitCode {
             println!("The configuration is valid.");
             ExitCode::SUCCESS
         }
+        Command::Backup { file } => match backup::backup(&config.storage.data_dir, &file).await {
+            Ok(m) => {
+                println!(
+                    "Backed up {} file(s), schema {}, to {}.",
+                    m.files.len(),
+                    m.schema_version,
+                    file.display()
+                );
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("pop: backup: {e}");
+                ExitCode::FAILURE
+            }
+        },
+        Command::Restore { file } => match backup::restore(&file, &config.storage.data_dir).await {
+            Ok(m) => {
+                println!(
+                    "Restored {} file(s), schema {}, made by POP {}, into {}.",
+                    m.files.len(),
+                    m.schema_version,
+                    m.pop_version,
+                    config.storage.data_dir.display()
+                );
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("pop: restore: {e}");
+                ExitCode::FAILURE
+            }
+        },
         Command::Serve => {
             init_logs(&config);
             match serve(config).await {

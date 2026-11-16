@@ -36,6 +36,14 @@ default, and `pop config check` validates a file without starting the server.
 Any key can be overridden from the environment as `POP_<SECTION>_<KEY>`:
 `POP_SERVER_LISTEN` overrides `server.listen`.
 
+## Backing up
+
+`pop backup <file>` writes the database and the stored print files to one
+archive, and is safe while the server is running. `pop restore <file>` puts one
+back into the configured data directory, which must not already hold a
+database. A restore checks every file against the archive's manifest and the
+database's integrity before anything is put in place.
+
 ## Testing
 
 `tools/check.sh` runs every suite in pinned containers; [docs/testing.md](docs/testing.md)
