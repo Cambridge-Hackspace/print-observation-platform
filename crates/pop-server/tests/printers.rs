@@ -360,3 +360,53 @@ async fn healthz_reports_bam_by_name_and_without_detail() {
         "an address reached a public answer: {body}"
     );
 }
+
+#[tokio::test]
+async fn healthz_says_when_bams_live_connection_is_down() {
+    let fake = FakeBam::start(RECORDING).await;
+    let dir = tempfile::tempdir().unwrap();
+    let db = db::open(&dir.path().join("pop.db")).await.unwrap();
+    let opts = pop_integrations::sync::Options {
+        first_retry: std::time::Duration::from_millis(50),
+        max_retry: std::time::Duration::from_millis(100),
+        ..pop_integrations::sync::Options::default()
+    };
+    let (view, _sync) = pop_integrations::sync::spawn(
+        Bam::new(fake.url(), TOKEN).unwrap(),
+        fake.id("printers").to_owned(),
+        opts,
+    );
+    let app = router(AppState::new(db, Arc::new(Embedded)).with_bam_sync(view.clone()));
+    let health = |app: Router| async move {
+        let res = app
+            .oneshot(Request::get("/healthz").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        let bytes = res.into_body().collect().await.unwrap().to_bytes();
+        serde_json::from_slice::<Value>(&bytes).unwrap()
+    };
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(4);
+    while !view.borrow().live {
+        assert!(tokio::time::Instant::now() < deadline, "never live");
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    assert_eq!(
+        health(app.clone()).await["checks"]["bam_live"],
+        json!({"ok": true})
+    );
+    fake.refuse_live(true);
+    fake.drop_live();
+    while view.borrow().live {
+        assert!(tokio::time::Instant::now() < deadline, "never down");
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    let h = health(app).await;
+    assert_eq!(h["checks"]["bam_live"]["ok"], false);
+    assert!(
+        h["checks"]["bam_live"]["error"]
+            .as_str()
+            .unwrap()
+            .contains("last said"),
+        "{h}"
+    );
+}

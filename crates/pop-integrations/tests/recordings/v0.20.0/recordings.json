@@ -1,14 +1,14 @@
 {
  "bam": "v0.20.0",
  "ids": {
-  "filament": "0de40d68-6e11-4d75-8eb9-c15fd0a1377d",
-  "incomplete": "bf25b4e7-86a9-4f43-b47c-a05126623b0c",
-  "mk4": "84c3f43e-d8ec-458d-b0e0-0b6a20738a07",
-  "old": "7c33df0b-0edd-45b6-8f38-6d9be460ef86",
-  "printers": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c",
-  "resin": "233acf18-19c7-437b-bfbb-bf463c3e90b0",
-  "voron": "fe8e4653-b13b-4c4f-96c7-864d1af4526e",
-  "x1": "c88097c4-26e7-4d1b-a445-f16a44a80c7b"
+  "filament": "126926e6-99d2-4960-9c59-977589de949f",
+  "incomplete": "796b699d-789e-4a4b-85dc-f7ff8988ce6e",
+  "mk4": "aaa16710-bdf5-449f-8838-3d828614e84f",
+  "old": "c70b535a-ed1a-46d9-b639-2fc8cc8fb404",
+  "printers": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
+  "resin": "4bf5faf5-35c3-46cd-97d7-a28ad264eebf",
+  "voron": "642f57e2-9fa1-4c13-8b7e-9258efb9c965",
+  "x1": "28c31053-26dc-4e28-af31-e4b4fdc5b9e0"
  },
  "recorded": {
   "bad_token": {
@@ -16,7 +16,7 @@
     "error": "Invalid, expired or revoked API token"
    },
    "method": "GET",
-   "path": "/api/v1/assets?category_id=dc0e71bb-909f-4dc4-a453-673bc7c8bd2c",
+   "path": "/api/v1/assets?category_id=0ab0563e-e4c9-4f89-b2fe-1477df526279",
    "status": 401
   },
   "categories": {
@@ -24,14 +24,14 @@
     "categories": [
      {
       "color_hex": "#3b82f6",
-      "created_at": "2026-11-16T11:03:17.482128237Z",
+      "created_at": "2026-11-16T11:37:52.030180815Z",
       "effective_review": {
        "enabled": false,
        "months": 0,
        "on_edit": "draft",
        "self_verify": false
       },
-      "id": "0de40d68-6e11-4d75-8eb9-c15fd0a1377d",
+      "id": "126926e6-99d2-4960-9c59-977589de949f",
       "implies": [],
       "included_by": [],
       "is_consumable": false,
@@ -49,19 +49,19 @@
       },
       "scan_template_id": null,
       "unit": "",
-      "updated_at": "2026-11-16T11:03:17.482128237Z",
+      "updated_at": "2026-11-16T11:37:52.030180815Z",
       "vendor_ids": []
      },
      {
       "color_hex": "#3b82f6",
-      "created_at": "2026-11-16T11:03:17.469757023Z",
+      "created_at": "2026-11-16T11:37:52.020766695Z",
       "effective_review": {
        "enabled": false,
        "months": 0,
        "on_edit": "draft",
        "self_verify": false
       },
-      "id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c",
+      "id": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
       "implies": [],
       "included_by": [],
       "is_consumable": false,
@@ -79,19 +79,19 @@
       },
       "scan_template_id": null,
       "unit": "",
-      "updated_at": "2026-11-16T11:03:17.469757023Z",
+      "updated_at": "2026-11-16T11:37:52.020766695Z",
       "vendor_ids": []
      },
      {
       "color_hex": "#3b82f6",
-      "created_at": "2026-11-16T11:03:17.47528168Z",
+      "created_at": "2026-11-16T11:37:52.025766915Z",
       "effective_review": {
        "enabled": false,
        "months": 0,
        "on_edit": "draft",
        "self_verify": false
       },
-      "id": "233acf18-19c7-437b-bfbb-bf463c3e90b0",
+      "id": "4bf5faf5-35c3-46cd-97d7-a28ad264eebf",
       "implies": [],
       "included_by": [],
       "is_consumable": false,
@@ -101,7 +101,7 @@
       "label_template_ids": [],
       "low_stock_threshold": null,
       "name": "Resin printers",
-      "parent_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c",
+      "parent_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
       "review": {
        "enabled": null,
        "months": null,
@@ -110,7 +110,7 @@
       },
       "scan_template_id": null,
       "unit": "",
-      "updated_at": "2026-11-16T11:03:17.47528168Z",
+      "updated_at": "2026-11-16T11:37:52.025766915Z",
       "vendor_ids": []
      }
     ]
@@ -123,13 +123,13 @@
    "body": {
     "events": [
      {
-      "asset_id": "c88097c4-26e7-4d1b-a445-f16a44a80c7b",
-      "created_at": "2026-11-16T11:03:17.545831Z",
-      "id": "f49eec26-51f0-4b45-9ca9-0d5978a58d84",
+      "asset_id": "28c31053-26dc-4e28-af31-e4b4fdc5b9e0",
+      "created_at": "2026-11-16T11:37:52.07922Z",
+      "id": "38051457-5bdb-4cef-801e-7fa8e823b2aa",
       "kind": "asset.created",
       "payload": {
        "asset": {
-        "id": "c88097c4-26e7-4d1b-a445-f16a44a80c7b",
+        "id": "28c31053-26dc-4e28-af31-e4b4fdc5b9e0",
         "name": "X1 Carbon"
        },
        "changes": [
@@ -138,7 +138,7 @@
          "what": "name"
         },
         {
-         "key": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c",
+         "key": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
          "to": "Printers",
          "what": "category"
         },
@@ -189,13 +189,13 @@
       }
      },
      {
-      "asset_id": "fe8e4653-b13b-4c4f-96c7-864d1af4526e",
-      "created_at": "2026-11-16T11:03:17.570229Z",
-      "id": "6b2df14b-230e-40b0-a036-0a0ae7f39331",
+      "asset_id": "642f57e2-9fa1-4c13-8b7e-9258efb9c965",
+      "created_at": "2026-11-16T11:37:52.092467Z",
+      "id": "79e687bc-7c8a-47b6-917a-6c1cea279a41",
       "kind": "asset.created",
       "payload": {
        "asset": {
-        "id": "fe8e4653-b13b-4c4f-96c7-864d1af4526e",
+        "id": "642f57e2-9fa1-4c13-8b7e-9258efb9c965",
         "name": "Voron 2.4"
        },
        "changes": [
@@ -204,7 +204,7 @@
          "what": "name"
         },
         {
-         "key": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c",
+         "key": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
          "to": "Printers",
          "what": "category"
         },
@@ -243,13 +243,13 @@
       }
      },
      {
-      "asset_id": "84c3f43e-d8ec-458d-b0e0-0b6a20738a07",
-      "created_at": "2026-11-16T11:03:17.593671Z",
-      "id": "16493db8-bc03-4b12-b035-9356260be4ed",
+      "asset_id": "aaa16710-bdf5-449f-8838-3d828614e84f",
+      "created_at": "2026-11-16T11:37:52.105309Z",
+      "id": "a5434038-ccd1-4be9-85c2-9fe9c5eb3871",
       "kind": "asset.created",
       "payload": {
        "asset": {
-        "id": "84c3f43e-d8ec-458d-b0e0-0b6a20738a07",
+        "id": "aaa16710-bdf5-449f-8838-3d828614e84f",
         "name": "MK4"
        },
        "changes": [
@@ -258,7 +258,7 @@
          "what": "name"
         },
         {
-         "key": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c",
+         "key": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
          "to": "Printers",
          "what": "category"
         },
@@ -285,13 +285,13 @@
       }
      },
      {
-      "asset_id": "bf25b4e7-86a9-4f43-b47c-a05126623b0c",
-      "created_at": "2026-11-16T11:03:17.613372Z",
-      "id": "c990b73c-2f7f-4059-aacc-0358095e0710",
+      "asset_id": "796b699d-789e-4a4b-85dc-f7ff8988ce6e",
+      "created_at": "2026-11-16T11:37:52.117952Z",
+      "id": "00f379af-3457-41c3-81b6-5a738604088d",
       "kind": "asset.created",
       "payload": {
        "asset": {
-        "id": "bf25b4e7-86a9-4f43-b47c-a05126623b0c",
+        "id": "796b699d-789e-4a4b-85dc-f7ff8988ce6e",
         "name": "Ender 3"
        },
        "changes": [
@@ -300,7 +300,7 @@
          "what": "name"
         },
         {
-         "key": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c",
+         "key": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
          "to": "Printers",
          "what": "category"
         },
@@ -315,13 +315,13 @@
       }
      },
      {
-      "asset_id": "7c33df0b-0edd-45b6-8f38-6d9be460ef86",
-      "created_at": "2026-11-16T11:03:17.631055Z",
-      "id": "36d9c0d7-302a-478f-a55e-0c597a88d48c",
+      "asset_id": "c70b535a-ed1a-46d9-b639-2fc8cc8fb404",
+      "created_at": "2026-11-16T11:37:52.131338Z",
+      "id": "a64cf5cb-1e31-4265-b774-8673540a364a",
       "kind": "asset.created",
       "payload": {
        "asset": {
-        "id": "7c33df0b-0edd-45b6-8f38-6d9be460ef86",
+        "id": "c70b535a-ed1a-46d9-b639-2fc8cc8fb404",
         "name": "Old Prusa"
        },
        "changes": [
@@ -330,7 +330,7 @@
          "what": "name"
         },
         {
-         "key": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c",
+         "key": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
          "to": "Printers",
          "what": "category"
         },
@@ -351,13 +351,13 @@
       }
      },
      {
-      "asset_id": "05eb8427-3b15-42fd-b7ef-851fa89eb517",
-      "created_at": "2026-11-16T11:03:17.647807Z",
-      "id": "a3bada83-cfd1-4ed0-bf6f-6e5e49faf7ff",
+      "asset_id": "0b84852f-8970-4994-b02e-6e30ac975124",
+      "created_at": "2026-11-16T11:37:52.145099Z",
+      "id": "09b41eb1-806d-4f5b-9647-b0847f3651c8",
       "kind": "asset.created",
       "payload": {
        "asset": {
-        "id": "05eb8427-3b15-42fd-b7ef-851fa89eb517",
+        "id": "0b84852f-8970-4994-b02e-6e30ac975124",
         "name": "Form 3"
        },
        "changes": [
@@ -366,7 +366,7 @@
          "what": "name"
         },
         {
-         "key": "233acf18-19c7-437b-bfbb-bf463c3e90b0",
+         "key": "4bf5faf5-35c3-46cd-97d7-a28ad264eebf",
          "to": "Resin printers",
          "what": "category"
         },
@@ -381,13 +381,13 @@
       }
      },
      {
-      "asset_id": "fe8e4653-b13b-4c4f-96c7-864d1af4526e",
-      "created_at": "2026-11-16T11:03:17.690895Z",
-      "id": "d8797425-bbcd-42cb-8a73-0bd1b858441e",
+      "asset_id": "642f57e2-9fa1-4c13-8b7e-9258efb9c965",
+      "created_at": "2026-11-16T11:37:52.190533Z",
+      "id": "143d20e9-4938-4c07-a5f3-e46012a4d9d9",
       "kind": "asset.edited",
       "payload": {
        "asset": {
-        "id": "fe8e4653-b13b-4c4f-96c7-864d1af4526e",
+        "id": "642f57e2-9fa1-4c13-8b7e-9258efb9c965",
         "name": "Voron 2.4"
        },
        "changes": [
@@ -403,13 +403,13 @@
       }
      },
      {
-      "asset_id": "7c33df0b-0edd-45b6-8f38-6d9be460ef86",
-      "created_at": "2026-11-16T11:03:17.710853Z",
-      "id": "daa796b5-677b-4205-96d6-35e42ff0cbd2",
+      "asset_id": "c70b535a-ed1a-46d9-b639-2fc8cc8fb404",
+      "created_at": "2026-11-16T11:37:52.205036Z",
+      "id": "74a9def0-f5fc-43fa-bce6-d32180de6ca7",
       "kind": "asset.archived",
       "payload": {
        "asset": {
-        "id": "7c33df0b-0edd-45b6-8f38-6d9be460ef86",
+        "id": "c70b535a-ed1a-46d9-b639-2fc8cc8fb404",
         "name": "Old Prusa"
        },
        "trigger": "manual"
@@ -419,15 +419,81 @@
     "more": false
    },
    "method": "GET",
-   "path": "/api/v1/events?kinds=asset.created,asset.edited,asset.archived,asset.restored&categories=dc0e71bb-909f-4dc4-a453-673bc7c8bd2c&limit=500",
+   "path": "/api/v1/events?kinds=asset.created,asset.edited,asset.archived,asset.restored&categories=0ab0563e-e4c9-4f89-b2fe-1477df526279&limit=500",
    "status": 200
+  },
+  "live": {
+   "body": {
+    "frames": [
+     {
+      "connection_id": "1a25e08f-7c59-4bb0-9cdf-d6170c2b6806",
+      "filter": {
+       "categories": [
+        "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       ],
+       "hooks": null,
+       "kinds": [
+        "asset.created",
+        "asset.edited",
+        "asset.archived",
+        "asset.restored"
+       ]
+      },
+      "type": "hello"
+     },
+     {
+      "event": {
+       "asset_id": "aaa16710-bdf5-449f-8838-3d828614e84f",
+       "created_at": "2026-11-16T11:37:52.274825Z",
+       "id": "3caa1140-04e5-42a5-8003-bce9e24de585",
+       "kind": "asset.edited",
+       "payload": {
+        "asset": {
+         "id": "aaa16710-bdf5-449f-8838-3d828614e84f",
+         "name": "MK4"
+        },
+        "changes": [
+         {
+          "from": "http://192.168.1.52",
+          "key": "address",
+          "label": "Address",
+          "to": "http://192.168.1.62",
+          "what": "field"
+         }
+        ],
+        "trigger": "manual"
+       }
+      },
+      "type": "event"
+     },
+     {
+      "event": {
+       "asset_id": "c70b535a-ed1a-46d9-b639-2fc8cc8fb404",
+       "created_at": "2026-11-16T11:37:52.287674Z",
+       "id": "d2a38875-2ea3-4270-b4cd-9d991cd0cadd",
+       "kind": "asset.restored",
+       "payload": {
+        "asset": {
+         "id": "c70b535a-ed1a-46d9-b639-2fc8cc8fb404",
+         "name": "Old Prusa"
+        },
+        "trigger": "manual"
+       }
+      },
+      "type": "event"
+     }
+    ]
+   },
+   "method": "GET",
+   "path": "/api/v1/events/live?kinds=asset.created,asset.edited,asset.archived,asset.restored&categories=0ab0563e-e4c9-4f89-b2fe-1477df526279",
+   "status": 101
   },
   "live_without_websocket": {
    "body": {
     "error": "Connect with a WebSocket (version 13) to receive events live"
    },
    "method": "GET",
-   "path": "/api/v1/events/live?kinds=asset.created,asset.edited,asset.archived,asset.restored&categories=dc0e71bb-909f-4dc4-a453-673bc7c8bd2c",
+   "path": "/api/v1/events/live?kinds=asset.created,asset.edited,asset.archived,asset.restored&categories=0ab0563e-e4c9-4f89-b2fe-1477df526279",
    "status": 426
   },
   "missing_asset": {
@@ -443,41 +509,41 @@
     "error": "Authentication required"
    },
    "method": "GET",
-   "path": "/api/v1/assets?category_id=dc0e71bb-909f-4dc4-a453-673bc7c8bd2c",
+   "path": "/api/v1/assets?category_id=0ab0563e-e4c9-4f89-b2fe-1477df526279",
    "status": 401
   },
   "printer_fields": {
    "body": {
-    "category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c",
+    "category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
     "fields": [
      {
       "field": {
-       "created_at": "2026-11-16T11:03:17.44448913Z",
-       "id": "eede8827-43c1-4596-8e66-09d46d8b5ce1",
+       "created_at": "2026-11-16T11:37:51.996523503Z",
+       "id": "9d437bfd-c590-46a8-a3af-5ac17747c77f",
        "key": "address",
        "label": "Address",
-       "updated_at": "2026-11-16T11:03:17.44448913Z",
+       "updated_at": "2026-11-16T11:37:51.996523503Z",
        "validation_type": "text"
       },
       "is_required": false,
-      "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+      "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
      },
      {
       "field": {
-       "created_at": "2026-11-16T11:03:17.448690114Z",
-       "id": "c0ec9391-c090-4096-9d9a-17272c2b87d0",
+       "created_at": "2026-11-16T11:37:52.001232176Z",
+       "id": "f9b40a11-e045-42ea-9180-38cebd2a9087",
        "key": "camera",
        "label": "Camera",
-       "updated_at": "2026-11-16T11:03:17.448690114Z",
+       "updated_at": "2026-11-16T11:37:52.001232176Z",
        "validation_type": "url"
       },
       "is_required": false,
-      "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+      "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
      },
      {
       "field": {
-       "created_at": "2026-11-16T11:03:17.437873686Z",
-       "id": "f1a0e447-d0e3-40c5-be05-abee9562aaf7",
+       "created_at": "2026-11-16T11:37:51.991688074Z",
+       "id": "65776958-86d0-4eef-bc08-2c608f24b7b6",
        "key": "connection",
        "label": "Connection",
        "options": {
@@ -504,52 +570,52 @@
          }
         ]
        },
-       "updated_at": "2026-11-16T11:03:17.437873686Z",
+       "updated_at": "2026-11-16T11:37:51.991688074Z",
        "validation_type": "select"
       },
       "is_required": false,
-      "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+      "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
      },
      {
       "field": {
-       "created_at": "2026-11-16T11:03:17.457166115Z",
-       "id": "a8ea0073-ae4c-4b68-973c-6187a33217f0",
+       "created_at": "2026-11-16T11:37:52.008949872Z",
+       "id": "b2531cc7-33f5-4c5c-a79d-9d9ca956814d",
        "key": "materials",
        "label": "Materials",
-       "updated_at": "2026-11-16T11:03:17.457166115Z",
+       "updated_at": "2026-11-16T11:37:52.008949872Z",
        "validation_type": "text"
       },
       "is_required": false,
-      "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+      "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
      },
      {
       "field": {
-       "created_at": "2026-11-16T11:03:17.453087065Z",
-       "id": "2bf88a32-7b3f-4426-ad09-147944bfff10",
+       "created_at": "2026-11-16T11:37:52.005165929Z",
+       "id": "0efad111-0f8d-4271-a6d1-ebc7d3bcd246",
        "key": "model",
        "label": "Model",
-       "updated_at": "2026-11-16T11:03:17.453087065Z",
+       "updated_at": "2026-11-16T11:37:52.005165929Z",
        "validation_type": "text"
       },
       "is_required": false,
-      "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+      "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
      },
      {
       "field": {
-       "created_at": "2026-11-16T11:03:17.465495452Z",
-       "id": "bee9bc63-f216-46eb-b7d7-f60ea3c7ab16",
+       "created_at": "2026-11-16T11:37:52.016405015Z",
+       "id": "0348bdf1-5e97-4c8a-a7af-f4dfa72beeed",
        "key": "serial",
        "label": "Serial number",
-       "updated_at": "2026-11-16T11:03:17.465495452Z",
+       "updated_at": "2026-11-16T11:37:52.016405015Z",
        "validation_type": "text"
       },
       "is_required": false,
-      "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+      "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
      },
      {
       "field": {
-       "created_at": "2026-11-16T11:03:17.461297821Z",
-       "id": "efeab938-711b-4883-b9a6-5209297e58aa",
+       "created_at": "2026-11-16T11:37:52.012518646Z",
+       "id": "42753882-34b4-4a75-8ab4-7d3f2e8577ee",
        "key": "training",
        "label": "Training",
        "options": {
@@ -564,16 +630,16 @@
          }
         ]
        },
-       "updated_at": "2026-11-16T11:03:17.461297821Z",
+       "updated_at": "2026-11-16T11:37:52.012518646Z",
        "validation_type": "select"
       },
       "is_required": false,
-      "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+      "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
      }
     ]
    },
    "method": "GET",
-   "path": "/api/v1/categories/dc0e71bb-909f-4dc4-a453-673bc7c8bd2c/fields",
+   "path": "/api/v1/categories/0ab0563e-e4c9-4f89-b2fe-1477df526279/fields",
    "status": 200
   },
   "printers": {
@@ -583,25 +649,25 @@
       "asset": {
        "condition": "ok",
        "condition_note": "",
-       "created_at": "2026-11-16T11:03:17.609864834Z",
+       "created_at": "2026-11-16T11:37:52.116194981Z",
        "icon_name": null,
-       "id": "bf25b4e7-86a9-4f43-b47c-a05126623b0c",
+       "id": "796b699d-789e-4a4b-85dc-f7ff8988ce6e",
        "label_icon_name": null,
        "name": "Ender 3",
        "stock": null,
-       "updated_at": "2026-11-16T11:03:17.609864834Z"
+       "updated_at": "2026-11-16T11:37:52.116194981Z"
       },
       "categories": [
        {
         "color_hex": "#3b82f6",
-        "created_at": "2026-11-16T11:03:17.469757023Z",
+        "created_at": "2026-11-16T11:37:52.020766695Z",
         "effective_review": {
          "enabled": false,
          "months": 0,
          "on_edit": "",
          "self_verify": false
         },
-        "id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c",
+        "id": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
         "implies": [],
         "included_by": [],
         "is_consumable": false,
@@ -619,7 +685,7 @@
         },
         "scan_template_id": null,
         "unit": "",
-        "updated_at": "2026-11-16T11:03:17.469757023Z",
+        "updated_at": "2026-11-16T11:37:52.020766695Z",
         "vendor_ids": []
        }
       ],
@@ -628,32 +694,32 @@
       "effective_fields": [
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.44448913Z",
-         "id": "eede8827-43c1-4596-8e66-09d46d8b5ce1",
+         "created_at": "2026-11-16T11:37:51.996523503Z",
+         "id": "9d437bfd-c590-46a8-a3af-5ac17747c77f",
          "key": "address",
          "label": "Address",
-         "updated_at": "2026-11-16T11:03:17.44448913Z",
+         "updated_at": "2026-11-16T11:37:51.996523503Z",
          "validation_type": "text"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.448690114Z",
-         "id": "c0ec9391-c090-4096-9d9a-17272c2b87d0",
+         "created_at": "2026-11-16T11:37:52.001232176Z",
+         "id": "f9b40a11-e045-42ea-9180-38cebd2a9087",
          "key": "camera",
          "label": "Camera",
-         "updated_at": "2026-11-16T11:03:17.448690114Z",
+         "updated_at": "2026-11-16T11:37:52.001232176Z",
          "validation_type": "url"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.437873686Z",
-         "id": "f1a0e447-d0e3-40c5-be05-abee9562aaf7",
+         "created_at": "2026-11-16T11:37:51.991688074Z",
+         "id": "65776958-86d0-4eef-bc08-2c608f24b7b6",
          "key": "connection",
          "label": "Connection",
          "options": {
@@ -680,52 +746,52 @@
            }
           ]
          },
-         "updated_at": "2026-11-16T11:03:17.437873686Z",
+         "updated_at": "2026-11-16T11:37:51.991688074Z",
          "validation_type": "select"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.457166115Z",
-         "id": "a8ea0073-ae4c-4b68-973c-6187a33217f0",
+         "created_at": "2026-11-16T11:37:52.008949872Z",
+         "id": "b2531cc7-33f5-4c5c-a79d-9d9ca956814d",
          "key": "materials",
          "label": "Materials",
-         "updated_at": "2026-11-16T11:03:17.457166115Z",
+         "updated_at": "2026-11-16T11:37:52.008949872Z",
          "validation_type": "text"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.453087065Z",
-         "id": "2bf88a32-7b3f-4426-ad09-147944bfff10",
+         "created_at": "2026-11-16T11:37:52.005165929Z",
+         "id": "0efad111-0f8d-4271-a6d1-ebc7d3bcd246",
          "key": "model",
          "label": "Model",
-         "updated_at": "2026-11-16T11:03:17.453087065Z",
+         "updated_at": "2026-11-16T11:37:52.005165929Z",
          "validation_type": "text"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.465495452Z",
-         "id": "bee9bc63-f216-46eb-b7d7-f60ea3c7ab16",
+         "created_at": "2026-11-16T11:37:52.016405015Z",
+         "id": "0348bdf1-5e97-4c8a-a7af-f4dfa72beeed",
          "key": "serial",
          "label": "Serial number",
-         "updated_at": "2026-11-16T11:03:17.465495452Z",
+         "updated_at": "2026-11-16T11:37:52.016405015Z",
          "validation_type": "text"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.461297821Z",
-         "id": "efeab938-711b-4883-b9a6-5209297e58aa",
+         "created_at": "2026-11-16T11:37:52.012518646Z",
+         "id": "42753882-34b4-4a75-8ab4-7d3f2e8577ee",
          "key": "training",
          "label": "Training",
          "options": {
@@ -740,11 +806,11 @@
            }
           ]
          },
-         "updated_at": "2026-11-16T11:03:17.461297821Z",
+         "updated_at": "2026-11-16T11:37:52.012518646Z",
          "validation_type": "select"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        }
       ],
       "field_values": {
@@ -785,25 +851,25 @@
       "asset": {
        "condition": "ok",
        "condition_note": "",
-       "created_at": "2026-11-16T11:03:17.590128538Z",
+       "created_at": "2026-11-16T11:37:52.104284739Z",
        "icon_name": null,
-       "id": "84c3f43e-d8ec-458d-b0e0-0b6a20738a07",
+       "id": "aaa16710-bdf5-449f-8838-3d828614e84f",
        "label_icon_name": null,
        "name": "MK4",
        "stock": null,
-       "updated_at": "2026-11-16T11:03:17.590128538Z"
+       "updated_at": "2026-11-16T11:37:52.104284739Z"
       },
       "categories": [
        {
         "color_hex": "#3b82f6",
-        "created_at": "2026-11-16T11:03:17.469757023Z",
+        "created_at": "2026-11-16T11:37:52.020766695Z",
         "effective_review": {
          "enabled": false,
          "months": 0,
          "on_edit": "",
          "self_verify": false
         },
-        "id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c",
+        "id": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
         "implies": [],
         "included_by": [],
         "is_consumable": false,
@@ -821,7 +887,7 @@
         },
         "scan_template_id": null,
         "unit": "",
-        "updated_at": "2026-11-16T11:03:17.469757023Z",
+        "updated_at": "2026-11-16T11:37:52.020766695Z",
         "vendor_ids": []
        }
       ],
@@ -830,32 +896,32 @@
       "effective_fields": [
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.44448913Z",
-         "id": "eede8827-43c1-4596-8e66-09d46d8b5ce1",
+         "created_at": "2026-11-16T11:37:51.996523503Z",
+         "id": "9d437bfd-c590-46a8-a3af-5ac17747c77f",
          "key": "address",
          "label": "Address",
-         "updated_at": "2026-11-16T11:03:17.44448913Z",
+         "updated_at": "2026-11-16T11:37:51.996523503Z",
          "validation_type": "text"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.448690114Z",
-         "id": "c0ec9391-c090-4096-9d9a-17272c2b87d0",
+         "created_at": "2026-11-16T11:37:52.001232176Z",
+         "id": "f9b40a11-e045-42ea-9180-38cebd2a9087",
          "key": "camera",
          "label": "Camera",
-         "updated_at": "2026-11-16T11:03:17.448690114Z",
+         "updated_at": "2026-11-16T11:37:52.001232176Z",
          "validation_type": "url"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.437873686Z",
-         "id": "f1a0e447-d0e3-40c5-be05-abee9562aaf7",
+         "created_at": "2026-11-16T11:37:51.991688074Z",
+         "id": "65776958-86d0-4eef-bc08-2c608f24b7b6",
          "key": "connection",
          "label": "Connection",
          "options": {
@@ -882,52 +948,52 @@
            }
           ]
          },
-         "updated_at": "2026-11-16T11:03:17.437873686Z",
+         "updated_at": "2026-11-16T11:37:51.991688074Z",
          "validation_type": "select"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.457166115Z",
-         "id": "a8ea0073-ae4c-4b68-973c-6187a33217f0",
+         "created_at": "2026-11-16T11:37:52.008949872Z",
+         "id": "b2531cc7-33f5-4c5c-a79d-9d9ca956814d",
          "key": "materials",
          "label": "Materials",
-         "updated_at": "2026-11-16T11:03:17.457166115Z",
+         "updated_at": "2026-11-16T11:37:52.008949872Z",
          "validation_type": "text"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.453087065Z",
-         "id": "2bf88a32-7b3f-4426-ad09-147944bfff10",
+         "created_at": "2026-11-16T11:37:52.005165929Z",
+         "id": "0efad111-0f8d-4271-a6d1-ebc7d3bcd246",
          "key": "model",
          "label": "Model",
-         "updated_at": "2026-11-16T11:03:17.453087065Z",
+         "updated_at": "2026-11-16T11:37:52.005165929Z",
          "validation_type": "text"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.465495452Z",
-         "id": "bee9bc63-f216-46eb-b7d7-f60ea3c7ab16",
+         "created_at": "2026-11-16T11:37:52.016405015Z",
+         "id": "0348bdf1-5e97-4c8a-a7af-f4dfa72beeed",
          "key": "serial",
          "label": "Serial number",
-         "updated_at": "2026-11-16T11:03:17.465495452Z",
+         "updated_at": "2026-11-16T11:37:52.016405015Z",
          "validation_type": "text"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.461297821Z",
-         "id": "efeab938-711b-4883-b9a6-5209297e58aa",
+         "created_at": "2026-11-16T11:37:52.012518646Z",
+         "id": "42753882-34b4-4a75-8ab4-7d3f2e8577ee",
          "key": "training",
          "label": "Training",
          "options": {
@@ -942,11 +1008,11 @@
            }
           ]
          },
-         "updated_at": "2026-11-16T11:03:17.461297821Z",
+         "updated_at": "2026-11-16T11:37:52.012518646Z",
          "validation_type": "select"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        }
       ],
       "field_values": {
@@ -989,25 +1055,25 @@
       "asset": {
        "condition": "ok",
        "condition_note": "",
-       "created_at": "2026-11-16T11:03:17.564440739Z",
+       "created_at": "2026-11-16T11:37:52.090405925Z",
        "icon_name": null,
-       "id": "fe8e4653-b13b-4c4f-96c7-864d1af4526e",
+       "id": "642f57e2-9fa1-4c13-8b7e-9258efb9c965",
        "label_icon_name": null,
        "name": "Voron 2.4",
        "stock": null,
-       "updated_at": "2026-11-16T11:03:17.688177577Z"
+       "updated_at": "2026-11-16T11:37:52.188482495Z"
       },
       "categories": [
        {
         "color_hex": "#3b82f6",
-        "created_at": "2026-11-16T11:03:17.469757023Z",
+        "created_at": "2026-11-16T11:37:52.020766695Z",
         "effective_review": {
          "enabled": false,
          "months": 0,
          "on_edit": "",
          "self_verify": false
         },
-        "id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c",
+        "id": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
         "implies": [],
         "included_by": [],
         "is_consumable": false,
@@ -1025,7 +1091,7 @@
         },
         "scan_template_id": null,
         "unit": "",
-        "updated_at": "2026-11-16T11:03:17.469757023Z",
+        "updated_at": "2026-11-16T11:37:52.020766695Z",
         "vendor_ids": []
        }
       ],
@@ -1034,32 +1100,32 @@
       "effective_fields": [
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.44448913Z",
-         "id": "eede8827-43c1-4596-8e66-09d46d8b5ce1",
+         "created_at": "2026-11-16T11:37:51.996523503Z",
+         "id": "9d437bfd-c590-46a8-a3af-5ac17747c77f",
          "key": "address",
          "label": "Address",
-         "updated_at": "2026-11-16T11:03:17.44448913Z",
+         "updated_at": "2026-11-16T11:37:51.996523503Z",
          "validation_type": "text"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.448690114Z",
-         "id": "c0ec9391-c090-4096-9d9a-17272c2b87d0",
+         "created_at": "2026-11-16T11:37:52.001232176Z",
+         "id": "f9b40a11-e045-42ea-9180-38cebd2a9087",
          "key": "camera",
          "label": "Camera",
-         "updated_at": "2026-11-16T11:03:17.448690114Z",
+         "updated_at": "2026-11-16T11:37:52.001232176Z",
          "validation_type": "url"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.437873686Z",
-         "id": "f1a0e447-d0e3-40c5-be05-abee9562aaf7",
+         "created_at": "2026-11-16T11:37:51.991688074Z",
+         "id": "65776958-86d0-4eef-bc08-2c608f24b7b6",
          "key": "connection",
          "label": "Connection",
          "options": {
@@ -1086,52 +1152,52 @@
            }
           ]
          },
-         "updated_at": "2026-11-16T11:03:17.437873686Z",
+         "updated_at": "2026-11-16T11:37:51.991688074Z",
          "validation_type": "select"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.457166115Z",
-         "id": "a8ea0073-ae4c-4b68-973c-6187a33217f0",
+         "created_at": "2026-11-16T11:37:52.008949872Z",
+         "id": "b2531cc7-33f5-4c5c-a79d-9d9ca956814d",
          "key": "materials",
          "label": "Materials",
-         "updated_at": "2026-11-16T11:03:17.457166115Z",
+         "updated_at": "2026-11-16T11:37:52.008949872Z",
          "validation_type": "text"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.453087065Z",
-         "id": "2bf88a32-7b3f-4426-ad09-147944bfff10",
+         "created_at": "2026-11-16T11:37:52.005165929Z",
+         "id": "0efad111-0f8d-4271-a6d1-ebc7d3bcd246",
          "key": "model",
          "label": "Model",
-         "updated_at": "2026-11-16T11:03:17.453087065Z",
+         "updated_at": "2026-11-16T11:37:52.005165929Z",
          "validation_type": "text"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.465495452Z",
-         "id": "bee9bc63-f216-46eb-b7d7-f60ea3c7ab16",
+         "created_at": "2026-11-16T11:37:52.016405015Z",
+         "id": "0348bdf1-5e97-4c8a-a7af-f4dfa72beeed",
          "key": "serial",
          "label": "Serial number",
-         "updated_at": "2026-11-16T11:03:17.465495452Z",
+         "updated_at": "2026-11-16T11:37:52.016405015Z",
          "validation_type": "text"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.461297821Z",
-         "id": "efeab938-711b-4883-b9a6-5209297e58aa",
+         "created_at": "2026-11-16T11:37:52.012518646Z",
+         "id": "42753882-34b4-4a75-8ab4-7d3f2e8577ee",
          "key": "training",
          "label": "Training",
          "options": {
@@ -1146,11 +1212,11 @@
            }
           ]
          },
-         "updated_at": "2026-11-16T11:03:17.461297821Z",
+         "updated_at": "2026-11-16T11:37:52.012518646Z",
          "validation_type": "select"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        }
       ],
       "field_values": {
@@ -1195,25 +1261,25 @@
       "asset": {
        "condition": "ok",
        "condition_note": "",
-       "created_at": "2026-11-16T11:03:17.539313127Z",
+       "created_at": "2026-11-16T11:37:52.077027801Z",
        "icon_name": null,
-       "id": "c88097c4-26e7-4d1b-a445-f16a44a80c7b",
+       "id": "28c31053-26dc-4e28-af31-e4b4fdc5b9e0",
        "label_icon_name": null,
        "name": "X1 Carbon",
        "stock": null,
-       "updated_at": "2026-11-16T11:03:17.539313127Z"
+       "updated_at": "2026-11-16T11:37:52.077027801Z"
       },
       "categories": [
        {
         "color_hex": "#3b82f6",
-        "created_at": "2026-11-16T11:03:17.469757023Z",
+        "created_at": "2026-11-16T11:37:52.020766695Z",
         "effective_review": {
          "enabled": false,
          "months": 0,
          "on_edit": "",
          "self_verify": false
         },
-        "id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c",
+        "id": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
         "implies": [],
         "included_by": [],
         "is_consumable": false,
@@ -1231,7 +1297,7 @@
         },
         "scan_template_id": null,
         "unit": "",
-        "updated_at": "2026-11-16T11:03:17.469757023Z",
+        "updated_at": "2026-11-16T11:37:52.020766695Z",
         "vendor_ids": []
        }
       ],
@@ -1240,32 +1306,32 @@
       "effective_fields": [
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.44448913Z",
-         "id": "eede8827-43c1-4596-8e66-09d46d8b5ce1",
+         "created_at": "2026-11-16T11:37:51.996523503Z",
+         "id": "9d437bfd-c590-46a8-a3af-5ac17747c77f",
          "key": "address",
          "label": "Address",
-         "updated_at": "2026-11-16T11:03:17.44448913Z",
+         "updated_at": "2026-11-16T11:37:51.996523503Z",
          "validation_type": "text"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.448690114Z",
-         "id": "c0ec9391-c090-4096-9d9a-17272c2b87d0",
+         "created_at": "2026-11-16T11:37:52.001232176Z",
+         "id": "f9b40a11-e045-42ea-9180-38cebd2a9087",
          "key": "camera",
          "label": "Camera",
-         "updated_at": "2026-11-16T11:03:17.448690114Z",
+         "updated_at": "2026-11-16T11:37:52.001232176Z",
          "validation_type": "url"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.437873686Z",
-         "id": "f1a0e447-d0e3-40c5-be05-abee9562aaf7",
+         "created_at": "2026-11-16T11:37:51.991688074Z",
+         "id": "65776958-86d0-4eef-bc08-2c608f24b7b6",
          "key": "connection",
          "label": "Connection",
          "options": {
@@ -1292,52 +1358,52 @@
            }
           ]
          },
-         "updated_at": "2026-11-16T11:03:17.437873686Z",
+         "updated_at": "2026-11-16T11:37:51.991688074Z",
          "validation_type": "select"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.457166115Z",
-         "id": "a8ea0073-ae4c-4b68-973c-6187a33217f0",
+         "created_at": "2026-11-16T11:37:52.008949872Z",
+         "id": "b2531cc7-33f5-4c5c-a79d-9d9ca956814d",
          "key": "materials",
          "label": "Materials",
-         "updated_at": "2026-11-16T11:03:17.457166115Z",
+         "updated_at": "2026-11-16T11:37:52.008949872Z",
          "validation_type": "text"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.453087065Z",
-         "id": "2bf88a32-7b3f-4426-ad09-147944bfff10",
+         "created_at": "2026-11-16T11:37:52.005165929Z",
+         "id": "0efad111-0f8d-4271-a6d1-ebc7d3bcd246",
          "key": "model",
          "label": "Model",
-         "updated_at": "2026-11-16T11:03:17.453087065Z",
+         "updated_at": "2026-11-16T11:37:52.005165929Z",
          "validation_type": "text"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.465495452Z",
-         "id": "bee9bc63-f216-46eb-b7d7-f60ea3c7ab16",
+         "created_at": "2026-11-16T11:37:52.016405015Z",
+         "id": "0348bdf1-5e97-4c8a-a7af-f4dfa72beeed",
          "key": "serial",
          "label": "Serial number",
-         "updated_at": "2026-11-16T11:03:17.465495452Z",
+         "updated_at": "2026-11-16T11:37:52.016405015Z",
          "validation_type": "text"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.461297821Z",
-         "id": "efeab938-711b-4883-b9a6-5209297e58aa",
+         "created_at": "2026-11-16T11:37:52.012518646Z",
+         "id": "42753882-34b4-4a75-8ab4-7d3f2e8577ee",
          "key": "training",
          "label": "Training",
          "options": {
@@ -1352,11 +1418,11 @@
            }
           ]
          },
-         "updated_at": "2026-11-16T11:03:17.461297821Z",
+         "updated_at": "2026-11-16T11:37:52.012518646Z",
          "validation_type": "select"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        }
       ],
       "field_values": {
@@ -1402,7 +1468,7 @@
     ]
    },
    "method": "GET",
-   "path": "/api/v1/assets?category_id=dc0e71bb-909f-4dc4-a453-673bc7c8bd2c",
+   "path": "/api/v1/assets?category_id=0ab0563e-e4c9-4f89-b2fe-1477df526279",
    "status": 200
   },
   "printers_archived": {
@@ -1410,28 +1476,28 @@
     "assets": [
      {
       "asset": {
-       "archived_at": "2026-11-16T11:03:17.710387275Z",
+       "archived_at": "2026-11-16T11:37:52.204790214Z",
        "condition": "ok",
        "condition_note": "",
-       "created_at": "2026-11-16T11:03:17.628608858Z",
+       "created_at": "2026-11-16T11:37:52.128343987Z",
        "icon_name": null,
-       "id": "7c33df0b-0edd-45b6-8f38-6d9be460ef86",
+       "id": "c70b535a-ed1a-46d9-b639-2fc8cc8fb404",
        "label_icon_name": null,
        "name": "Old Prusa",
        "stock": null,
-       "updated_at": "2026-11-16T11:03:17.710387275Z"
+       "updated_at": "2026-11-16T11:37:52.204790214Z"
       },
       "categories": [
        {
         "color_hex": "#3b82f6",
-        "created_at": "2026-11-16T11:03:17.469757023Z",
+        "created_at": "2026-11-16T11:37:52.020766695Z",
         "effective_review": {
          "enabled": false,
          "months": 0,
          "on_edit": "",
          "self_verify": false
         },
-        "id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c",
+        "id": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
         "implies": [],
         "included_by": [],
         "is_consumable": false,
@@ -1449,7 +1515,7 @@
         },
         "scan_template_id": null,
         "unit": "",
-        "updated_at": "2026-11-16T11:03:17.469757023Z",
+        "updated_at": "2026-11-16T11:37:52.020766695Z",
         "vendor_ids": []
        }
       ],
@@ -1458,32 +1524,32 @@
       "effective_fields": [
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.44448913Z",
-         "id": "eede8827-43c1-4596-8e66-09d46d8b5ce1",
+         "created_at": "2026-11-16T11:37:51.996523503Z",
+         "id": "9d437bfd-c590-46a8-a3af-5ac17747c77f",
          "key": "address",
          "label": "Address",
-         "updated_at": "2026-11-16T11:03:17.44448913Z",
+         "updated_at": "2026-11-16T11:37:51.996523503Z",
          "validation_type": "text"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.448690114Z",
-         "id": "c0ec9391-c090-4096-9d9a-17272c2b87d0",
+         "created_at": "2026-11-16T11:37:52.001232176Z",
+         "id": "f9b40a11-e045-42ea-9180-38cebd2a9087",
          "key": "camera",
          "label": "Camera",
-         "updated_at": "2026-11-16T11:03:17.448690114Z",
+         "updated_at": "2026-11-16T11:37:52.001232176Z",
          "validation_type": "url"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.437873686Z",
-         "id": "f1a0e447-d0e3-40c5-be05-abee9562aaf7",
+         "created_at": "2026-11-16T11:37:51.991688074Z",
+         "id": "65776958-86d0-4eef-bc08-2c608f24b7b6",
          "key": "connection",
          "label": "Connection",
          "options": {
@@ -1510,52 +1576,52 @@
            }
           ]
          },
-         "updated_at": "2026-11-16T11:03:17.437873686Z",
+         "updated_at": "2026-11-16T11:37:51.991688074Z",
          "validation_type": "select"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.457166115Z",
-         "id": "a8ea0073-ae4c-4b68-973c-6187a33217f0",
+         "created_at": "2026-11-16T11:37:52.008949872Z",
+         "id": "b2531cc7-33f5-4c5c-a79d-9d9ca956814d",
          "key": "materials",
          "label": "Materials",
-         "updated_at": "2026-11-16T11:03:17.457166115Z",
+         "updated_at": "2026-11-16T11:37:52.008949872Z",
          "validation_type": "text"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.453087065Z",
-         "id": "2bf88a32-7b3f-4426-ad09-147944bfff10",
+         "created_at": "2026-11-16T11:37:52.005165929Z",
+         "id": "0efad111-0f8d-4271-a6d1-ebc7d3bcd246",
          "key": "model",
          "label": "Model",
-         "updated_at": "2026-11-16T11:03:17.453087065Z",
+         "updated_at": "2026-11-16T11:37:52.005165929Z",
          "validation_type": "text"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.465495452Z",
-         "id": "bee9bc63-f216-46eb-b7d7-f60ea3c7ab16",
+         "created_at": "2026-11-16T11:37:52.016405015Z",
+         "id": "0348bdf1-5e97-4c8a-a7af-f4dfa72beeed",
          "key": "serial",
          "label": "Serial number",
-         "updated_at": "2026-11-16T11:03:17.465495452Z",
+         "updated_at": "2026-11-16T11:37:52.016405015Z",
          "validation_type": "text"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        },
        {
         "field": {
-         "created_at": "2026-11-16T11:03:17.461297821Z",
-         "id": "efeab938-711b-4883-b9a6-5209297e58aa",
+         "created_at": "2026-11-16T11:37:52.012518646Z",
+         "id": "42753882-34b4-4a75-8ab4-7d3f2e8577ee",
          "key": "training",
          "label": "Training",
          "options": {
@@ -1570,11 +1636,11 @@
            }
           ]
          },
-         "updated_at": "2026-11-16T11:03:17.461297821Z",
+         "updated_at": "2026-11-16T11:37:52.012518646Z",
          "validation_type": "select"
         },
         "is_required": false,
-        "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
        }
       ],
       "field_values": {
@@ -1615,7 +1681,7 @@
     ]
    },
    "method": "GET",
-   "path": "/api/v1/assets?archived=true&category_id=dc0e71bb-909f-4dc4-a453-673bc7c8bd2c",
+   "path": "/api/v1/assets?archived=true&category_id=0ab0563e-e4c9-4f89-b2fe-1477df526279",
    "status": 200
   },
   "x1": {
@@ -1624,25 +1690,25 @@
      "asset": {
       "condition": "ok",
       "condition_note": "",
-      "created_at": "2026-11-16T11:03:17.539313127Z",
+      "created_at": "2026-11-16T11:37:52.077027801Z",
       "icon_name": null,
-      "id": "c88097c4-26e7-4d1b-a445-f16a44a80c7b",
+      "id": "28c31053-26dc-4e28-af31-e4b4fdc5b9e0",
       "label_icon_name": null,
       "name": "X1 Carbon",
       "stock": null,
-      "updated_at": "2026-11-16T11:03:17.539313127Z"
+      "updated_at": "2026-11-16T11:37:52.077027801Z"
      },
      "categories": [
       {
        "color_hex": "#3b82f6",
-       "created_at": "2026-11-16T11:03:17.469757023Z",
+       "created_at": "2026-11-16T11:37:52.020766695Z",
        "effective_review": {
         "enabled": false,
         "months": 0,
         "on_edit": "",
         "self_verify": false
        },
-       "id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c",
+       "id": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
        "implies": [],
        "included_by": [],
        "is_consumable": false,
@@ -1660,7 +1726,7 @@
        },
        "scan_template_id": null,
        "unit": "",
-       "updated_at": "2026-11-16T11:03:17.469757023Z",
+       "updated_at": "2026-11-16T11:37:52.020766695Z",
        "vendor_ids": []
       }
      ],
@@ -1669,32 +1735,32 @@
      "effective_fields": [
       {
        "field": {
-        "created_at": "2026-11-16T11:03:17.44448913Z",
-        "id": "eede8827-43c1-4596-8e66-09d46d8b5ce1",
+        "created_at": "2026-11-16T11:37:51.996523503Z",
+        "id": "9d437bfd-c590-46a8-a3af-5ac17747c77f",
         "key": "address",
         "label": "Address",
-        "updated_at": "2026-11-16T11:03:17.44448913Z",
+        "updated_at": "2026-11-16T11:37:51.996523503Z",
         "validation_type": "text"
        },
        "is_required": false,
-       "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+       "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
       },
       {
        "field": {
-        "created_at": "2026-11-16T11:03:17.448690114Z",
-        "id": "c0ec9391-c090-4096-9d9a-17272c2b87d0",
+        "created_at": "2026-11-16T11:37:52.001232176Z",
+        "id": "f9b40a11-e045-42ea-9180-38cebd2a9087",
         "key": "camera",
         "label": "Camera",
-        "updated_at": "2026-11-16T11:03:17.448690114Z",
+        "updated_at": "2026-11-16T11:37:52.001232176Z",
         "validation_type": "url"
        },
        "is_required": false,
-       "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+       "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
       },
       {
        "field": {
-        "created_at": "2026-11-16T11:03:17.437873686Z",
-        "id": "f1a0e447-d0e3-40c5-be05-abee9562aaf7",
+        "created_at": "2026-11-16T11:37:51.991688074Z",
+        "id": "65776958-86d0-4eef-bc08-2c608f24b7b6",
         "key": "connection",
         "label": "Connection",
         "options": {
@@ -1721,52 +1787,52 @@
           }
          ]
         },
-        "updated_at": "2026-11-16T11:03:17.437873686Z",
+        "updated_at": "2026-11-16T11:37:51.991688074Z",
         "validation_type": "select"
        },
        "is_required": false,
-       "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+       "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
       },
       {
        "field": {
-        "created_at": "2026-11-16T11:03:17.457166115Z",
-        "id": "a8ea0073-ae4c-4b68-973c-6187a33217f0",
+        "created_at": "2026-11-16T11:37:52.008949872Z",
+        "id": "b2531cc7-33f5-4c5c-a79d-9d9ca956814d",
         "key": "materials",
         "label": "Materials",
-        "updated_at": "2026-11-16T11:03:17.457166115Z",
+        "updated_at": "2026-11-16T11:37:52.008949872Z",
         "validation_type": "text"
        },
        "is_required": false,
-       "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+       "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
       },
       {
        "field": {
-        "created_at": "2026-11-16T11:03:17.453087065Z",
-        "id": "2bf88a32-7b3f-4426-ad09-147944bfff10",
+        "created_at": "2026-11-16T11:37:52.005165929Z",
+        "id": "0efad111-0f8d-4271-a6d1-ebc7d3bcd246",
         "key": "model",
         "label": "Model",
-        "updated_at": "2026-11-16T11:03:17.453087065Z",
+        "updated_at": "2026-11-16T11:37:52.005165929Z",
         "validation_type": "text"
        },
        "is_required": false,
-       "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+       "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
       },
       {
        "field": {
-        "created_at": "2026-11-16T11:03:17.465495452Z",
-        "id": "bee9bc63-f216-46eb-b7d7-f60ea3c7ab16",
+        "created_at": "2026-11-16T11:37:52.016405015Z",
+        "id": "0348bdf1-5e97-4c8a-a7af-f4dfa72beeed",
         "key": "serial",
         "label": "Serial number",
-        "updated_at": "2026-11-16T11:03:17.465495452Z",
+        "updated_at": "2026-11-16T11:37:52.016405015Z",
         "validation_type": "text"
        },
        "is_required": false,
-       "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+       "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
       },
       {
        "field": {
-        "created_at": "2026-11-16T11:03:17.461297821Z",
-        "id": "efeab938-711b-4883-b9a6-5209297e58aa",
+        "created_at": "2026-11-16T11:37:52.012518646Z",
+        "id": "42753882-34b4-4a75-8ab4-7d3f2e8577ee",
         "key": "training",
         "label": "Training",
         "options": {
@@ -1781,11 +1847,11 @@
           }
          ]
         },
-        "updated_at": "2026-11-16T11:03:17.461297821Z",
+        "updated_at": "2026-11-16T11:37:52.012518646Z",
         "validation_type": "select"
        },
        "is_required": false,
-       "source_category_id": "dc0e71bb-909f-4dc4-a453-673bc7c8bd2c"
+       "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
       }
      ],
      "field_values": {
@@ -1830,7 +1896,7 @@
     }
    },
    "method": "GET",
-   "path": "/api/v1/assets/c88097c4-26e7-4d1b-a445-f16a44a80c7b",
+   "path": "/api/v1/assets/28c31053-26dc-4e28-af31-e4b4fdc5b9e0",
    "status": 200
   }
  }

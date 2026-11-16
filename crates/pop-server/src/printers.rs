@@ -181,3 +181,24 @@ impl HealthCheck for BamHealth {
         })
     }
 }
+
+/// BAM!'s live connection is open (#22): while it is not, POP's printers are
+/// as BAM! last said, and changes wait for it to reconnect.
+pub struct BamLiveHealth(pub tokio::sync::watch::Receiver<pop_integrations::sync::View>);
+
+impl HealthCheck for BamLiveHealth {
+    fn name(&self) -> &'static str {
+        "bam_live"
+    }
+
+    fn check(&self) -> CheckFuture<'_> {
+        let live = self.0.borrow().live;
+        Box::pin(async move {
+            if live {
+                Ok(())
+            } else {
+                Err("BAM!'s live connection is down: printers are as BAM! last said".to_owned())
+            }
+        })
+    }
+}

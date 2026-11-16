@@ -5,6 +5,7 @@
 
 pub mod bam;
 pub mod printers;
+pub mod sync;
 
 #[cfg(feature = "fakes")]
 pub mod fakes;
