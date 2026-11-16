@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // The tower's home screen (#49), rendered from a given state.
-import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, within } from '@testing-library/svelte';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, within } from '@testing-library/svelte';
 import TowerView from './TowerView.svelte';
 import type { ScreenState } from '../screen';
 import type { TowerPrinter } from '../generated/TowerPrinter';
@@ -15,6 +15,7 @@ const state = (s: Partial<PrinterState> & Pick<PrinterState, 'status'>): Printer
   seconds_left: null,
   job: null,
   error: null,
+  held: false,
   ...s,
 });
 const printer = (name: string, s: PrinterState, more: Partial<TowerPrinter> = {}): TowerPrinter => ({
@@ -29,6 +30,7 @@ const printer = (name: string, s: PrinterState, more: Partial<TowerPrinter> = {}
 const screen = (printers: TowerPrinter[], public_url: string | null = null): ScreenState => ({
   status: { version: '0.1.0', schema_version: 6, public_url },
   printers,
+  told: [],
 });
 const NOW = new Date(2026, 10, 16, 12, 11);
 
@@ -61,6 +63,17 @@ describe('the tower', () => {
     expect(within(mk4).getByRole('progressbar').getAttribute('aria-valuenow')).toBe('81');
     const ender = getAllByTestId('printer')[0]!;
     expect(ender.textContent).toContain('Stopped at 37% · The filament ran out');
+  });
+
+  it('opens a printer that needs a hand when it is tapped, and only that one', async () => {
+    const onopen = vi.fn();
+    const { getAllByTestId } = render(TowerView, { screen: screen(TOWER), connection: 'live', now: NOW, onopen });
+    const cards = getAllByTestId('printer');
+    expect(cards.map((c) => within(c).queryAllByRole('button').length)).toEqual([1, 0, 0, 0]);
+    for (const c of cards.slice(1)) await fireEvent.click(c);
+    expect(onopen).not.toHaveBeenCalled();
+    await fireEvent.click(within(cards[0]!).getByRole('button', { name: 'See what Ender 3 needs' }));
+    expect(onopen).toHaveBeenCalledWith('id-Ender 3');
   });
 
   it('counts each state in the header', () => {

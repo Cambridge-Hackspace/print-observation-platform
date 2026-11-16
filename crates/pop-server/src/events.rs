@@ -237,6 +237,7 @@ async fn snapshot(state: &AppState, at: u64) -> Result<Event, Infallible> {
     let snap = ServerEvent::Snapshot(Snapshot {
         status: state.status().await,
         printers: state.tower.borrow().clone(),
+        told: state.told.borrow().clone(),
     });
     frame(&state.events, at, &snap)
 }

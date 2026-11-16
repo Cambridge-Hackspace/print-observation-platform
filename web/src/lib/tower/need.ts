@@ -112,7 +112,12 @@ export function card(p: TowerPrinter, now: Date): Card {
   switch (s.status) {
     case 'needs_hand': {
       const at = s.progress === null ? 'Stopped' : `Stopped at ${percent(s.progress)}`;
-      return { state: 'Needs a hand', job: whose, left: s.error ? `${at} · ${s.error.words}` : at, right: '' };
+      return {
+        state: 'Needs a hand',
+        job: whose,
+        left: s.error ? `${at} · ${s.error.words}` : at,
+        right: 'tap to see what to do',
+      };
     }
     case 'printing': {
       const parts = [s.progress === null ? '' : percent(s.progress)];

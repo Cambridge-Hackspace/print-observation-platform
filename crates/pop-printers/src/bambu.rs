@@ -247,6 +247,10 @@ impl Report {
             _ => PrinterStatus::Idle,
         };
         let has_print = status != PrinterStatus::Idle;
+        // A pause for an error keeps the print on the printer, to resume
+        // there; FAILED does not.
+        let held = status == PrinterStatus::NeedsHand
+            && self.0.get("gcode_state").and_then(Value::as_str) == Some("PAUSE");
         let progress = self
             .u64("mc_percent")
             .filter(|_| has_print)
@@ -285,6 +289,7 @@ impl Report {
             error: error
                 .filter(|_| status == PrinterStatus::NeedsHand)
                 .map(PrinterError::raw),
+            held,
         }
     }
 }
@@ -450,6 +455,16 @@ mod tests {
             s.error.as_ref().map(|e| e.raw.as_str()),
             Some("Bambu error 0700_8011")
         );
+        assert!(s.held, "the print waits on the printer, to resume there");
+    }
+
+    #[test]
+    fn a_failed_print_is_not_held() {
+        let s = report(json!({"gcode_state": "FAILED", "print_error": 0x0700_8011u64})).state();
+        assert_eq!(s.status, PrinterStatus::NeedsHand);
+        assert!(!s.held, "a failed print is gone");
+        let s = report(json!({"gcode_state": "PAUSE"})).state();
+        assert!(!s.held, "a pause without an error does not need a hand");
     }
 
     #[test]

@@ -11,11 +11,11 @@ const printer = (name: string, status: 'idle' | 'printing'): TowerPrinter => ({
   watched: true,
   materials: ['PLA'],
   training: null,
-  state: { status, progress: null, layer: null, seconds_left: null, job: null, error: null },
+  state: { status, progress: null, layer: null, seconds_left: null, job: null, error: null, held: false },
 });
 const snapshot = (n: number, printers: TowerPrinter[] = []): ServerEvent => ({
   type: 'snapshot',
-  data: { status: { version: '0.1.0', schema_version: n, public_url: null }, printers },
+  data: { status: { version: '0.1.0', schema_version: n, public_url: null }, printers, told: [] },
 });
 
 describe('reduce', () => {
@@ -36,6 +36,21 @@ describe('reduce', () => {
     expect(s.status?.schema_version).toBe(1);
     s = reduce(s, snapshot(2));
     expect(s.printers).toEqual([]);
+  });
+
+  it('replaces what the group was told on a told event, and on a snapshot', () => {
+    const told = [{ printer: 'Voron', text: 'Voron needs a hand.', at: 1 }];
+    let s = reduce(empty(), snapshot(1, [printer('Voron', 'idle')]));
+    s = reduce(s, { type: 'told', data: told });
+    expect(s.told).toEqual(told);
+    expect(s.printers.map((p) => p.name)).toEqual(['Voron']);
+    s = reduce(s, snapshot(2));
+    expect(s.told).toEqual([]);
+    const fresh: ServerEvent = {
+      type: 'snapshot',
+      data: { status: { version: '0.1.0', schema_version: 3, public_url: null }, printers: [], told },
+    };
+    expect(reduce(empty(), fresh).told).toEqual(told);
   });
 
   it('never changes the state it is given', () => {
