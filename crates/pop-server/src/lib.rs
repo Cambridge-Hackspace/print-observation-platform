@@ -11,6 +11,7 @@ pub mod config;
 pub mod db;
 pub mod events;
 pub mod health;
+pub mod notices;
 pub mod notify;
 pub mod pins;
 pub mod printers;

@@ -250,12 +250,14 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
         state = state.with_tower(tower);
     }
     // Group notices (#68), to the Discord webhook as saved at each one.
-    let (notifier, _notices) = pop_server::notify::spawn(
+    let (notifier, _delivery) = pop_server::notify::spawn(
         state.db.clone(),
         state.secrets.clone(),
         state.http.clone(),
         pop_server::notify::Options::default(),
     );
+    // The group hears when a printer needs a hand, and when it is fixed (#69).
+    let _notices = pop_server::notices::spawn(state.tower.clone(), notifier.clone());
     state = state.with_notifier(notifier);
     let events = state.events.clone();
     let app = router(state);
