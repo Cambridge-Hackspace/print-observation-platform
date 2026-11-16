@@ -9,6 +9,7 @@
 //! No other printer notices. Drivers arrive in the ADR's order: Moonraker,
 //! then OctoPrint and PrusaLink, then Bambu in LAN mode, then USB serial.
 
+pub mod bambu;
 pub mod driver;
 #[cfg(feature = "fakes")]
 pub mod fakes;
