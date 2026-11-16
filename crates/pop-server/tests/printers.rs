@@ -163,6 +163,42 @@ fn named<'a>(all: &'a [Value], name: &str) -> &'a Value {
         .unwrap_or_else(|| panic!("no {name}"))
 }
 
+/// The printers table (#86): each printer's categories, training and camera,
+/// whether POP can run it yet or not.
+#[tokio::test]
+async fn each_printer_says_its_category_training_and_camera() {
+    let pop = pop().await;
+    let all = pop.printers().await;
+    let voron = named(&all, "Voron 2.4");
+    assert_eq!(voron["ready"], true);
+    assert_eq!(voron["categories"], json!(["Printers"]));
+    assert_eq!(voron["training"], "advanced");
+    assert_eq!(voron["camera"], false);
+    // Not ready (no access code yet), and still said from BAM!'s fields.
+    let x1 = named(&all, "X1 Carbon");
+    assert_eq!(x1["ready"], false);
+    assert_eq!(x1["training"], "basic");
+    assert_eq!(x1["camera"], true);
+    let ender = named(&all, "Ender 3");
+    assert_eq!(ender["training"], Value::Null);
+    assert_eq!(ender["camera"], false);
+    // Ready, and the camera still said.
+    let (code, body) = pop.enter_code(pop.fake.id("x1"), "12345678", LOCAL).await;
+    assert_eq!(code, StatusCode::NO_CONTENT, "{body}");
+    let x1 = named(&pop.printers().await, "X1 Carbon").clone();
+    assert_eq!(x1["ready"], true);
+    assert_eq!(x1["camera"], true);
+    assert_eq!(x1["training"], "basic");
+    // A field left blank in BAM! is no training and no camera.
+    pop.fake
+        .edit_without_event(pop.fake.id("incomplete"), "training", "  ");
+    pop.fake
+        .edit_without_event(pop.fake.id("incomplete"), "camera", " ");
+    let ender = named(&pop.printers().await, "Ender 3").clone();
+    assert_eq!(ender["training"], Value::Null);
+    assert_eq!(ender["camera"], false);
+}
+
 /// The issue's "done when": a printer with a missing or invalid field is
 /// shown to admins with the field named, rather than half-added.
 #[tokio::test]

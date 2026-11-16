@@ -222,6 +222,12 @@ pub struct AdminPrinter {
     pub problems: Vec<PrinterProblem>,
     /// Whether the tower runs it, or it waits for an admin to say (#23).
     pub tower: TowerState,
+    /// The BAM! categories it is in, by name (#86).
+    pub categories: Vec<String>,
+    /// The training it needs, as BAM! says, if any.
+    pub training: Option<String>,
+    /// Whether BAM! gives it a camera.
+    pub camera: bool,
 }
 
 /// Where a printer from BAM! stands with the tower (#23).

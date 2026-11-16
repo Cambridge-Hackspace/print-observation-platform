@@ -71,6 +71,13 @@ pub async fn list(State(state): State<AppState>) -> Response {
         None | Some(TowerState::Retired) => TowerState::Offered,
         Some(s) => *s,
     };
+    // A field as BAM! has it, when it has one that is not blank.
+    let field = |a: &pop_integrations::bam::Asset, key: &str| {
+        a.field_values
+            .get(key)
+            .map(|v| v.trim().to_owned())
+            .filter(|v| !v.is_empty())
+    };
     let mut out: Vec<AdminPrinter> = assets
         .iter()
         .map(|a| match printer_from(a, &bam.fields, &has_code) {
@@ -81,6 +88,9 @@ pub async fn list(State(state): State<AppState>) -> Response {
                 connection: Some(kind(&p.connection).to_owned()),
                 problems: vec![],
                 tower: tower(&a.asset.id),
+                categories: a.categories.iter().map(|c| c.name.clone()).collect(),
+                training: p.training,
+                camera: p.camera.is_some(),
             },
             Err(problems) => AdminPrinter {
                 bam_id: a.asset.id.clone(),
@@ -95,6 +105,9 @@ pub async fn list(State(state): State<AppState>) -> Response {
                     })
                     .collect(),
                 tower: tower(&a.asset.id),
+                categories: a.categories.iter().map(|c| c.name.clone()).collect(),
+                training: field(a, &bam.fields.training),
+                camera: field(a, &bam.fields.camera).is_some(),
             },
         })
         .collect();
