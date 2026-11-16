@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { follow, type Connection } from './lib/live';
-  import type { Status } from './lib/generated/Status';
+  import { empty, reduce } from './lib/screen';
 
-  // The connection, and the newest status the server has sent over it.
+  // The connection, and what the server has said over it.
   let connection: Connection = $state('connecting');
-  let status: Status | null = $state(null);
+  let screen = $state(empty());
+  const status = $derived(screen.status);
 
   const label: Record<Connection, string> = {
     connecting: 'Connecting',
@@ -15,9 +16,7 @@
 
   const stop = follow('/api/events', {
     connection: (c) => (connection = c),
-    event: (e) => {
-      if (e.type === 'status') status = e.data;
-    },
+    event: (e) => (screen = reduce(screen, e)),
   });
   onDestroy(stop);
 </script>

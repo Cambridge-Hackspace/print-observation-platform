@@ -9,7 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use pop_server::api::{ApiError, Health, ServerEvent, Status};
+use pop_server::api::{ApiError, Health, ServerEvent, Snapshot, Status};
 use ts_rs::TS;
 
 fn generated_dir() -> PathBuf {
@@ -21,6 +21,7 @@ fn generated_dir() -> PathBuf {
 fn export(dir: &Path) {
     Status::export_all_to(dir).unwrap();
     ServerEvent::export_all_to(dir).unwrap();
+    Snapshot::export_all_to(dir).unwrap();
     ApiError::export_all_to(dir).unwrap();
     Health::export_all_to(dir).unwrap();
 }
