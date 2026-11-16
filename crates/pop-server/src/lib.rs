@@ -10,6 +10,7 @@ pub mod backup;
 pub mod config;
 pub mod db;
 pub mod events;
+pub mod guides;
 pub mod health;
 pub mod notices;
 pub mod notify;
@@ -66,6 +67,8 @@ pub struct AppState {
     pub notifier: Option<notify::Notifier>,
     /// For POP's own requests out: Discord.
     pub http: reqwest::Client,
+    /// Where stored files live: the data directory's files/ (#3, #71).
+    pub files_dir: Option<std::path::PathBuf>,
 }
 
 impl AppState {
@@ -84,7 +87,14 @@ impl AppState {
             public_url: None,
             notifier: None,
             http: reqwest::Client::new(),
+            files_dir: None,
         }
+    }
+
+    /// Keep stored files (guide images) under `dir`.
+    pub fn with_files_dir(mut self, dir: std::path::PathBuf) -> Self {
+        self.files_dir = Some(dir);
+        self
     }
 
     /// Post group notices through this notifier (#68).
@@ -271,6 +281,56 @@ pub fn routes() -> Vec<Route> {
             reach: Reach::LocalOnly,
             who: Who::Admin,
             handler: post(printers::decline),
+        },
+        // Guides (#71): written by admins, from anywhere; nothing here
+        // reaches a printer.
+        Route {
+            method: Method::GET,
+            path: "/api/admin/guides",
+            effect: Effect::Read,
+            reach: Reach::Anywhere,
+            who: Who::Admin,
+            handler: get(guides::admin_list),
+        },
+        Route {
+            method: Method::POST,
+            path: "/api/admin/guides",
+            effect: Effect::Content,
+            reach: Reach::Anywhere,
+            who: Who::Admin,
+            handler: post(guides::admin_create),
+        },
+        Route {
+            method: Method::GET,
+            path: "/api/admin/guides/{slug}",
+            effect: Effect::Read,
+            reach: Reach::Anywhere,
+            who: Who::Admin,
+            handler: get(guides::admin_get),
+        },
+        Route {
+            method: Method::PUT,
+            path: "/api/admin/guides/{slug}",
+            effect: Effect::Content,
+            reach: Reach::Anywhere,
+            who: Who::Admin,
+            handler: put(guides::admin_update),
+        },
+        Route {
+            method: Method::POST,
+            path: "/api/admin/guides/{slug}/images",
+            effect: Effect::Content,
+            reach: Reach::Anywhere,
+            who: Who::Admin,
+            handler: post(guides::admin_add_image),
+        },
+        Route {
+            method: Method::GET,
+            path: "/api/admin/guides/{slug}/images/{id}",
+            effect: Effect::Read,
+            reach: Reach::Anywhere,
+            who: Who::Admin,
+            handler: get(guides::admin_image),
         },
         Route {
             method: Method::GET,

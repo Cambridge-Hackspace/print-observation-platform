@@ -76,6 +76,21 @@ const WRITE_ROUTES: &[(&str, &str, &str)] = &[
         "/api/admin/notify/discord/test",
         "tests/notify.rs: setting_clearing_and_testing_are_recorded_without_the_url",
     ),
+    (
+        "POST",
+        "/api/admin/guides",
+        "tests/guides.rs: writing_editing_publishing_and_renaming_are_recorded",
+    ),
+    (
+        "PUT",
+        "/api/admin/guides/{slug}",
+        "tests/guides.rs: writing_editing_publishing_and_renaming_are_recorded",
+    ),
+    (
+        "POST",
+        "/api/admin/guides/{slug}/images",
+        "tests/guides.rs: writing_editing_publishing_and_renaming_are_recorded",
+    ),
 ];
 
 #[test]
