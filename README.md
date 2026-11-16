@@ -30,10 +30,11 @@ cargo run -p pop-server                            # http://127.0.0.1:8080
 The server embeds `web/dist` when it is compiled, so build the app first.
 For the app with hot reload, run the server, then `npm run dev` in `web/`.
 
-| Variable       | Default          | What it is                                  |
-| -------------- | ---------------- | ------------------------------------------- |
-| `POP_LISTEN`   | `127.0.0.1:8080` | The address the server listens on.          |
-| `POP_DATA_DIR` | `./data`         | The database and uploaded prints live here. |
+Configuration is one TOML file, `pop.toml` beside the binary or named with
+`--config`. [`pop.example.toml`](pop.example.toml) documents every key with its
+default, and `pop config check` validates a file without starting the server.
+Any key can be overridden from the environment as `POP_<SECTION>_<KEY>`:
+`POP_SERVER_LISTEN` overrides `server.listen`.
 
 ## Testing
 
