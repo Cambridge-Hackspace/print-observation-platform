@@ -1,6 +1,7 @@
 //! POP's server (ADR 0001): the API, live updates over Server-Sent Events, and
 //! the web app, from one binary.
 
+pub mod access;
 pub mod api;
 pub mod assets;
 pub mod backup;
@@ -11,12 +12,13 @@ pub mod health;
 
 use std::sync::Arc;
 
-use axum::{Json, Router, extract::State, routing::get};
+use axum::{Json, Router, extract::State, http::Method, routing::get};
 use sqlx::SqlitePool;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::Level;
 
 use crate::{
+    access::{Effect, Reach, Route},
     api::Status,
     assets::Assets,
     events::Events,
@@ -31,6 +33,8 @@ pub struct AppState {
     pub assets: Arc<dyn Assets>,
     /// What `/healthz` checks: the database, and each configured integration.
     pub checks: Arc<Vec<Arc<dyn HealthCheck>>>,
+    /// Which requests are local (#7).
+    pub access: config::Access,
 }
 
 impl AppState {
@@ -40,7 +44,15 @@ impl AppState {
             db,
             events: Events::new(),
             assets,
+            access: config::Access::default(),
         }
+    }
+
+    /// Use these networks and proxies to tell local requests from remote ones.
+    /// Without this, only this machine is local.
+    pub fn with_access(mut self, access: config::Access) -> Self {
+        self.access = access;
+        self
     }
 
     /// Add a check to `/healthz`, for an integration that is configured.
@@ -63,12 +75,43 @@ impl AppState {
     }
 }
 
+/// Every route POP serves, with what it does and from where it may be
+/// reached (#7). The web app's fallback, which serves files and changes
+/// nothing, is outside the table.
+pub fn routes() -> Vec<Route> {
+    vec![
+        Route {
+            method: Method::GET,
+            path: "/healthz",
+            effect: Effect::Read,
+            reach: Reach::Anywhere,
+            handler: get(health::healthz),
+        },
+        Route {
+            method: Method::GET,
+            path: "/api/status",
+            effect: Effect::Read,
+            reach: Reach::Anywhere,
+            handler: get(status),
+        },
+        Route {
+            method: Method::GET,
+            path: "/api/events",
+            effect: Effect::Read,
+            reach: Reach::Anywhere,
+            handler: get(events::stream),
+        },
+    ]
+}
+
 /// Every route POP serves.
 pub fn router(state: AppState) -> Router {
-    Router::new()
-        .route("/healthz", get(health::healthz))
-        .route("/api/status", get(status))
-        .route("/api/events", get(events::stream))
+    router_with(routes(), state)
+}
+
+/// A router serving `table`, for a test that needs routes of its own.
+pub fn router_with(table: Vec<Route>, state: AppState) -> Router {
+    access::build(table, &state)
         .fallback(assets::spa)
         .with_state(state)
         // One structured log line per request, at the configured level.

@@ -104,6 +104,11 @@ pub struct Access {
     /// session) is local, and may control printers (ADR 0001, "Control is
     /// local"). Empty means only loopback is local.
     pub local_networks: Vec<IpNet>,
+    /// Reverse proxies whose forwarding headers are believed. A request that
+    /// carries `Forwarded` or `X-Forwarded-For` from any other peer is remote,
+    /// whatever its address: a proxy on this machine would otherwise make every
+    /// request it passes on look local.
+    pub trusted_proxies: Vec<IpNet>,
 }
 
 /// What is wrong, and where.
@@ -198,19 +203,10 @@ impl Config {
             self.log.format = enum_value("POP_LOG_FORMAT", &v)?;
         }
         if let Some(v) = env("POP_ACCESS_LOCAL_NETWORKS") {
-            self.access.local_networks = v
-                .split(',')
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-                .map(|s| {
-                    s.parse().map_err(|_| {
-                        err(
-                            "POP_ACCESS_LOCAL_NETWORKS",
-                            format!("{s:?} is not a network: expected CIDR notation, such as 192.168.1.0/24, comma-separated"),
-                        )
-                    })
-                })
-                .collect::<Result<_, _>>()?;
+            self.access.local_networks = networks("POP_ACCESS_LOCAL_NETWORKS", &v)?;
+        }
+        if let Some(v) = env("POP_ACCESS_TRUSTED_PROXIES") {
+            self.access.trusted_proxies = networks("POP_ACCESS_TRUSTED_PROXIES", &v)?;
         }
         Ok(())
     }
@@ -229,6 +225,22 @@ impl Config {
     pub fn database_path(&self) -> PathBuf {
         self.storage.data_dir.join("pop.db")
     }
+}
+
+/// A comma-separated list of networks from an environment variable.
+fn networks(var: &str, v: &str) -> Result<Vec<IpNet>, ConfigError> {
+    v.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            s.parse().map_err(|_| {
+                err(
+                    var,
+                    format!("{s:?} is not a network: expected CIDR notation, such as 192.168.1.0/24, comma-separated"),
+                )
+            })
+        })
+        .collect()
 }
 
 fn read(path: &Path) -> Result<String, ConfigError> {
@@ -342,6 +354,7 @@ mod tests {
             ("POP_LOG_LEVEL", "loud"),
             ("POP_LOG_FORMAT", "xml"),
             ("POP_ACCESS_LOCAL_NETWORKS", "10.0.0.0/8, the-shop"),
+            ("POP_ACCESS_TRUSTED_PROXIES", "a-proxy"),
         ] {
             assert_eq!(env_err(&[(var, value)]).key, var, "{var}={value:?}");
         }

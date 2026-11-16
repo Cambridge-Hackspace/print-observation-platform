@@ -136,7 +136,7 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
             "built without the web app: run tools/web/build.sh, then build the server again"
         );
     }
-    let state = AppState::new(pool, Arc::new(Embedded));
+    let state = AppState::new(pool, Arc::new(Embedded)).with_access(config.access.clone());
     let events = state.events.clone();
     let app = router(state);
     let listen = config.server.listen;
@@ -147,14 +147,18 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
         "POP {} listening on http://{listen}",
         env!("CARGO_PKG_VERSION")
     );
-    axum::serve(listener, app)
-        .with_graceful_shutdown(async move {
-            shutdown().await;
-            // Live streams never end on their own; end them, or the
-            // graceful shutdown waits on them forever.
-            events.close();
-        })
-        .await?;
+    // With each connection's peer address, which decides what is local (#7).
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .with_graceful_shutdown(async move {
+        shutdown().await;
+        // Live streams never end on their own; end them, or the
+        // graceful shutdown waits on them forever.
+        events.close();
+    })
+    .await?;
     Ok(())
 }
 
