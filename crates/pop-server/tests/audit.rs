@@ -61,6 +61,21 @@ const WRITE_ROUTES: &[(&str, &str, &str)] = &[
         "/api/admin/printers/{bam_id}/decline",
         "tests/tower.rs: adding_and_declining_are_recorded",
     ),
+    (
+        "PUT",
+        "/api/admin/notify/discord",
+        "tests/notify.rs: setting_clearing_and_testing_are_recorded_without_the_url",
+    ),
+    (
+        "DELETE",
+        "/api/admin/notify/discord",
+        "tests/notify.rs: setting_clearing_and_testing_are_recorded_without_the_url",
+    ),
+    (
+        "POST",
+        "/api/admin/notify/discord/test",
+        "tests/notify.rs: setting_clearing_and_testing_are_recorded_without_the_url",
+    ),
 ];
 
 #[test]

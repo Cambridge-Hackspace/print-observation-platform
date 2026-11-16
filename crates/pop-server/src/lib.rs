@@ -11,6 +11,7 @@ pub mod config;
 pub mod db;
 pub mod events;
 pub mod health;
+pub mod notify;
 pub mod pins;
 pub mod printers;
 pub mod run;
@@ -60,6 +61,10 @@ pub struct AppState {
     pub decided: Arc<tokio::sync::Notify>,
     /// The address phones reach POP at, if set (#49).
     pub public_url: Option<String>,
+    /// Posts group notices (#68), once started.
+    pub notifier: Option<notify::Notifier>,
+    /// For POP's own requests out: Discord.
+    pub http: reqwest::Client,
 }
 
 impl AppState {
@@ -76,7 +81,15 @@ impl AppState {
             tower: tokio::sync::watch::channel(Vec::new()).1,
             decided: Arc::new(tokio::sync::Notify::new()),
             public_url: None,
+            notifier: None,
+            http: reqwest::Client::new(),
         }
+    }
+
+    /// Post group notices through this notifier (#68).
+    pub fn with_notifier(mut self, notifier: notify::Notifier) -> Self {
+        self.notifier = Some(notifier);
+        self
     }
 
     /// The address phones reach POP at; empty for none.
@@ -257,6 +270,39 @@ pub fn routes() -> Vec<Route> {
             reach: Reach::LocalOnly,
             who: Who::Admin,
             handler: post(printers::decline),
+        },
+        Route {
+            method: Method::GET,
+            path: "/api/admin/notify",
+            effect: Effect::Read,
+            reach: Reach::LocalOnly,
+            who: Who::Admin,
+            handler: get(notify::settings),
+        },
+        Route {
+            method: Method::PUT,
+            path: "/api/admin/notify/discord",
+            // Where notices go, and a secret: from inside the space only.
+            effect: Effect::Settings,
+            reach: Reach::LocalOnly,
+            who: Who::Admin,
+            handler: put(notify::set_webhook),
+        },
+        Route {
+            method: Method::DELETE,
+            path: "/api/admin/notify/discord",
+            effect: Effect::Settings,
+            reach: Reach::LocalOnly,
+            who: Who::Admin,
+            handler: delete(notify::clear_webhook),
+        },
+        Route {
+            method: Method::POST,
+            path: "/api/admin/notify/discord/test",
+            effect: Effect::Settings,
+            reach: Reach::LocalOnly,
+            who: Who::Admin,
+            handler: post(notify::test_webhook),
         },
         Route {
             method: Method::PUT,
