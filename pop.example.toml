@@ -33,3 +33,11 @@ format = "text"
 #
 # local_networks = ["192.168.1.0/24"]
 local_networks = []
+# Reverse proxies whose forwarding headers (Forwarded, X-Forwarded-For) are
+# believed, in CIDR notation. A request carrying those headers from anything
+# else is remote, whatever its address: otherwise a proxy on this machine
+# would make every request it passes on look local. Name your proxy here if
+# you put one in front of POP (docs: remote access).
+#
+# trusted_proxies = ["127.0.0.1/32"]
+trusted_proxies = []
