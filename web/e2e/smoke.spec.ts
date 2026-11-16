@@ -54,3 +54,15 @@ test('a screen of the app passes an accessibility check', async ({ page }) => {
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
   expect(results.violations, JSON.stringify(results.violations, null, 1)).toEqual([]);
 });
+
+test('the public guides open signed out, and pass an accessibility check', async ({ page }) => {
+  const res = await page.goto('/guides');
+  expect(res?.status()).toBe(200);
+  // A new POP has none published: it says so, rather than nothing.
+  await expect(page.getByText('No guides are published yet.')).toBeVisible();
+  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+  expect(results.violations, JSON.stringify(results.violations, null, 1)).toEqual([]);
+  // A guide that is not published says so.
+  await page.goto('/guides/no-such-guide');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('No such guide');
+});

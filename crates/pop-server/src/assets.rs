@@ -89,7 +89,17 @@ pub async fn spa(State(state): State<AppState>, req: Request) -> Response {
         return (StatusCode::NOT_FOUND, "not found").into_response();
     }
     match assets.get("index.html") {
-        Some(index) => file(index, "no-cache"),
+        Some(index) => {
+            let mut res = file(index, "no-cache");
+            // Only the public guides may be indexed, and only when that is
+            // allowed (#94); never the kiosk, the phone or the admin desk.
+            let guides = path == "guides" || path.starts_with("guides/");
+            if !(guides && state.guides.indexable) {
+                res.headers_mut()
+                    .insert("x-robots-tag", HeaderValue::from_static("noindex"));
+            }
+            res
+        }
         None => (
             StatusCode::SERVICE_UNAVAILABLE,
             "This POP was built without its web app. Run tools/web/build.sh, then build the server again.",
