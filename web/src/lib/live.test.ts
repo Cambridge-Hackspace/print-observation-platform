@@ -59,15 +59,15 @@ function setup() {
   return { sources, events, states, invalid, stop, last };
 }
 
-const STATUS = '{"type":"status","data":{"version":"0.1.0","schema_version":1}}';
+const STATUS = '{"type":"status","data":{"version":"0.1.0","schema_version":1,"public_url":null}}';
 
 describe('parse', () => {
   it('reads a snapshot', () => {
     expect(
-      parse('{"type":"snapshot","data":{"status":{"version":"0.1.0","schema_version":1},"printers":[]}}'),
+      parse('{"type":"snapshot","data":{"status":{"version":"0.1.0","schema_version":1,"public_url":null},"printers":[]}}'),
     ).toEqual({
       type: 'snapshot',
-      data: { status: { version: '0.1.0', schema_version: 1 }, printers: [] },
+      data: { status: { version: '0.1.0', schema_version: 1, public_url: null }, printers: [] },
     });
   });
   it('reads the printers, as the server sends them', () => {
@@ -89,8 +89,15 @@ describe('parse', () => {
     };
     expect(parse(JSON.stringify({ type: 'printers', data: [voron] }))).toEqual({ type: 'printers', data: [voron] });
   });
+  it('reads where phones reach POP, when it is set', () => {
+    const raw = '{"type":"status","data":{"version":"0.1.0","schema_version":1,"public_url":"https://pop.example.org"}}';
+    expect(parse(raw)).toEqual({
+      type: 'status',
+      data: { version: '0.1.0', schema_version: 1, public_url: 'https://pop.example.org' },
+    });
+  });
   it('reads a status event', () => {
-    expect(parse(STATUS)).toEqual({ type: 'status', data: { version: '0.1.0', schema_version: 1 } });
+    expect(parse(STATUS)).toEqual({ type: 'status', data: { version: '0.1.0', schema_version: 1, public_url: null } });
   });
   it('refuses what is not a ServerEvent', () => {
     for (const raw of [
@@ -100,10 +107,12 @@ describe('parse', () => {
       '{"type":"status"}',
       '{"type":"status","data":{"version":1,"schema_version":1}}',
       '{"type":"status","data":{"version":"0.1.0","schema_version":"1"}}',
+      '{"type":"status","data":{"version":"0.1.0","schema_version":1}}',
+      '{"type":"status","data":{"version":"0.1.0","schema_version":1,"public_url":7}}',
       '{"type":"printer","data":{}}',
       '{"type":"snapshot","data":{}}',
       '{"type":"snapshot","data":{"status":{"version":"0.1.0"}}}',
-      '{"type":"snapshot","data":{"status":{"version":"0.1.0","schema_version":1}}}',
+      '{"type":"snapshot","data":{"status":{"version":"0.1.0","schema_version":1,"public_url":null}}}',
       '{"type":"printers","data":{}}',
       '{"type":"printers","data":[{"id":"a"}]}',
       '{"type":"printers","data":[{"id":"a","name":"A","watched":true,"materials":[1],"training":null,"state":{"status":"idle","progress":null,"layer":null,"seconds_left":null,"job":null,"error":null}}]}',
@@ -137,7 +146,7 @@ describe('follow', () => {
     t.last().open();
     t.last().message(STATUS);
     t.last().message('{"type":"status","data":{}}');
-    expect(t.events).toEqual([{ type: 'status', data: { version: '0.1.0', schema_version: 1 } }]);
+    expect(t.events).toEqual([{ type: 'status', data: { version: '0.1.0', schema_version: 1, public_url: null } }]);
     expect(t.invalid).toEqual(['{"type":"status","data":{}}']);
     expect(t.states.at(-1)).toBe('live');
   });

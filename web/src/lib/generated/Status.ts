@@ -11,4 +11,8 @@ version: string,
 /**
  * The newest database migration applied.
  */
-schema_version: number, };
+schema_version: number, 
+/**
+ * The address phones reach POP at, when it is set (#49).
+ */
+public_url: string | null, };

@@ -4,7 +4,7 @@ import { empty, reduce, type ScreenState } from './screen';
 import type { ServerEvent } from './generated/ServerEvent';
 import type { TowerPrinter } from './generated/TowerPrinter';
 
-const status = (n: number): ServerEvent => ({ type: 'status', data: { version: '0.1.0', schema_version: n } });
+const status = (n: number): ServerEvent => ({ type: 'status', data: { version: '0.1.0', schema_version: n, public_url: null } });
 const printer = (name: string, status: 'idle' | 'printing'): TowerPrinter => ({
   id: name,
   name,
@@ -15,7 +15,7 @@ const printer = (name: string, status: 'idle' | 'printing'): TowerPrinter => ({
 });
 const snapshot = (n: number, printers: TowerPrinter[] = []): ServerEvent => ({
   type: 'snapshot',
-  data: { status: { version: '0.1.0', schema_version: n }, printers },
+  data: { status: { version: '0.1.0', schema_version: n, public_url: null }, printers },
 });
 
 describe('reduce', () => {

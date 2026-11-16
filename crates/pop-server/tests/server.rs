@@ -177,6 +177,16 @@ async fn status_reports_the_version_and_the_newest_migration() {
     let body: serde_json::Value = serde_json::from_str(&text(res).await).unwrap();
     assert_eq!(body["version"], env!("CARGO_PKG_VERSION"));
     assert_eq!(body["schema_version"], newest_migration());
+    assert_eq!(body["public_url"], serde_json::Value::Null, "none set");
+}
+
+#[tokio::test]
+async fn status_says_where_phones_reach_pop_when_it_is_set() {
+    let mut pop = Pop::new(built_app()).await;
+    pop.state = pop.state.clone().with_public_url("https://pop.example.org");
+    let body: serde_json::Value =
+        serde_json::from_str(&text(pop.get("/api/status").await).await).unwrap();
+    assert_eq!(body["public_url"], "https://pop.example.org");
 }
 
 #[tokio::test]
@@ -379,6 +389,7 @@ fn status_event(schema_version: i64) -> ServerEvent {
     ServerEvent::Status(Status {
         version: "test".into(),
         schema_version,
+        public_url: None,
     })
 }
 

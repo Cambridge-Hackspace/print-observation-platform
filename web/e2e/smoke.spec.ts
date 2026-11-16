@@ -17,10 +17,21 @@ test('the app goes live and shows what the server reports', async ({ page, reque
   await expect(page.getByTestId('schema')).toHaveText(String(status.schema_version));
 });
 
-test('a screen of the app opens at its own address', async ({ page }) => {
+test('the tower opens at its own address and goes live', async ({ page }) => {
   const res = await page.goto('/kiosk');
   expect(res?.status()).toBe(200);
-  await expect(page.getByTestId('connection')).toHaveText('Live');
+  await expect(page.getByTestId('tower')).toHaveAttribute('data-connection', 'live');
+  // No BAM! here, so no printers: it says how to get some, and keeps the
+  // tap prompt.
+  await expect(page.getByText(/an admin adds them from BAM!/)).toBeVisible();
+  await expect(page.getByText('Tap your card to start printing')).toBeVisible();
+});
+
+test('the tower passes an accessibility check', async ({ page }) => {
+  await page.goto('/kiosk');
+  await expect(page.getByTestId('tower')).toHaveAttribute('data-connection', 'live');
+  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+  expect(results.violations, JSON.stringify(results.violations, null, 1)).toEqual([]);
 });
 
 test('an unknown API path is an error, not the app', async ({ request }) => {

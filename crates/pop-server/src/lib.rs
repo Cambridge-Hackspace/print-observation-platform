@@ -58,6 +58,8 @@ pub struct AppState {
     pub tower: tokio::sync::watch::Receiver<Vec<api::TowerPrinter>>,
     /// Told when an admin decides about a printer, so the runner looks again.
     pub decided: Arc<tokio::sync::Notify>,
+    /// The address phones reach POP at, if set (#49).
+    pub public_url: Option<String>,
 }
 
 impl AppState {
@@ -73,7 +75,14 @@ impl AppState {
             bam_view: None,
             tower: tokio::sync::watch::channel(Vec::new()).1,
             decided: Arc::new(tokio::sync::Notify::new()),
+            public_url: None,
         }
+    }
+
+    /// The address phones reach POP at; empty for none.
+    pub fn with_public_url(mut self, url: &str) -> Self {
+        self.public_url = (!url.is_empty()).then(|| url.to_owned());
+        self
     }
 
     /// Show the tower's printers as this runner runs them (#49).
@@ -131,6 +140,7 @@ impl AppState {
             // rather than taking the status down with it; /healthz is what
             // fails on a broken database.
             schema_version: db::schema_version(&self.db).await.unwrap_or(0),
+            public_url: self.public_url.clone(),
         }
     }
 }
