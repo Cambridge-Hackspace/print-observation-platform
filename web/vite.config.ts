@@ -9,6 +9,9 @@ const api = process.env.POP_URL ?? 'http://127.0.0.1:8080';
 
 export default defineConfig({
   plugins: [svelte()],
+  // Under Vitest, Svelte's browser build, so components can be mounted in
+  // jsdom (src/lib/design/design.test.ts).
+  resolve: process.env.VITEST ? { conditions: ['browser'] } : undefined,
   build: { outDir: 'dist', emptyOutDir: true },
   server: {
     proxy: {
@@ -18,6 +21,7 @@ export default defineConfig({
   },
   test: {
     include: ['src/**/*.test.ts'],
+    setupFiles: ['src/test/setup.ts'],
     environment: 'node',
   },
 });
