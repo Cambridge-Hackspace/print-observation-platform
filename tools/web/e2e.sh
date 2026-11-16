@@ -33,7 +33,7 @@ mkdir -p "$ROOT/web/.e2e"
     set -e
     npm ci --no-audit --no-fund >/dev/null
     state=$(mktemp -d)
-    POP_DATA_DIR="$state" POP_LISTEN=127.0.0.1:8080 .e2e/pop >"$state/server.log" 2>&1 &
+    POP_STORAGE_DATA_DIR="$state" POP_SERVER_LISTEN=127.0.0.1:8080 .e2e/pop >"$state/server.log" 2>&1 &
     up=0
     for _ in $(seq 1 50); do
       if wget -q -O /dev/null http://127.0.0.1:8080/healthz 2>/dev/null; then up=1; break; fi

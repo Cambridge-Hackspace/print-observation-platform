@@ -1,0 +1,35 @@
+# POP's configuration, with every key at its default.
+#
+# Copy this to pop.toml beside the binary, or name another file with
+# `pop --config <file>` or POP_CONFIG. Any key can be left out, and then has
+# the value shown here. `pop config check` validates a file without starting
+# the server.
+#
+# Every key can also be set from the environment, as POP_<SECTION>_<KEY> in
+# capitals, which wins over the file: POP_SERVER_LISTEN overrides
+# server.listen. Use that for secrets, and in containers.
+
+[server]
+# The address and port to listen on. 0.0.0.0:8080 listens on every network.
+listen = "127.0.0.1:8080"
+
+[storage]
+# Where the database and the stored print files live. Back it up with
+# `pop backup`.
+data_dir = "data"
+
+[log]
+# error, warn, info, debug or trace.
+level = "info"
+# text, for a person reading a terminal, or json, one object per line, for a
+# log collector.
+format = "text"
+
+[access]
+# The space's own networks, in CIDR notation. Requests from these, or from a
+# kiosk session, may control printers; requests from anywhere else can watch,
+# report a problem and upload, but never touch a printer. Empty means only
+# this machine is local.
+#
+# local_networks = ["192.168.1.0/24"]
+local_networks = []
