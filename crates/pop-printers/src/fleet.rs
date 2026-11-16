@@ -151,7 +151,12 @@ async fn supervise(
     updates: broadcast::Sender<Update>,
     backoff: Backoff,
 ) {
-    let set = |s: PrinterState| {
+    let set = |mut s: PrinterState| {
+        // Every error explained before anyone sees it (#35), whichever
+        // driver reported it.
+        if let Some(e) = &s.error {
+            s.error = Some(crate::errors::explain(&e.raw, s.layer.map(|l| l.current)));
+        }
         if *state.borrow() != s {
             state.send_replace(s.clone());
             let _ = updates.send(Update {

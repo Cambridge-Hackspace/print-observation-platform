@@ -36,6 +36,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     driver::{Capabilities, Driver, DriverError, DriverFuture, Reporter},
+    errors::PrinterError,
     state::{Job, Layer, PrinterState, PrinterStatus},
 };
 
@@ -280,7 +281,9 @@ impl Report {
             layer,
             seconds_left,
             job,
-            error: error.filter(|_| status == PrinterStatus::NeedsHand),
+            error: error
+                .filter(|_| status == PrinterStatus::NeedsHand)
+                .map(PrinterError::raw),
         }
     }
 }
@@ -334,7 +337,7 @@ impl Driver for Bambu {
                 let hold = self.hold_after_refusal;
                 async move {
                     r.report(PrinterState {
-                        error: Some(why.clone()),
+                        error: Some(PrinterError::raw(why.clone())),
                         ..PrinterState::offline()
                     });
                     tokio::time::sleep(hold).await;
@@ -442,7 +445,10 @@ mod tests {
         // Some print error; what each code means is the catalog's (#35).
         let s = report(json!({"gcode_state": "PAUSE", "print_error": 0x0700_8011u64})).state();
         assert_eq!(s.status, PrinterStatus::NeedsHand);
-        assert_eq!(s.error.as_deref(), Some("Bambu error 0700_8011"));
+        assert_eq!(
+            s.error.as_ref().map(|e| e.raw.as_str()),
+            Some("Bambu error 0700_8011")
+        );
     }
 
     #[test]
@@ -450,7 +456,10 @@ mod tests {
         let s = report(json!({"gcode_state": "FAILED", "print_error": 0,
             "hms": [{"attr": 0x0300_0100u64, "code": 0x0001_0007u64}]}))
         .state();
-        assert_eq!(s.error.as_deref(), Some("Bambu HMS 0300_0100_0001_0007"));
+        assert_eq!(
+            s.error.as_ref().map(|e| e.raw.as_str()),
+            Some("Bambu HMS 0300_0100_0001_0007")
+        );
     }
 
     #[test]

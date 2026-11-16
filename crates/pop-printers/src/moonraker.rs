@@ -27,6 +27,7 @@ use tokio_tungstenite::tungstenite::{Message, client::IntoClientRequest, http::H
 
 use crate::{
     driver::{Capabilities, Driver, DriverError, DriverFuture, Reporter},
+    errors::PrinterError,
     state::{Job, Layer, PrinterState, PrinterStatus},
 };
 
@@ -98,8 +99,10 @@ impl Objects {
                 // shutdown or error: Klipper itself has stopped.
                 return PrinterState {
                     status: PrinterStatus::NeedsHand,
-                    error: message("webhooks", "state_message")
-                        .or_else(|| Some("Klipper has stopped".to_owned())),
+                    error: Some(PrinterError::raw(
+                        message("webhooks", "state_message")
+                            .unwrap_or_else(|| "Klipper has stopped".to_owned()),
+                    )),
                     ..PrinterState::idle()
                 };
             }
@@ -164,12 +167,12 @@ impl Objects {
             }
             _ => None,
         };
-        let error = if status == PrinterStatus::NeedsHand {
-            message("print_stats", "message")
-                .or_else(|| Some("the print stopped with an error".to_owned()))
-        } else {
-            None
-        };
+        let error = (status == PrinterStatus::NeedsHand).then(|| {
+            PrinterError::raw(
+                message("print_stats", "message")
+                    .unwrap_or_else(|| "the print stopped with an error".to_owned()),
+            )
+        });
         PrinterState {
             status,
             progress,

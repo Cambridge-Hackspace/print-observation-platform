@@ -124,7 +124,10 @@ async fn a_pause_with_a_print_error_needs_a_hand_and_names_the_code() {
     let s = r
         .until(|s| s.status == PrinterStatus::NeedsHand, "needing a hand")
         .await;
-    assert_eq!(s.error.as_deref(), Some("Bambu error 0700_8011"));
+    assert_eq!(
+        s.error.as_ref().map(|e| e.raw.as_str()),
+        Some("Bambu error 0700_8011")
+    );
 }
 
 #[tokio::test]
@@ -143,7 +146,8 @@ async fn a_different_certificate_is_refused_and_shown_not_just_offline() {
         .until(
             |s| {
                 s.error
-                    .as_deref()
+                    .as_ref()
+                    .map(|e| e.raw.as_str())
                     .is_some_and(|e| e.contains("certificate changed"))
             },
             "refusing the new certificate",
@@ -165,7 +169,8 @@ async fn a_wrong_access_code_is_shown() {
         .until(
             |s| {
                 s.error
-                    .as_deref()
+                    .as_ref()
+                    .map(|e| e.raw.as_str())
                     .is_some_and(|e| e.contains("access code"))
             },
             "showing the refused code",
