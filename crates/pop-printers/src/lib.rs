@@ -10,7 +10,10 @@
 //! then OctoPrint and PrusaLink, then Bambu in LAN mode, then USB serial.
 
 pub mod driver;
+#[cfg(feature = "fakes")]
+pub mod fakes;
 pub mod fleet;
+pub mod moonraker;
 pub mod state;
 
 pub use driver::{Capabilities, Driver, DriverError, Reporter};
