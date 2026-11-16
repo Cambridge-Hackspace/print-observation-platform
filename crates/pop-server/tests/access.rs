@@ -12,7 +12,7 @@ use axum::{
 use http_body_util::BodyExt;
 use pop_server::{
     AppState,
-    access::{Effect, Reach, Route, violations},
+    access::{Effect, Reach, Route, Who, violations},
     assets::Embedded,
     config::Access,
     db, router_with, routes,
@@ -31,6 +31,7 @@ fn start_print(reach: Reach) -> Route {
         path: "/api/printers/{id}/start",
         effect: Effect::ControlsPrinter,
         reach,
+        who: Who::Anyone,
         handler: post(ok),
     }
 }
@@ -41,6 +42,7 @@ fn watch() -> Route {
         path: "/api/printers/{id}/watch",
         effect: Effect::Read,
         reach: Reach::Anywhere,
+        who: Who::Anyone,
         handler: get(ok),
     }
 }
@@ -93,11 +95,23 @@ async fn send(
     peer: Option<&str>,
     headers: &[(&str, &str)],
 ) -> (StatusCode, String) {
+    // A request that changes something must be JSON (#11), as every real
+    // client's is.
+    let json = matches!(method, Method::POST | Method::PUT | Method::PATCH);
     let mut req = Request::builder().method(method).uri(uri);
+    if json {
+        req = req.header("content-type", "application/json");
+    }
     for (k, v) in headers {
         req = req.header(*k, *v);
     }
-    let mut req = req.body(Body::empty()).unwrap();
+    let mut req = req
+        .body(if json {
+            Body::from("{}")
+        } else {
+            Body::empty()
+        })
+        .unwrap();
     if let Some(p) = peer {
         req.extensions_mut()
             .insert(ConnectInfo(p.parse::<SocketAddr>().unwrap()));

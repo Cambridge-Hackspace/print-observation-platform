@@ -9,7 +9,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use pop_server::api::{ApiError, Health, ServerEvent, Snapshot, Status};
+use pop_server::api::{
+    ApiError, Health, NewPassword, NewRole, NewUser, Role, ServerEvent, SignIn, Snapshot, Status,
+    User,
+};
 use ts_rs::TS;
 
 fn generated_dir() -> PathBuf {
@@ -24,6 +27,12 @@ fn export(dir: &Path) {
     Snapshot::export_all_to(dir).unwrap();
     ApiError::export_all_to(dir).unwrap();
     Health::export_all_to(dir).unwrap();
+    Role::export_all_to(dir).unwrap();
+    User::export_all_to(dir).unwrap();
+    SignIn::export_all_to(dir).unwrap();
+    NewUser::export_all_to(dir).unwrap();
+    NewPassword::export_all_to(dir).unwrap();
+    NewRole::export_all_to(dir).unwrap();
 }
 
 fn read_dir(dir: &Path) -> BTreeMap<String, String> {

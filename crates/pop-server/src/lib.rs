@@ -4,21 +4,28 @@
 pub mod access;
 pub mod api;
 pub mod assets;
+pub mod auth;
 pub mod backup;
 pub mod config;
 pub mod db;
 pub mod events;
 pub mod health;
+pub mod users;
 
 use std::sync::Arc;
 
-use axum::{Json, Router, extract::State, http::Method, routing::get};
+use axum::{
+    Json, Router,
+    extract::State,
+    http::Method,
+    routing::{delete, get, post, put},
+};
 use sqlx::SqlitePool;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::Level;
 
 use crate::{
-    access::{Effect, Reach, Route},
+    access::{Effect, Reach, Route, Who},
     api::Status,
     assets::Assets,
     events::Events,
@@ -85,6 +92,7 @@ pub fn routes() -> Vec<Route> {
             path: "/healthz",
             effect: Effect::Read,
             reach: Reach::Anywhere,
+            who: Who::Anyone,
             handler: get(health::healthz),
         },
         Route {
@@ -92,6 +100,7 @@ pub fn routes() -> Vec<Route> {
             path: "/api/status",
             effect: Effect::Read,
             reach: Reach::Anywhere,
+            who: Who::Anyone,
             handler: get(status),
         },
         Route {
@@ -99,7 +108,66 @@ pub fn routes() -> Vec<Route> {
             path: "/api/events",
             effect: Effect::Read,
             reach: Reach::Anywhere,
+            who: Who::Anyone,
             handler: get(events::stream),
+        },
+        // ---- signing in and out (#11) ----
+        Route {
+            method: Method::POST,
+            path: "/api/session",
+            effect: Effect::Account,
+            reach: Reach::Anywhere,
+            who: Who::Anyone,
+            handler: post(auth::sign_in),
+        },
+        Route {
+            method: Method::DELETE,
+            path: "/api/session",
+            effect: Effect::Account,
+            reach: Reach::Anywhere,
+            who: Who::Member,
+            handler: delete(auth::sign_out),
+        },
+        Route {
+            method: Method::GET,
+            path: "/api/me",
+            effect: Effect::Read,
+            reach: Reach::Anywhere,
+            who: Who::Member,
+            handler: get(auth::me),
+        },
+        // ---- managing accounts (#11) ----
+        Route {
+            method: Method::GET,
+            path: "/api/admin/users",
+            effect: Effect::Read,
+            reach: Reach::Anywhere,
+            who: Who::Admin,
+            handler: get(auth::list),
+        },
+        Route {
+            method: Method::POST,
+            path: "/api/admin/users",
+            effect: Effect::Account,
+            reach: Reach::Anywhere,
+            who: Who::Admin,
+            handler: post(auth::create),
+        },
+        Route {
+            method: Method::PUT,
+            path: "/api/admin/users/{id}/password",
+            effect: Effect::Account,
+            reach: Reach::Anywhere,
+            who: Who::Admin,
+            handler: put(auth::reset_password),
+        },
+        Route {
+            method: Method::PUT,
+            path: "/api/admin/users/{id}/role",
+            effect: Effect::Account,
+            reach: Reach::Anywhere,
+            who: Who::Admin,
+            handler: put(auth::set_role),
         },
     ]
 }
