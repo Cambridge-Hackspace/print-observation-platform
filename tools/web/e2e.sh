@@ -32,8 +32,11 @@ mkdir -p "$ROOT/web/.e2e"
   sh -c '
     set -e
     npm ci --no-audit --no-fund >/dev/null
+    # The binary runs from an empty directory, a copy with nothing beside
+    # it: whatever web app it serves is the one compiled into it (#4).
     state=$(mktemp -d)
-    POP_STORAGE_DATA_DIR="$state" POP_SERVER_LISTEN=127.0.0.1:8080 .e2e/pop >"$state/server.log" 2>&1 &
+    cp .e2e/pop "$state/pop"
+    (cd "$state" && POP_STORAGE_DATA_DIR="$state/data" POP_SERVER_LISTEN=127.0.0.1:8080 ./pop >"$state/server.log" 2>&1) &
     up=0
     for _ in $(seq 1 50); do
       if wget -q -O /dev/null http://127.0.0.1:8080/healthz 2>/dev/null; then up=1; break; fi
