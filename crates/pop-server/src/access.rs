@@ -46,6 +46,8 @@ pub enum Effect {
     Account,
     /// Changes a tower-wide setting, such as where group notices go (#68).
     Settings,
+    /// Writes guides (#71): nothing that reaches a printer.
+    Content,
 }
 
 /// Who may use a route (#11).

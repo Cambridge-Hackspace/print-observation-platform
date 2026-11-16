@@ -213,7 +213,8 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
     let mut state = AppState::new(pool, Arc::new(Embedded))
         .with_access(config.access.clone())
         .with_secrets(pop_server::secrets::Secrets::new(&config.secrets.key))
-        .with_public_url(&config.server.public_url);
+        .with_public_url(&config.server.public_url)
+        .with_files_dir(config.storage.data_dir.join(pop_server::backup::FILES_DIR));
     if !config.bam.url.is_empty() {
         let client = pop_integrations::bam::Bam::new(&config.bam.url, &config.bam.token)
             .map_err(|e| format!("BAM!: {e}"))?;

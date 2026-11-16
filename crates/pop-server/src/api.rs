@@ -155,6 +155,11 @@ pub enum AuditKind {
     WebhookCleared,
     /// An admin sent a test message to the group.
     WebhookTested,
+    /// An admin wrote a new guide.
+    GuideCreated,
+    /// An admin edited, renamed, published or unpublished a guide, or added
+    /// an image to it.
+    GuideEdited,
     /// A kind this build does not know, written by a newer POP. Shown, never
     /// hidden.
     Other,
@@ -242,4 +247,97 @@ pub struct NotifySettings {
 pub struct DiscordWebhook {
     /// As Discord's channel settings copy it.
     pub webhook_url: String,
+}
+
+/// A guide (#71): steps and yes/no flowcharts, as every viewer reads them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct Guide {
+    /// Stable, for links: `stringing-on-petg`.
+    pub slug: String,
+    pub title: String,
+    pub status: GuideStatus,
+    /// One sentence on what it fixes.
+    pub summary: String,
+    /// The id of the step it starts at.
+    pub start: String,
+    pub steps: Vec<GuideStep>,
+}
+
+/// Whether members and the public see a guide.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum GuideStatus {
+    Draft,
+    Published,
+}
+
+/// One step: something to do, or a yes/no question.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct GuideStep {
+    /// Unique in the guide: `dry-it`.
+    pub id: String,
+    /// What to do, or the question.
+    pub title: String,
+    /// More words, if any.
+    #[serde(default)]
+    pub body: String,
+    /// An image of this guide's, by id.
+    #[serde(default)]
+    pub image: Option<String>,
+    pub then: Then,
+}
+
+/// Where a step leads.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Then {
+    /// The end: this step says what to do.
+    Done,
+    /// On to another step.
+    Next { step: String },
+    /// A yes/no question: each answer leads to a step.
+    Question { yes: String, no: String },
+}
+
+/// A guide, in a list.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct GuideSummary {
+    pub slug: String,
+    pub title: String,
+    pub summary: String,
+    pub status: GuideStatus,
+    #[ts(type = "number")]
+    pub updated_at: i64,
+}
+
+/// One thing wrong with a guide, naming the step when it is one step's.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct GuideProblem {
+    pub step: Option<String>,
+    pub problem: String,
+}
+
+/// `422` for a guide that cannot be kept: everything wrong with it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct GuideProblems {
+    pub error: String,
+    pub problems: Vec<GuideProblem>,
+}
+
+/// `POST /api/admin/guides/{slug}/images`: an image, in base64, since every
+/// request that changes something is JSON (#7).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct NewGuideImage {
+    /// image/png, image/jpeg or image/webp.
+    pub content_type: String,
+    pub data_base64: String,
+}
+
+/// An image kept for a guide.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct GuideImage {
+    pub id: String,
 }
