@@ -5,6 +5,8 @@
 //! one, run `tools/gen-types.sh`; `tests/types.rs` fails until the generated
 //! files match.
 
+use std::collections::BTreeMap;
+
 use serde::Serialize;
 use ts_rs::TS;
 
@@ -29,6 +31,24 @@ pub enum ServerEvent {
     /// screen has fallen behind and missed events, so it catches up from a
     /// snapshot instead of from a gap.
     Status(Status),
+}
+
+/// `GET /healthz`: whether each part POP depends on is working.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct Health {
+    /// Every check passed.
+    pub ok: bool,
+    /// Each check by name: `database`, and each configured integration.
+    pub checks: BTreeMap<String, CheckResult>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct CheckResult {
+    pub ok: bool,
+    /// What is wrong, in a sentence, when it is not ok.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub error: Option<String>,
 }
 
 /// The body of every API error.

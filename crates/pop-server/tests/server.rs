@@ -14,7 +14,9 @@ use pop_server::{
     AppState,
     api::{ServerEvent, Status},
     assets::{Asset, Assets},
-    db, router,
+    db,
+    health::{CheckFuture, HealthCheck},
+    router,
 };
 use tower::ServiceExt;
 
@@ -95,22 +97,76 @@ fn newest_migration() -> i64 {
         .expect("at least one migration")
 }
 
-#[tokio::test]
-async fn healthz_is_ok_on_a_fresh_database() {
-    let pop = Pop::new(built_app()).await;
+/// An integration's health check that answers as told.
+struct Integration(&'static str, Result<(), &'static str>);
+
+impl HealthCheck for Integration {
+    fn name(&self) -> &'static str {
+        self.0
+    }
+    fn check(&self) -> CheckFuture<'_> {
+        let r = self.1.map_err(str::to_owned);
+        Box::pin(async move { r })
+    }
+}
+
+async fn health(pop: &Pop) -> (StatusCode, serde_json::Value) {
     let res = pop.get("/healthz").await;
-    assert_eq!(res.status(), StatusCode::OK);
-    assert_eq!(text(res).await, "ok");
+    let code = res.status();
+    (code, serde_json::from_str(&text(res).await).unwrap())
 }
 
 #[tokio::test]
-async fn healthz_fails_when_the_database_is_gone() {
+async fn healthz_reports_the_database_ok_on_a_fresh_database() {
+    let pop = Pop::new(built_app()).await;
+    let (code, body) = health(&pop).await;
+    assert_eq!(code, StatusCode::OK);
+    assert_eq!(body["ok"], true);
+    assert_eq!(body["checks"]["database"], serde_json::json!({"ok": true}));
+}
+
+#[tokio::test]
+async fn healthz_fails_naming_the_database_when_it_is_gone() {
     let pop = Pop::new(built_app()).await;
     pop.state.db.close().await;
+    let (code, body) = health(&pop).await;
+    assert_eq!(code, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body["ok"], false);
+    assert_eq!(body["checks"]["database"]["ok"], false);
+    // A sentence, not the driver's error, which can carry paths: this route is
+    // reachable from outside the space.
     assert_eq!(
-        pop.get("/healthz").await.status(),
-        StatusCode::SERVICE_UNAVAILABLE
+        body["checks"]["database"]["error"],
+        "the database does not answer"
     );
+}
+
+#[tokio::test]
+async fn healthz_names_each_integration_and_fails_on_any() {
+    let mut pop = Pop::new(built_app()).await;
+    pop.state = pop
+        .state
+        .clone()
+        .with_check(Integration("bam", Ok(())))
+        .with_check(Integration("go2rtc", Err("go2rtc does not answer")));
+    let (code, body) = health(&pop).await;
+    assert_eq!(code, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body["ok"], false);
+    assert_eq!(body["checks"]["database"]["ok"], true);
+    assert_eq!(body["checks"]["bam"], serde_json::json!({"ok": true}));
+    assert_eq!(
+        body["checks"]["go2rtc"],
+        serde_json::json!({"ok": false, "error": "go2rtc does not answer"})
+    );
+}
+
+#[tokio::test]
+async fn healthz_is_ok_when_every_integration_is() {
+    let mut pop = Pop::new(built_app()).await;
+    pop.state = pop.state.clone().with_check(Integration("bam", Ok(())));
+    let (code, body) = health(&pop).await;
+    assert_eq!(code, StatusCode::OK);
+    assert_eq!(body["ok"], true);
 }
 
 #[tokio::test]

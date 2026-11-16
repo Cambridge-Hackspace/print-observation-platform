@@ -27,3 +27,11 @@ test('an unknown API path is an error, not the app', async ({ request }) => {
   expect(res.status()).toBe(404);
   expect(await res.json()).toHaveProperty('error');
 });
+
+test('the server reports its health, naming the database', async ({ request }) => {
+  const res = await request.get('/healthz');
+  expect(res.status()).toBe(200);
+  const health = await res.json();
+  expect(health.ok).toBe(true);
+  expect(health.checks.database).toEqual({ ok: true });
+});
