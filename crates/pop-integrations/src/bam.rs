@@ -190,6 +190,14 @@ impl Bam {
         })
     }
 
+    pub(crate) fn base(&self) -> &str {
+        &self.base
+    }
+
+    pub(crate) fn token(&self) -> &str {
+        &self.token
+    }
+
     async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, BamError> {
         let res = self
             .http

@@ -24,6 +24,14 @@ What it shows about BAM!, and what POP relies on:
   a printer.
 - A bad token, no token, a missing asset and a plain request for the live
   WebSocket each have BAM!'s own refusal.
+- The live WebSocket (`live`), opened as POP's sync opens it: BAM!'s hello,
+  then an edit and a restore made while it was open, frame by frame. The fake
+  makes its frames from these, and from the event history's, so every frame
+  it sends is a shape BAM! sent.
+
+The fake keeps the printer category's assets as state, seeded from the
+recording, so a test can change a printer and see POP follow. Each request is
+recorded once: the fake refuses a recording that answers one request twice.
 
 ## Recording again
 

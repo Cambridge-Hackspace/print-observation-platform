@@ -110,8 +110,14 @@ os.makedirs(out, exist_ok=True)
 anon = urllib.request.build_opener()
 recorded = {}
 def record(name, method, path, token=token):
+    # One answer per request: the fake keys them by request, so a second
+    # would silently replace the first.
+    same = [n for n, r in recorded.items()
+            if (r["method"], r["path"], r.get("_token")) == (method, path, token)]
+    if same:
+        sys.exit(f"{name} asks what {same[0]} asked: record each request once")
     status, body = call(method, path, token=token, opener=anon)
-    recorded[name] = {"method": method, "path": path, "status": status, "body": body}
+    recorded[name] = {"method": method, "path": path, "status": status, "body": body, "_token": token}
 
 record("categories", "GET", "/api/v1/categories")
 record("printer_fields", "GET", f"/api/v1/categories/{printers}/fields")
@@ -125,8 +131,60 @@ kinds = "asset.created,asset.edited,asset.archived,asset.restored"
 record("events", "GET", f"/api/v1/events?kinds={kinds}&categories={printers}&limit=500")
 record("live_without_websocket", "GET", f"/api/v1/events/live?kinds={kinds}&categories={printers}")
 
+# ---- the live WebSocket, as POP's sync opens it (#22) ---------------------------
+import base64, socket, urllib.parse
+
+def ws_open(path, token):
+    """A WebSocket to BAM!, with POP's token: enough of RFC 6455 to read text."""
+    u = urllib.parse.urlsplit(BASE)
+    s = socket.create_connection((u.hostname, u.port or 80), timeout=10)
+    key = base64.b64encode(os.urandom(16)).decode()
+    s.sendall((f"GET {path} HTTP/1.1\r\nHost: {u.netloc}\r\nUpgrade: websocket\r\n"
+               f"Connection: Upgrade\r\nSec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n"
+               f"Authorization: Bearer {token}\r\n\r\n").encode())
+    head = b""
+    while b"\r\n\r\n" not in head:
+        head += s.recv(1)
+    if b" 101 " not in head.split(b"\r\n")[0]:
+        sys.exit(f"the live connection was refused: {head!r}")
+    return s
+
+def ws_text(s):
+    """The next text frame (pings and the like skipped)."""
+    def exact(n):
+        b = b""
+        while len(b) < n:
+            chunk = s.recv(n - len(b))
+            if not chunk:
+                sys.exit("the live connection closed")
+            b += chunk
+        return b
+    while True:
+        b1, b2 = exact(2)
+        n = b2 & 0x7F
+        if n == 126:
+            n = int.from_bytes(exact(2), "big")
+        elif n == 127:
+            n = int.from_bytes(exact(8), "big")
+        payload = exact(n)
+        if b1 & 0x0F == 1:
+            return json.loads(payload)
+
+live_path = f"/api/v1/events/live?kinds={kinds}&categories={printers}"
+ws = ws_open(live_path, token)
+frames = [ws_text(ws)]  # hello
+ok(*call("PUT", f"/api/v1/assets/{mk4}", {"field_values": {"connection": "prusalink",
+    "address": "http://192.168.1.62", "model": "Original Prusa MK4"}}), "editing the MK4 while live")
+frames.append(ws_text(ws))
+ok(*call("POST", f"/api/v1/assets/{old}/restore"), "restoring the old Prusa while live")
+frames.append(ws_text(ws))
+ws.close()
+recorded["live"] = {"method": "GET", "path": live_path, "status": 101, "body": {"frames": frames}}
+
 ids = {"printers": printers, "resin": resin, "filament": filament, "x1": x1, "voron": voron, "mk4": mk4,
        "incomplete": incomplete, "old": old}
+for r in recorded.values():
+    r.pop("_token", None)  # never write a token down
 with open(os.path.join(out, "recordings.json"), "w") as f:
     json.dump({"bam": ver, "ids": ids, "recorded": recorded}, f, indent=1, sort_keys=True)
     f.write("\n")

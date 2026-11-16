@@ -58,6 +58,16 @@ with ChaCha20-Poly1305 under the key in `POP_SECRETS_KEY` (`openssl rand
 -base64 32`). Without a key, POP refuses to keep it, rather than keep it in
 plain text. Changing the key means entering the codes again.
 
+## Keeping up with BAM!
+
+POP keeps BAM!'s live connection open (`/api/v1/events/live`), filtered to
+the printer category's created, edited, archived and restored events, and
+reads the category again on each. BAM! does not replay what a connection
+missed, so POP reads the whole category every time it connects, and every
+five minutes besides. While the live connection is down, POP's printers are
+as BAM! last said, and `/healthz` says so (`bam_live`). The token needs
+`events.read` for this, and BAM! allows five live connections per token.
+
 ## What POP was tested against
 
 `crates/pop-integrations/tests/recordings` holds a real BAM! v0.20.0's

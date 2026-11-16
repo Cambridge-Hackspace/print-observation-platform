@@ -216,11 +216,20 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
     if !config.bam.url.is_empty() {
         let client = pop_integrations::bam::Bam::new(&config.bam.url, &config.bam.token)
             .map_err(|e| format!("BAM!: {e}"))?;
-        state = state.with_bam(pop_server::printers::BamSource {
-            client,
-            category: config.bam.category.clone(),
-            fields: config.bam.fields.clone(),
-        });
+        // Kept in sync with BAM!'s live connection, re-read on every
+        // reconnect and every five minutes (#22).
+        let (view, _sync) = pop_integrations::sync::spawn(
+            client.clone(),
+            config.bam.category.clone(),
+            pop_integrations::sync::Options::default(),
+        );
+        state = state
+            .with_bam(pop_server::printers::BamSource {
+                client,
+                category: config.bam.category.clone(),
+                fields: config.bam.fields.clone(),
+            })
+            .with_bam_sync(view);
     }
     let events = state.events.clone();
     let app = router(state);

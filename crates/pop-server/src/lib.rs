@@ -49,6 +49,8 @@ pub struct AppState {
     pub bam: Option<Arc<printers::BamSource>>,
     /// Seals the secrets POP keeps for printers (#21).
     pub secrets: secrets::Secrets,
+    /// The printer category as BAM! last said, kept in sync (#22).
+    pub bam_view: Option<tokio::sync::watch::Receiver<pop_integrations::sync::View>>,
 }
 
 impl AppState {
@@ -61,7 +63,18 @@ impl AppState {
             access: config::Access::default(),
             bam: None,
             secrets: secrets::Secrets::none(),
+            bam_view: None,
         }
+    }
+
+    /// Follow BAM!'s printer category through this sync (#22), and check its
+    /// live connection on /healthz.
+    pub fn with_bam_sync(
+        mut self,
+        view: tokio::sync::watch::Receiver<pop_integrations::sync::View>,
+    ) -> Self {
+        self.bam_view = Some(view.clone());
+        self.with_check(printers::BamLiveHealth(view))
     }
 
     /// Read printers from this BAM!, and check it on /healthz.
