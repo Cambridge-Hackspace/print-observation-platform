@@ -1225,6 +1225,12 @@ version = "0.1.0"
 [[package]]
 name = "pop-printers"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "tokio",
+ "tracing",
+ "ts-rs",
+]
 
 [[package]]
 name = "pop-server"
@@ -1239,6 +1245,7 @@ dependencies = [
  "hex",
  "http-body-util",
  "ipnet",
+ "pop-printers",
  "rand",
  "rpassword",
  "rust-embed",

@@ -1,9 +1,18 @@
 //! Printer access: one driver interface, and a driver per kind of printer.
 //!
-//! Every printer is reached through one trait (ADR 0001, "Printers: one driver
-//! interface"). Each driver says what it can do, and each connected printer
-//! runs as its own supervised task, so one misbehaving printer cannot take the
-//! fleet with it. Drivers arrive in the ADR's order: Moonraker, then OctoPrint
-//! and PrusaLink, then Bambu in LAN mode, then USB serial for Marlin.
-//!
-//! Empty until the first driver lands.
+//! Every printer is reached through one trait, [`Driver`] (ADR 0001,
+//! "Printers: one driver interface"; #25). Each driver says what it can do
+//! ([`Capabilities`]) and reports one state model ([`PrinterState`]). Each
+//! printer runs as its own supervised task in a [`Fleet`]: a driver that
+//! fails, panics or stops is replaced with a fresh one, after a pause that
+//! grows while it keeps failing, and the printer reads as offline meanwhile.
+//! No other printer notices. Drivers arrive in the ADR's order: Moonraker,
+//! then OctoPrint and PrusaLink, then Bambu in LAN mode, then USB serial.
+
+pub mod driver;
+pub mod fleet;
+pub mod state;
+
+pub use driver::{Capabilities, Driver, DriverError, Reporter};
+pub use fleet::{Fleet, Printer, Update};
+pub use state::{Job, Layer, PrinterState, PrinterStatus};
