@@ -20,16 +20,25 @@ pub struct Status {
     pub schema_version: i64,
 }
 
+/// Everything a screen shows, at one moment. A screen that receives one
+/// replaces its state with it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct Snapshot {
+    pub status: Status,
+}
+
 /// One message on the live-update stream (`GET /api/events`).
 ///
 /// Serialized as `{"type": "...", "data": ...}`, so the web app can switch on
-/// `type` without guessing.
+/// `type` without guessing. A `snapshot` replaces a screen's state; every
+/// other event changes part of it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(tag = "type", content = "data", rename_all = "snake_case")]
 pub enum ServerEvent {
-    /// The server's status. Sent first on every connection, and again when a
-    /// screen has fallen behind and missed events, so it catches up from a
-    /// snapshot instead of from a gap.
+    /// Everything, at once: sent to a screen that connects, to one that
+    /// reconnects too late to catch up, and to one that falls behind.
+    Snapshot(Snapshot),
+    /// The server's status changed.
     Status(Status),
 }
 

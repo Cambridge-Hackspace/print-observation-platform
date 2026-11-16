@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { follow, parse, FIRST_RETRY_MS, MAX_RETRY_MS, type Connection, type Source } from './live';
+import {
+  follow,
+  parse,
+  resumeUrl,
+  FIRST_RETRY_MS,
+  MAX_RETRY_MS,
+  type Connection,
+  type Source,
+} from './live';
 import type { ServerEvent } from './generated/ServerEvent';
 
 /** Stands in for an EventSource; the test drives it. */
@@ -14,8 +22,8 @@ class FakeSource implements Source {
     this.readyState = 1;
     this.onopen?.(new Event('open'));
   }
-  message(data: string) {
-    this.onmessage?.({ data } as MessageEvent);
+  message(data: string, lastEventId = '') {
+    this.onmessage?.({ data, lastEventId } as MessageEvent);
   }
   /** The browser lost the connection and will retry it itself. */
   drop() {
@@ -54,6 +62,12 @@ function setup() {
 const STATUS = '{"type":"status","data":{"version":"0.1.0","schema_version":1}}';
 
 describe('parse', () => {
+  it('reads a snapshot', () => {
+    expect(parse('{"type":"snapshot","data":{"status":{"version":"0.1.0","schema_version":1}}}')).toEqual({
+      type: 'snapshot',
+      data: { status: { version: '0.1.0', schema_version: 1 } },
+    });
+  });
   it('reads a status event', () => {
     expect(parse(STATUS)).toEqual({ type: 'status', data: { version: '0.1.0', schema_version: 1 } });
   });
@@ -66,6 +80,8 @@ describe('parse', () => {
       '{"type":"status","data":{"version":1,"schema_version":1}}',
       '{"type":"status","data":{"version":"0.1.0","schema_version":"1"}}',
       '{"type":"printer","data":{}}',
+      '{"type":"snapshot","data":{}}',
+      '{"type":"snapshot","data":{"status":{"version":"0.1.0"}}}',
     ]) {
       expect(parse(raw), raw).toBeNull();
     }
@@ -147,5 +163,33 @@ describe('follow', () => {
     t2.last().open();
     t2.stop();
     expect(t2.last().closed).toBe(true);
+  });
+});
+
+describe('resuming', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('builds the address with the last id, escaped', () => {
+    expect(resumeUrl('/api/events', '')).toBe('/api/events');
+    expect(resumeUrl('/api/events', 'a1b.42')).toBe('/api/events?last_event_id=a1b.42');
+    expect(resumeUrl('/api/events?x=1', 'e&v.1')).toBe('/api/events?x=1&last_event_id=e%26v.1');
+  });
+
+  it('reopens a connection it opens itself from the last id it saw', () => {
+    const t = setup();
+    t.last().open();
+    t.last().message(STATUS, 'ep.7');
+    t.last().message(STATUS, 'ep.8');
+    t.last().refuse();
+    vi.advanceTimersByTime(FIRST_RETRY_MS);
+    expect(t.last().url).toBe('/api/events?last_event_id=ep.8');
+  });
+
+  it('reopens plainly when it has seen nothing yet', () => {
+    const t = setup();
+    t.last().refuse();
+    vi.advanceTimersByTime(FIRST_RETRY_MS);
+    expect(t.last().url).toBe('/api/events');
   });
 });

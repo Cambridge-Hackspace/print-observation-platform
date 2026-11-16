@@ -12,9 +12,9 @@ Each suite is there for defects the cheaper ones cannot see.
 | --- | --- | --- |
 | `cargo fmt`, `cargo clippy -D warnings` | `tools/rust.sh` | Style drift and the mistakes clippy knows. |
 | Unit tests, `crates/*/src` | `tools/rust.sh` | Configuration: defaults, and errors that name the setting at fault. |
-| Server tests, `crates/pop-server/tests/server.rs` | `tools/rust.sh` | The router against a real SQLite database: health, status, the web app's routing rules (an API path never gets the app's HTML; hashed files cache for good, others don't; a missing file is a 404), and the live stream (a snapshot on connect, events in order to every screen, a fresh snapshot for a screen that fell behind, and every stream ending on shutdown). |
+| Server tests, `crates/pop-server/tests/server.rs` | `tools/rust.sh` | The router against a real SQLite database: health, status, the web app's routing rules (an API path never gets the app's HTML; hashed files cache for good, others don't; a missing file is a 404), and the live stream (a snapshot on connect; events in order to every screen; a screen that drops and resumes ending where a steady one does, sent every event once; a snapshot for a resume too late, from another server, or a screen that fell behind; and every stream ending on shutdown). |
 | Type drift, `crates/pop-server/tests/types.rs` | `tools/rust.sh` | The web app's generated types no longer matching the server's. |
-| `svelte-check`, Vitest, `web/src/**/*.test.ts` | `tools/web/build.sh check` | Type errors in the app, and the live-update client: what counts as a valid event, and reconnecting after the browser gives up, waiting longer each time up to a limit. |
+| `svelte-check`, Vitest, `web/src/**/*.test.ts` | `tools/web/build.sh check` | Type errors in the app, and the live-update client: what counts as a valid event; reconnecting after the browser gives up, waiting longer each time up to a limit, and from the last event seen; and a screen's state as the fold of its stream. |
 | Playwright, `web/e2e` | `tools/web/e2e.sh` | The wiring no other suite can see: a release binary serving the app it was built with, the app going live over the stream, and showing what the API reports. |
 
 Every assertion was checked by breaking the code it covers and watching it
@@ -22,9 +22,6 @@ fail, then restoring it.
 
 ## What is not proven
 
-- **That the server subscribes to events before taking a snapshot**, which is
-  what stops an event published in between from being lost. That race cannot
-  be forced from outside the handler.
 - **Live updates through a reverse proxy.** A proxy that buffers responses
   holds Server-Sent Events back; deployment will need its own check.
 - **The kiosk's hardware.** Chromium in `cage` on the tower's box (ADR 0001)
