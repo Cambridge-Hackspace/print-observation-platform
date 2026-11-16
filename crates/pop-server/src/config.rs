@@ -27,6 +27,7 @@ pub struct Config {
     pub access: Access,
     pub bam: Bam,
     pub secrets: Secrets,
+    pub guides: Guides,
 }
 
 /// Where POP reads its printers (#20, #21). Off while `url` is empty.
@@ -41,6 +42,18 @@ pub struct Bam {
     pub category: String,
     /// Which of the category's fields give each printer's settings.
     pub fields: pop_integrations::printers::FieldMap,
+}
+
+/// How published guides are offered to everyone (#94).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Default)]
+#[serde(deny_unknown_fields, default)]
+pub struct Guides {
+    /// The license each published guide is shown under: "CC BY-SA 4.0".
+    /// Empty: none is shown.
+    pub license: String,
+    /// Whether search engines may index the public guides. Off: every
+    /// public guide answer says noindex.
+    pub indexable: bool,
 }
 
 /// Where secrets POP keeps (a Bambu printer's access code) are sealed.
@@ -256,6 +269,19 @@ impl Config {
         set("POP_BAM_FIELDS_TRAINING", &mut f.training);
         set("POP_BAM_FIELDS_SERIAL", &mut f.serial);
         set("POP_SECRETS_KEY", &mut self.secrets.key);
+        set("POP_GUIDES_LICENSE", &mut self.guides.license);
+        if let Some(v) = env("POP_GUIDES_INDEXABLE") {
+            self.guides.indexable = match v.as_str() {
+                "true" => true,
+                "false" => false,
+                _ => {
+                    return Err(err(
+                        "POP_GUIDES_INDEXABLE",
+                        format!("{v:?}: expected true or false"),
+                    ));
+                }
+            };
+        }
         // Each override that has a form is checked here, so its error names
         // the variable rather than the file's key.
         if env("POP_SERVER_PUBLIC_URL").is_some()
@@ -619,6 +645,27 @@ mod tests {
         })
         .unwrap();
         assert_eq!(c.server.public_url, "http://10.0.0.5:8080");
+    }
+
+    #[test]
+    fn guides_settings_come_from_the_file_or_the_environment() {
+        let c = Config::parse("[guides]\nlicense = \"CC BY-SA 4.0\"\nindexable = true\n").unwrap();
+        assert_eq!(c.guides.license, "CC BY-SA 4.0");
+        assert!(c.guides.indexable);
+        assert!(
+            !Config::default().guides.indexable,
+            "not indexed unless said"
+        );
+        let e = env_err(&[("POP_GUIDES_INDEXABLE", "yes")]);
+        assert_eq!(e.key, "POP_GUIDES_INDEXABLE");
+        let c = Config::load(None, |k| match k {
+            "POP_GUIDES_INDEXABLE" => Some("true".to_owned()),
+            "POP_GUIDES_LICENSE" => Some("CC BY 4.0".to_owned()),
+            _ => None,
+        })
+        .unwrap();
+        assert!(c.guides.indexable);
+        assert_eq!(c.guides.license, "CC BY 4.0");
     }
 
     #[test]

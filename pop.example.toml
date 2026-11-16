@@ -71,3 +71,10 @@ serial = "serial"
 # random bytes in base64, as `openssl rand -base64 32` makes. A secret: give
 # it as POP_SECRETS_KEY, not here. Empty: POP refuses to keep secrets.
 key = ""
+
+[guides]
+# The license each published guide is shown under, such as "CC BY-SA 4.0".
+# Empty: none is shown.
+license = ""
+# Whether search engines may index the public guides at /guides.
+indexable = false

@@ -341,3 +341,30 @@ pub struct NewGuideImage {
 pub struct GuideImage {
     pub id: String,
 }
+
+/// `GET /api/public/guides/{slug}`: a published guide, for anyone (#94).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct PublicGuide {
+    pub slug: String,
+    pub title: String,
+    pub summary: String,
+    pub start: String,
+    pub steps: Vec<GuideStep>,
+    /// The license it is offered under, when one is set.
+    pub license: Option<String>,
+}
+
+/// `GET /api/public/guides`: the published guides, by title.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct PublicGuideList {
+    pub guides: Vec<PublicGuideSummary>,
+    pub license: Option<String>,
+}
+
+/// A published guide, in the public list.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct PublicGuideSummary {
+    pub slug: String,
+    pub title: String,
+    pub summary: String,
+}

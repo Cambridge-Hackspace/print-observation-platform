@@ -7,12 +7,12 @@ use axum::{
     body::Body,
     extract::ConnectInfo,
     http::{Method, Request, StatusCode},
-    routing::{get, post},
+    routing::{get, post, put},
 };
 use http_body_util::BodyExt;
 use pop_server::{
     AppState,
-    access::{Effect, Reach, Route, Who, violations},
+    access::{Effect, Reach, Route, Violation, Who, is_public, public_changes, violations},
     assets::Embedded,
     config::Access,
     db, router_with, routes,
@@ -191,6 +191,45 @@ async fn a_route_reachable_from_anywhere_serves_a_remote_request() {
 
 /// Every local-only route in the real table refuses a remote request. Empty
 /// today, like the table's printer routes; it covers each as it arrives.
+#[test]
+fn no_public_route_changes_anything_but_signing_in() {
+    assert_eq!(public_changes(&routes()), []);
+    // The public guides (#94) are in the table, and public.
+    let public: Vec<&str> = routes()
+        .iter()
+        .filter(|r| is_public(r))
+        .map(|r| r.path)
+        .collect();
+    for p in [
+        "/api/public/guides",
+        "/api/public/guides/{slug}",
+        "/api/public/guides/{slug}/images/{id}",
+    ] {
+        assert!(public.contains(&p), "{p} is not public: {public:?}");
+    }
+}
+
+#[test]
+fn the_check_fails_a_public_route_that_writes() {
+    // The oracle, fed what a broken table would hold: a public route that
+    // writes a guide.
+    let writes = Route {
+        method: Method::PUT,
+        path: "/api/public/guides/{slug}",
+        effect: Effect::Content,
+        reach: Reach::Anywhere,
+        who: Who::Anyone,
+        handler: put(ok),
+    };
+    assert_eq!(
+        public_changes(&[watch(), writes]),
+        [Violation {
+            method: Method::PUT,
+            path: "/api/public/guides/{slug}"
+        }]
+    );
+}
+
 #[tokio::test]
 async fn every_local_only_route_of_the_real_table_refuses_a_remote_request() {
     let local: Vec<_> = routes()

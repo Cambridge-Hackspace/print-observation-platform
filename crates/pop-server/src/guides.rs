@@ -709,3 +709,171 @@ pub async fn serve_image(db: &SqlitePool, files: &Path, guide_id: i64, image_id:
         Err(e) => error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
     }
 }
+
+// ---- for everyone (#94) ------------------------------------------------------
+
+use axum::http::HeaderMap;
+use sha2::{Digest, Sha256};
+
+use crate::api::{PublicGuide, PublicGuideList, PublicGuideSummary};
+
+/// How long a cache or proxy may keep a public answer before asking again
+/// (with its ETag, so asking is cheap).
+const PUBLIC_MAX_AGE: &str = "public, max-age=60";
+
+/// A public answer: an ETag of its bytes, a 304 when the asker has them
+/// already, and noindex unless the guides may be indexed.
+fn public_answer(
+    state: &AppState,
+    headers: &HeaderMap,
+    content_type: &str,
+    bytes: Vec<u8>,
+) -> Response {
+    let etag = format!("\"{}\"", hex::encode(&Sha256::digest(&bytes)[..16]));
+    let fresh = headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.split(',').any(|t| t.trim() == etag || t.trim() == "*"));
+    let mut res = if fresh {
+        StatusCode::NOT_MODIFIED.into_response()
+    } else {
+        (
+            [
+                (header::CONTENT_TYPE, content_type.to_owned()),
+                (header::X_CONTENT_TYPE_OPTIONS, "nosniff".to_owned()),
+            ],
+            Body::from(bytes),
+        )
+            .into_response()
+    };
+    let h = res.headers_mut();
+    h.insert(header::ETAG, etag.parse().expect("hex is a header value"));
+    h.insert(
+        header::CACHE_CONTROL,
+        PUBLIC_MAX_AGE.parse().expect("a header value"),
+    );
+    if !state.guides.indexable {
+        h.insert("x-robots-tag", "noindex".parse().expect("a header value"));
+    }
+    res
+}
+
+fn license(state: &AppState) -> Option<String> {
+    let l = state.guides.license.trim();
+    (!l.is_empty()).then(|| l.to_owned())
+}
+
+/// What a public slug names: the published guide's id and slug now, a
+/// redirect from an old slug, or nothing a stranger may see.
+enum Public {
+    Here(i64),
+    Moved(String),
+    Nothing,
+}
+
+async fn public(db: &SqlitePool, slug: &str) -> Result<Public, sqlx::Error> {
+    let Some((id, current)) = find(db, slug).await? else {
+        return Ok(Public::Nothing);
+    };
+    let status: String = sqlx::query_scalar("SELECT status FROM guides WHERE id = ?")
+        .bind(id)
+        .fetch_one(db)
+        .await?;
+    // A draft is not there, whether by its slug or an old one.
+    Ok(if status != "published" {
+        Public::Nothing
+    } else if current != slug {
+        Public::Moved(current)
+    } else {
+        Public::Here(id)
+    })
+}
+
+fn moved(to: String) -> Response {
+    (StatusCode::PERMANENT_REDIRECT, [(header::LOCATION, to)]).into_response()
+}
+
+/// `GET /api/public/guides`.
+pub async fn public_list(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let guides = match list(&state.db, true).await {
+        Ok(g) => g,
+        Err(e) => return error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
+    };
+    let body = PublicGuideList {
+        guides: guides
+            .into_iter()
+            .map(|g| PublicGuideSummary {
+                slug: g.slug,
+                title: g.title,
+                summary: g.summary,
+            })
+            .collect(),
+        license: license(&state),
+    };
+    let bytes = serde_json::to_vec(&body).expect("a list serializes");
+    public_answer(&state, &headers, "application/json", bytes)
+}
+
+/// `GET /api/public/guides/{slug}`: a published guide; 404 for a draft.
+pub async fn public_get(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    UrlPath(slug): UrlPath<String>,
+) -> Response {
+    match public(&state.db, &slug).await {
+        Ok(Public::Here(_)) => {}
+        Ok(Public::Moved(to)) => return moved(format!("/api/public/guides/{to}")),
+        Ok(Public::Nothing) => {
+            return error(StatusCode::NOT_FOUND, "no published guide has that slug");
+        }
+        Err(e) => return error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
+    }
+    let g = match get(&state.db, &slug).await {
+        Ok(Some(g)) => g,
+        Ok(None) => return error(StatusCode::NOT_FOUND, "no published guide has that slug"),
+        Err(e) => return error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
+    };
+    let body = PublicGuide {
+        slug: g.slug,
+        title: g.title,
+        summary: g.summary,
+        start: g.start,
+        steps: g.steps,
+        license: license(&state),
+    };
+    let bytes = serde_json::to_vec(&body).expect("a guide serializes");
+    public_answer(&state, &headers, "application/json", bytes)
+}
+
+/// `GET /api/public/guides/{slug}/images/{id}`: a published guide's image;
+/// a draft's stays private.
+pub async fn public_image(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    UrlPath((slug, image_id)): UrlPath<(String, String)>,
+) -> Response {
+    let id = match public(&state.db, &slug).await {
+        Ok(Public::Here(id)) => id,
+        Ok(Public::Moved(to)) => {
+            return moved(format!("/api/public/guides/{to}/images/{image_id}"));
+        }
+        Ok(Public::Nothing) => return error(StatusCode::NOT_FOUND, "no such image"),
+        Err(e) => return error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
+    };
+    let Some(files) = state.files_dir.clone() else {
+        return error(StatusCode::NOT_FOUND, "no such image");
+    };
+    match image(&state.db, &files, id, &image_id).await {
+        Ok(Some((path, ct))) => match tokio::fs::read(&path).await {
+            Ok(bytes) => public_answer(&state, &headers, &ct, bytes),
+            Err(e) => {
+                tracing::error!(
+                    "guide image {image_id} is in the database but its file is not: {e}"
+                );
+                error(StatusCode::NOT_FOUND, "no such image")
+            }
+        },
+        Ok(None) => error(StatusCode::NOT_FOUND, "no such image"),
+        Err(e) => error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
+    }
+}
