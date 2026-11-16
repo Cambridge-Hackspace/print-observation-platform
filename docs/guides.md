@@ -101,7 +101,11 @@ Two settings, in `[guides]`:
   every public answer says `X-Robots-Tag: noindex`.
 
 The public pages at `/guides` and `/guides/{slug}` come with the guide viewers
-(#56, #72), which render the same walk-through.
+(#56, #72), which render the same walk-through. They are also the phone app's
+Guides (#72), so members can learn before they come in: they fit a phone's
+width, and lead back to the printers. On a phone, "The whole guide" keeps the
+flowchart at its own size and scrolls it sideways, since shrunk to fit the
+screen its words are too small to read; at the kiosk it sits beside the step.
 
 ## Errors link to the right guide
 

@@ -36,6 +36,10 @@ mkdir -p "$ROOT/web/.e2e"
     # it: whatever web app it serves is the one compiled into it (#4).
     state=$(mktemp -d)
     cp .e2e/pop "$state/pop"
+    # An admin, for the tests that need content an admin writes (a published
+    # guide, #72). Made the way a deployment makes its first one (README).
+    export POP_E2E_ADMIN_PASSWORD="an e2e admin password"
+    (cd "$state" && printf "%s\n" "$POP_E2E_ADMIN_PASSWORD" | POP_STORAGE_DATA_DIR="$state/data" ./pop user create-admin e2e --name "E2E Admin")
     (cd "$state" && POP_STORAGE_DATA_DIR="$state/data" POP_SERVER_LISTEN=127.0.0.1:8080 ./pop >"$state/server.log" 2>&1) &
     up=0
     for _ in $(seq 1 50); do

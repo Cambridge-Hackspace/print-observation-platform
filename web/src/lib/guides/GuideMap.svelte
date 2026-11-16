@@ -3,7 +3,18 @@
   import { layout, BOX_W, BOX_H } from './layout';
   import type { Walk, Walkable } from './walk';
 
-  let { guide, walk, label }: { guide: Walkable; walk: Walk; label: string } = $props();
+  let {
+    guide,
+    walk,
+    label,
+    fit = true,
+  }: {
+    guide: Walkable;
+    walk: Walk;
+    label: string;
+    /** Shrink to the space it has; or, false, keep its own size to be scrolled, as on a phone (#72). */
+    fit?: boolean;
+  } = $props();
 
   const chart = $derived(layout(guide));
   const here = $derived(walk.trail[walk.trail.length - 1]);
@@ -30,8 +41,10 @@
 
 <svg
   class="map"
+  class:natural={!fit}
   viewBox="0 0 {chart.width} {chart.height}"
-  width="100%"
+  width={fit ? '100%' : chart.width}
+  height={fit ? undefined : chart.height}
   role="img"
   aria-label={label}
   data-testid="guide-map"
@@ -89,6 +102,9 @@
     display: block;
     max-width: 100%;
     height: auto;
+  }
+  .map.natural {
+    max-width: none;
   }
   .box {
     font: 13px var(--pop-font);

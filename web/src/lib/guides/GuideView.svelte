@@ -69,7 +69,11 @@
   {:else}
     <details class="whole">
       <summary>The whole guide</summary>
-      <GuideMap {guide} {walk} label="The {title} flowchart, with your path so far marked" />
+      <!-- At its own size, scrolled sideways if it is wider than the screen:
+           shrunk to fit a phone, its words are too small to read (#72). -->
+      <div class="scroll" data-testid="map-scroll">
+        <GuideMap {guide} {walk} fit={false} label="The {title} flowchart, with your path so far marked" />
+      </div>
     </details>
   {/if}
 </div>
@@ -131,6 +135,10 @@
     flex-direction: column;
     gap: 12px;
     font-size: 16px;
+  }
+  .scroll {
+    overflow-x: auto;
+    max-width: 100%;
   }
   details.whole summary {
     cursor: pointer;

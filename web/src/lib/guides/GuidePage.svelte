@@ -34,6 +34,7 @@
       <Logo />
       <span>{kiosk ? 'Back to the printers' : 'All guides'}</span>
     </a>
+    {#if !kiosk}<a class="app" href="/">Printers</a>{/if}
   </header>
   {#if guide}
     <h1>{guide.title}</h1>
@@ -72,6 +73,13 @@
   }
   header {
     display: flex;
+    flex-wrap: wrap;
+  }
+  .app {
+    margin-left: auto;
+    padding: 8px 0;
+    color: var(--pop-butter);
+    font-size: 16px;
   }
   .home {
     display: flex;

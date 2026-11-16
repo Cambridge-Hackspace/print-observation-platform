@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/svelte';
 import GuideView from './GuideView.svelte';
 import GuidePage from './GuidePage.svelte';
+import GuidesIndex from './GuidesIndex.svelte';
 import { STRINGING } from './fixture';
 
 afterEach(() => {
@@ -87,6 +88,18 @@ describe('the guide viewer', () => {
     const p = view('page');
     expect(p.container.querySelector('details [data-testid="guide-map"]')).toBeTruthy();
   });
+
+  it('keeps the flowchart at its own size on a page, to scroll sideways on a phone, and fits it at the kiosk (#72)', () => {
+    const k = view('kiosk');
+    expect(k.getByTestId('guide-map').getAttribute('width')).toBe('100%');
+    cleanup();
+    const p = view('page');
+    const map = p.getByTestId('guide-map');
+    expect(map.closest('[data-testid="map-scroll"]')).toBeTruthy();
+    const [, , w, h] = map.getAttribute('viewBox')!.split(' ');
+    expect(map.getAttribute('width')).toBe(w);
+    expect(map.getAttribute('height')).toBe(h);
+  });
 });
 
 describe('the public guide page', () => {
@@ -97,6 +110,8 @@ describe('the public guide page', () => {
     expect(p.getByText('Shared under CC BY-SA 4.0.')).toBeTruthy();
     expect((fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toBe('/api/public/guides/stringing-on-petg');
     expect(p.getByRole('link', { name: /All guides/ }).getAttribute('href')).toBe('/guides');
+    // And back to the phone app (#72).
+    expect(p.getByRole('link', { name: 'Printers' }).getAttribute('href')).toBe('/');
   });
 
   it('says so when there is no such published guide', async () => {
@@ -110,6 +125,17 @@ describe('the public guide page', () => {
     const p = render(GuidePage, { slug: 'stringing-on-petg', kiosk: true });
     await waitFor(() => expect(p.getByTestId('guide')).toBeTruthy());
     expect(p.getByRole('link', { name: /Back to the printers/ }).getAttribute('href')).toBe('/kiosk');
+    expect(p.queryByRole('link', { name: 'Printers' }), 'the kiosk has its own way back').toBeNull();
     expect(p.container.querySelector('aside [data-testid="guide-map"]')).toBeTruthy();
+  });
+});
+
+describe('the guides index', () => {
+  it('lists the published guides and leads back to the phone app (#72)', async () => {
+    const list = { guides: [{ slug: 'stringing-on-petg', title: 'Stringing on PETG', summary: 'Hairs between parts.' }], license: null };
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(list), { status: 200 })));
+    const p = render(GuidesIndex);
+    await waitFor(() => expect(p.getByRole('link', { name: 'Stringing on PETG' }).getAttribute('href')).toBe('/guides/stringing-on-petg'));
+    expect(p.getByRole('link', { name: 'Printers' }).getAttribute('href')).toBe('/');
   });
 });
