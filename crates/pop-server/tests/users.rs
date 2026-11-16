@@ -471,3 +471,303 @@ async fn an_expired_session_signs_nobody_in() {
     let me = pop.send(Method::GET, "/api/me", Some(&cookie), None).await;
     assert_eq!(me.code, StatusCode::UNAUTHORIZED);
 }
+
+// ---- managing local users (#90) -------------------------------------------------------
+
+impl Pop {
+    async fn put(&self, cookie: &str, id: i64, what: &str, body: Value) -> Res {
+        self.send(
+            Method::PUT,
+            &format!("/api/admin/users/{id}/{what}"),
+            Some(cookie),
+            Some(body),
+        )
+        .await
+    }
+
+    async fn accounts(&self, cookie: &str) -> Vec<Value> {
+        let r = self
+            .send(Method::GET, "/api/admin/users", Some(cookie), None)
+            .await;
+        assert_eq!(r.code, StatusCode::OK, "{}", r.body);
+        r.body.as_array().unwrap().clone()
+    }
+
+    async fn audit(&self, cookie: &str, kind: &str) -> Vec<String> {
+        let r = self
+            .send(
+                Method::GET,
+                &format!("/api/admin/audit?kind={kind}"),
+                Some(cookie),
+                None,
+            )
+            .await;
+        assert_eq!(r.code, StatusCode::OK, "{}", r.body);
+        r.body
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| {
+                // Read back as the kind it was written as, not "other".
+                assert_eq!(e["kind"], kind, "{e}");
+                e["summary"].as_str().unwrap().to_owned()
+            })
+            .collect()
+    }
+}
+
+#[tokio::test]
+async fn the_list_says_whether_each_account_is_active_and_its_training() {
+    let pop = pop().await;
+    let admin = pop.sign_in("ada", ADMIN_PW).await;
+    let all = pop.accounts(&admin).await;
+    assert_eq!(all.len(), 2);
+    let grace = all.iter().find(|a| a["username"] == "grace").unwrap();
+    assert_eq!(grace["active"], true);
+    assert_eq!(grace["training"], json!([]));
+    assert_eq!(grace["role"], "member");
+}
+
+#[tokio::test]
+async fn renaming_keeps_the_username_it_signs_in_with() {
+    let pop = pop().await;
+    let admin = pop.sign_in("ada", ADMIN_PW).await;
+    let r = pop
+        .put(
+            &admin,
+            pop.member_id,
+            "name",
+            json!({"name": "  Grace Hopper "}),
+        )
+        .await;
+    assert_eq!(r.code, StatusCode::OK, "{}", r.body);
+    assert_eq!(r.body["name"], "Grace Hopper");
+    assert_eq!(r.body["username"], "grace");
+    let me = pop.sign_in("grace", MEMBER_PW).await;
+    let who = pop.send(Method::GET, "/api/me", Some(&me), None).await;
+    assert_eq!(who.body["name"], "Grace Hopper");
+    let blank = pop
+        .put(&admin, pop.member_id, "name", json!({"name": "  "}))
+        .await;
+    assert_eq!(blank.code, StatusCode::BAD_REQUEST, "{}", blank.body);
+    assert!(blank.body["error"].as_str().unwrap().starts_with("name"));
+}
+
+#[tokio::test]
+async fn a_deactivated_account_is_signed_out_and_cannot_sign_in_until_reactivated() {
+    let pop = pop().await;
+    let admin = pop.sign_in("ada", ADMIN_PW).await;
+    let grace = pop.sign_in("grace", MEMBER_PW).await;
+    let r = pop
+        .put(&admin, pop.member_id, "active", json!({"active": false}))
+        .await;
+    assert_eq!(r.code, StatusCode::OK, "{}", r.body);
+    assert_eq!(r.body["active"], false);
+    // Her sign-in has ended...
+    let me = pop.send(Method::GET, "/api/me", Some(&grace), None).await;
+    assert_eq!(me.code, StatusCode::UNAUTHORIZED);
+    // ...and the right password answers as a wrong one does.
+    let tried = pop
+        .send(
+            Method::POST,
+            "/api/session",
+            None,
+            Some(json!({"username": "grace", "password": MEMBER_PW})),
+        )
+        .await;
+    let wrong = pop
+        .send(
+            Method::POST,
+            "/api/session",
+            None,
+            Some(json!({"username": "grace", "password": "not it at all"})),
+        )
+        .await;
+    assert_eq!(tried.code, StatusCode::UNAUTHORIZED);
+    assert_eq!(tried.body, wrong.body, "no hint that the account exists");
+    assert!(tried.cookie.is_none());
+    // Reactivated, she signs in again.
+    let back = pop
+        .put(&admin, pop.member_id, "active", json!({"active": true}))
+        .await;
+    assert_eq!(back.body["active"], true);
+    pop.sign_in("grace", MEMBER_PW).await;
+}
+
+#[tokio::test]
+async fn a_session_of_a_deactivated_account_is_refused_even_if_it_survived() {
+    // Two oracles for "signed out": the sessions are deleted (above), and a
+    // session row that somehow outlived the deactivation still signs nobody
+    // in.
+    let pop = pop().await;
+    let admin = pop.sign_in("ada", ADMIN_PW).await;
+    let grace = pop.sign_in("grace", MEMBER_PW).await;
+    sqlx::query("UPDATE users SET active = 0 WHERE id = ?")
+        .bind(pop.member_id)
+        .execute(&pop.db)
+        .await
+        .unwrap();
+    let me = pop.send(Method::GET, "/api/me", Some(&grace), None).await;
+    assert_eq!(me.code, StatusCode::UNAUTHORIZED);
+    let still = pop.send(Method::GET, "/api/me", Some(&admin), None).await;
+    assert_eq!(still.code, StatusCode::OK, "only hers");
+}
+
+#[tokio::test]
+async fn the_last_active_admin_cannot_be_deactivated_or_demoted() {
+    let pop = pop().await;
+    let admin = pop.sign_in("ada", ADMIN_PW).await;
+    let r = pop
+        .put(&admin, pop.admin_id, "active", json!({"active": false}))
+        .await;
+    assert_eq!(r.code, StatusCode::CONFLICT, "{}", r.body);
+    // Grace is made an admin, then deactivated: she does not count.
+    pop.put(&admin, pop.member_id, "role", json!({"role": "admin"}))
+        .await;
+    let off = pop
+        .put(&admin, pop.member_id, "active", json!({"active": false}))
+        .await;
+    assert_eq!(off.code, StatusCode::OK, "{}", off.body);
+    let demote = pop
+        .put(&admin, pop.admin_id, "role", json!({"role": "member"}))
+        .await;
+    assert_eq!(demote.code, StatusCode::CONFLICT, "{}", demote.body);
+    let deactivate = pop
+        .put(&admin, pop.admin_id, "active", json!({"active": false}))
+        .await;
+    assert_eq!(deactivate.code, StatusCode::CONFLICT, "{}", deactivate.body);
+    // Back on, she does: now Ada can step away.
+    pop.put(&admin, pop.member_id, "active", json!({"active": true}))
+        .await;
+    let ok = pop
+        .put(&admin, pop.admin_id, "active", json!({"active": false}))
+        .await;
+    assert_eq!(ok.code, StatusCode::OK, "{}", ok.body);
+}
+
+#[tokio::test]
+async fn training_is_set_whole_trimmed_and_held_once() {
+    let pop = pop().await;
+    let admin = pop.sign_in("ada", ADMIN_PW).await;
+    let r = pop
+        .put(
+            &admin,
+            pop.member_id,
+            "training",
+            json!({"training": [" basic", "advanced", "Advanced", "basic "]}),
+        )
+        .await;
+    assert_eq!(r.code, StatusCode::OK, "{}", r.body);
+    assert_eq!(r.body["training"], json!(["advanced", "basic"]));
+    let all = pop.accounts(&admin).await;
+    let grace = all.iter().find(|a| a["username"] == "grace").unwrap();
+    assert_eq!(grace["training"], json!(["advanced", "basic"]));
+    let ada = all.iter().find(|a| a["username"] == "ada").unwrap();
+    assert_eq!(ada["training"], json!([]), "hers alone");
+    // Set whole: what is left out is no longer held.
+    let r = pop
+        .put(
+            &admin,
+            pop.member_id,
+            "training",
+            json!({"training": ["basic"]}),
+        )
+        .await;
+    assert_eq!(r.body["training"], json!(["basic"]));
+    for bad in [json!([""]), json!(["a".repeat(41)]), json!(["tab\there"])] {
+        let r = pop
+            .put(
+                &admin,
+                pop.member_id,
+                "training",
+                json!({ "training": bad }),
+            )
+            .await;
+        assert_eq!(r.code, StatusCode::BAD_REQUEST, "{bad}: {}", r.body);
+        assert!(r.body["error"].as_str().unwrap().starts_with("training"));
+    }
+    let many: Vec<String> = (0..33).map(|i| format!("t{i}")).collect();
+    let r = pop
+        .put(
+            &admin,
+            pop.member_id,
+            "training",
+            json!({ "training": many }),
+        )
+        .await;
+    assert_eq!(r.code, StatusCode::BAD_REQUEST, "{}", r.body);
+    let kept = pop.accounts(&admin).await;
+    let kept = kept.iter().find(|a| a["username"] == "grace").unwrap();
+    assert_eq!(
+        kept["training"],
+        json!(["basic"]),
+        "a refused change changes nothing"
+    );
+}
+
+#[tokio::test]
+async fn renaming_deactivating_and_training_are_recorded_and_no_change_is_not() {
+    let pop = pop().await;
+    let admin = pop.sign_in("ada", ADMIN_PW).await;
+    let _grace = pop.sign_in("grace", MEMBER_PW).await;
+    let id = pop.member_id;
+    pop.put(&admin, id, "name", json!({"name": "Grace Hopper"}))
+        .await;
+    pop.put(&admin, id, "name", json!({"name": "Grace Hopper"}))
+        .await;
+    assert_eq!(
+        pop.audit(&admin, "name_changed").await,
+        ["Ada renamed Grace to Grace Hopper"]
+    );
+    pop.put(&admin, id, "active", json!({"active": false}))
+        .await;
+    pop.put(&admin, id, "active", json!({"active": false}))
+        .await;
+    assert_eq!(
+        pop.audit(&admin, "account_deactivated").await,
+        ["Ada deactivated Grace Hopper's account, ending 1 sign-in(s)"]
+    );
+    pop.put(&admin, id, "active", json!({"active": true})).await;
+    assert_eq!(
+        pop.audit(&admin, "account_reactivated").await,
+        ["Ada reactivated Grace Hopper's account"]
+    );
+    pop.put(
+        &admin,
+        id,
+        "training",
+        json!({"training": ["basic", "advanced"]}),
+    )
+    .await;
+    // The same training, in another order and case: no change.
+    pop.put(
+        &admin,
+        id,
+        "training",
+        json!({"training": ["Advanced", "basic"]}),
+    )
+    .await;
+    pop.put(&admin, id, "training", json!({"training": []}))
+        .await;
+    assert_eq!(
+        pop.audit(&admin, "training_changed").await,
+        [
+            "Ada set Grace Hopper's training to none (was advanced, basic)",
+            "Ada set Grace Hopper's training to advanced, basic (was none)",
+        ]
+    );
+}
+
+#[tokio::test]
+async fn managing_an_unknown_account_is_a_404() {
+    let pop = pop().await;
+    let admin = pop.sign_in("ada", ADMIN_PW).await;
+    for (what, body) in [
+        ("name", json!({"name": "X"})),
+        ("active", json!({"active": false})),
+        ("training", json!({"training": []})),
+    ] {
+        let r = pop.put(&admin, 9999, what, body).await;
+        assert_eq!(r.code, StatusCode::NOT_FOUND, "{what}: {}", r.body);
+    }
+}

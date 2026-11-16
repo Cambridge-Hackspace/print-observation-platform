@@ -151,6 +151,40 @@ pub struct NewRole {
     pub role: Role,
 }
 
+/// An account as an admin manages it (#90): who it is, whether it can sign
+/// in, and the training it holds here.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct Account {
+    #[ts(type = "number")]
+    pub id: i64,
+    pub username: String,
+    pub name: String,
+    pub role: Role,
+    /// False once deactivated: signed out, and cannot sign in.
+    pub active: bool,
+    /// Training held, as a printer's BAM! training field names it, sorted.
+    pub training: Vec<String>,
+}
+
+/// `PUT /api/admin/users/{id}/name`.
+#[derive(Debug, Clone, Deserialize, TS)]
+pub struct NewName {
+    pub name: String,
+}
+
+/// `PUT /api/admin/users/{id}/active`.
+#[derive(Debug, Clone, Deserialize, TS)]
+pub struct NewActive {
+    pub active: bool,
+}
+
+/// `PUT /api/admin/users/{id}/training`: every training it holds, replacing
+/// what it held.
+#[derive(Debug, Clone, Deserialize, TS)]
+pub struct NewTraining {
+    pub training: Vec<String>,
+}
+
 /// What an audit entry records.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
@@ -182,6 +216,14 @@ pub enum AuditKind {
     GuideEdited,
     /// An admin linked a guide to an error the catalog knows, or unlinked it.
     ErrorGuideLinked,
+    /// An admin changed an account's name.
+    NameChanged,
+    /// An admin deactivated an account, signing it out.
+    AccountDeactivated,
+    /// An admin reactivated an account.
+    AccountReactivated,
+    /// An admin changed the training an account holds.
+    TrainingChanged,
     /// A kind this build does not know, written by a newer POP. Shown, never
     /// hidden.
     Other,

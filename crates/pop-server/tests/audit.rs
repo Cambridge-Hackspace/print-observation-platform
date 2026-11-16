@@ -48,6 +48,21 @@ const WRITE_ROUTES: &[(&str, &str, &str)] = &[
     ),
     (
         "PUT",
+        "/api/admin/users/{id}/name",
+        "tests/users.rs: renaming_deactivating_and_training_are_recorded_and_no_change_is_not",
+    ),
+    (
+        "PUT",
+        "/api/admin/users/{id}/active",
+        "tests/users.rs: renaming_deactivating_and_training_are_recorded_and_no_change_is_not",
+    ),
+    (
+        "PUT",
+        "/api/admin/users/{id}/training",
+        "tests/users.rs: renaming_deactivating_and_training_are_recorded_and_no_change_is_not",
+    ),
+    (
+        "PUT",
         "/api/admin/printers/{bam_id}/access-code",
         "tests/printers.rs: entering_an_access_code_is_recorded_without_the_code",
     ),

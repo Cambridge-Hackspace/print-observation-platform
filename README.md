@@ -45,8 +45,12 @@ pop user create-admin ada --name "Ada Lovelace"   # asks for the password
 ```
 
 In a script, give the password on standard input instead. Members and admins
-sign in on the web; an admin can reset anyone's password, which signs that
-person out everywhere.
+sign in on the web. On the admin desk (`/admin`), under **People**, an admin
+adds people, renames them, makes them admins or members, records the training
+they hold here (named as a printer's BAM! training field names it), and resets
+passwords, which signs that person out everywhere. Deactivating someone signs
+them out and stops them signing in, and keeps their history; reactivating
+undoes it. POP always keeps at least one active admin.
 
 ## Backing up
 
