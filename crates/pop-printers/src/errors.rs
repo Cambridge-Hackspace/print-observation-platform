@@ -25,6 +25,10 @@ pub struct PrinterError {
     pub raw: String,
     /// Whether the catalog knew it. When it did not, `words` carry `raw`.
     pub known: bool,
+    /// The catalog entry that explained it, which a guide can be linked to
+    /// (#73); none when the catalog did not know it.
+    #[serde(default)]
+    pub key: Option<String>,
 }
 
 impl PrinterError {
@@ -35,6 +39,7 @@ impl PrinterError {
             words: raw.clone(),
             raw,
             known: false,
+            key: None,
         }
     }
 }
@@ -47,6 +52,8 @@ enum Match {
 }
 
 struct Entry {
+    /// Stable, for linking a guide to it (#73): never renamed.
+    key: &'static str,
     matches: Match,
     /// `{heater}` is replaced with the heater's name, for the one entry that
     /// has one.
@@ -64,48 +71,56 @@ const KLIPPER: &str = "https://github.com/Klipper3d/klipper/blob/master/";
 // before the general shutdown it is part of.
 const CATALOG: &[Entry] = &[
     Entry {
+        key: "klipper-timer-too-close",
         matches: Match::Contains("Timer too close"),
         words: "The printer's controller fell behind its schedule and shut down",
         at_layer: true,
         source: "klippy/mcu.py: an MCU shutdown, reason \"Timer too close\"; docs/FAQ.md",
     },
     Entry {
+        key: "klipper-adc-out-of-range",
         matches: Match::Contains("ADC out of range"),
         words: "A temperature reading went out of range and the printer shut down",
         at_layer: true,
         source: "klippy/mcu.py: an MCU shutdown, reason \"ADC out of range\"; docs/FAQ.md",
     },
     Entry {
+        key: "klipper-lost-mcu",
         matches: Match::StartsWith("Lost communication with MCU"),
         words: "The printer lost contact with its controller board",
         at_layer: true,
         source: "klippy/mcu.py: \"Lost communication with MCU '%s'\"",
     },
     Entry {
+        key: "klipper-mcu-shutdown",
         matches: Match::StartsWith("MCU '"),
         words: "The printer's controller shut down",
         at_layer: true,
         source: "klippy/mcu.py: \"MCU '%s' shutdown: %s\"",
     },
     Entry {
+        key: "klipper-heater-not-heating",
         matches: Match::StartsWith("Heater "),
         words: "The {heater} heater is not warming up as fast as it should",
         at_layer: true,
         source: "klippy/extras/verify_heater.py: \"Heater %s not heating at expected rate\"",
     },
     Entry {
+        key: "klipper-move-out-of-range",
         matches: Match::StartsWith("Move out of range"),
         words: "A move went past the edge of the printer's build area",
         at_layer: true,
         source: "klippy/kinematics: \"Move out of range\"",
     },
     Entry {
+        key: "klipper-must-home",
         matches: Match::StartsWith("Must home axis first"),
         words: "The printer was asked to move before finding its home position",
         at_layer: false,
         source: "klippy/kinematics: \"Must home axis first\"",
     },
     Entry {
+        key: "klipper-extrude-too-cold",
         matches: Match::StartsWith("Extrude below minimum temp"),
         words: "The printer tried to push filament before the nozzle was hot enough",
         at_layer: true,
@@ -134,6 +149,7 @@ pub fn explain(raw: &str, layer: Option<u32>) -> PrinterError {
             words: format!("The printer reported: {raw}"),
             raw: raw.to_owned(),
             known: false,
+            key: None,
         };
     };
     let mut words = entry.words.to_owned();
@@ -148,6 +164,7 @@ pub fn explain(raw: &str, layer: Option<u32>) -> PrinterError {
         words,
         raw: raw.to_owned(),
         known: true,
+        key: Some(entry.key.to_owned()),
     }
 }
 
@@ -162,6 +179,28 @@ pub fn sources() -> Vec<String> {
             } else {
                 e.source.to_owned()
             }
+        })
+        .collect()
+}
+
+/// One entry of the catalog, as an admin linking guides to errors sees it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct CatalogEntry {
+    pub key: String,
+    /// Its words, as printed ("{heater}" where the heater's name goes).
+    pub words: String,
+    /// Where its meaning comes from.
+    pub source: String,
+}
+
+/// Every entry of the catalog, in order.
+pub fn catalog() -> Vec<CatalogEntry> {
+    CATALOG
+        .iter()
+        .map(|e| CatalogEntry {
+            key: e.key.to_owned(),
+            words: e.words.to_owned(),
+            source: e.source.to_owned(),
         })
         .collect()
 }
@@ -250,6 +289,29 @@ mod tests {
     #[test]
     fn a_message_that_only_looks_like_a_heater_one_is_not_explained_as_one() {
         assert!(!explain("Heater extruder approaching target", None).known);
+    }
+
+    #[test]
+    fn every_entry_has_its_own_stable_key_and_says_it_when_it_explains() {
+        let keys: Vec<&str> = CATALOG.iter().map(|e| e.key).collect();
+        let unique: std::collections::BTreeSet<&str> = keys.iter().copied().collect();
+        assert_eq!(unique.len(), keys.len(), "{keys:?}");
+        for k in &keys {
+            assert!(
+                k.split('-').all(|w| !w.is_empty()
+                    && w.chars()
+                        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())),
+                "{k}"
+            );
+        }
+        assert_eq!(
+            explain("Must home axis first: 10.000 10.000 5.000", None)
+                .key
+                .as_deref(),
+            Some("klipper-must-home")
+        );
+        assert_eq!(explain("something new", None).key, None);
+        assert_eq!(catalog().len(), CATALOG.len());
     }
 
     #[test]

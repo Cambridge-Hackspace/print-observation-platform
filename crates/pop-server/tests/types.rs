@@ -10,10 +10,10 @@ use std::{
 };
 
 use pop_server::api::{
-    AccessCode, AdminPrinter, ApiError, AuditEntry, AuditKind, DiscordWebhook, Guide, GuideImage,
-    GuideProblems, GuideSummary, Health, NewGuideImage, NewPassword, NewRole, NewUser,
-    NotifySettings, PublicGuide, PublicGuideList, Role, ServerEvent, SignIn, Snapshot, Status,
-    TowerPrinter, TowerState, User,
+    AccessCode, AdminPrinter, ApiError, AuditEntry, AuditKind, DiscordWebhook, ErrorGuide, Guide,
+    GuideImage, GuideProblems, GuideSummary, Health, LinkGuide, NewGuideImage, NewPassword,
+    NewRole, NewUser, NotifySettings, PublicGuide, PublicGuideList, Role, ServerEvent, SignIn,
+    Snapshot, Status, TowerPrinter, TowerState, User,
 };
 use ts_rs::TS;
 
@@ -44,6 +44,8 @@ fn export(dir: &Path) {
     NewGuideImage::export_all_to(dir).unwrap();
     PublicGuide::export_all_to(dir).unwrap();
     PublicGuideList::export_all_to(dir).unwrap();
+    ErrorGuide::export_all_to(dir).unwrap();
+    LinkGuide::export_all_to(dir).unwrap();
     NotifySettings::export_all_to(dir).unwrap();
     DiscordWebhook::export_all_to(dir).unwrap();
     // The printer state model (#25), from pop-printers.

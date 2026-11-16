@@ -91,6 +91,11 @@ const WRITE_ROUTES: &[(&str, &str, &str)] = &[
         "/api/admin/guides/{slug}/images",
         "tests/guides.rs: writing_editing_publishing_and_renaming_are_recorded",
     ),
+    (
+        "PUT",
+        "/api/admin/error-guides/{key}",
+        "tests/error_guides.rs: linking_and_unlinking_are_recorded",
+    ),
 ];
 
 #[test]

@@ -81,7 +81,7 @@ describe('parse', () => {
         layer: { current: 41, total: null },
         seconds_left: 2280,
         job: { name: 'phone_stand.gcode', owner: 'Sam Lee' },
-        error: { words: 'The filament ran out', raw: 'filament runout', known: true },
+        error: { words: 'The filament ran out', raw: 'filament runout', known: true, key: 'klipper-runout' },
       },
       watched: true,
       materials: ['PLA', 'PETG'],

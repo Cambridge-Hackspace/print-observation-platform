@@ -80,19 +80,17 @@ function printerState(v: unknown): PrinterState | null {
   });
   const error = nullable(o.error, (e) => {
     const x = obj(e);
-    return x && str(x.words) && str(x.raw) && typeof x.known === 'boolean'
-      ? { words: x.words, raw: x.raw, known: x.known }
-      : null;
+    if (!x || !str(x.words) || !str(x.raw) || typeof x.known !== 'boolean') return null;
+    // The catalog entry's key (#73); absent from a server older than it.
+    const key = x.key === undefined ? null : nullable(x.key, (k) => (str(k) ? k : null));
+    return key === undefined ? null : { words: x.words, raw: x.raw, known: x.known, key };
   });
-  if ([progress, seconds_left, layer, job, error].includes(undefined)) return null;
-  return {
-    status: o.status as PrinterStatus,
-    progress: progress!,
-    seconds_left: seconds_left!,
-    layer: layer!,
-    job: job!,
-    error: error!,
-  } as PrinterState;
+  if (progress === undefined || seconds_left === undefined || layer === undefined) return null;
+  if (job === undefined || error === undefined) return null;
+  // Built field by field, with no cast, so a field the server adds fails the
+  // type check here until it is read.
+  const state: PrinterState = { status: o.status as PrinterStatus, progress, seconds_left, layer, job, error };
+  return state;
 }
 
 function printer(v: unknown): TowerPrinter | null {

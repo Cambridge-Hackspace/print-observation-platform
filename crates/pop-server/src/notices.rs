@@ -150,6 +150,7 @@ mod tests {
             words: "The filament ran out at layer 112.".into(),
             raw: "Filament runout".into(),
             known: true,
+            key: None,
         });
         p
     }

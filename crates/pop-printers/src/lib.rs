@@ -19,6 +19,6 @@ pub mod moonraker;
 pub mod state;
 
 pub use driver::{Capabilities, Driver, DriverError, Reporter};
-pub use errors::{PrinterError, explain};
+pub use errors::{CatalogEntry, PrinterError, catalog, explain};
 pub use fleet::{Fleet, Printer, Update};
 pub use state::{Job, Layer, PrinterState, PrinterStatus};
