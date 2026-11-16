@@ -1,9 +1,15 @@
 //! POP's database: SQLite through sqlx (ADR 0001), one file beside the
-//! uploaded prints, so a backup is a file copy.
+//! stored print files, in WAL mode. `pop backup` copies both (#3).
 
 use std::{path::Path, str::FromStr, time::Duration};
 
-use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions};
+use sqlx::{
+    migrate::Migrator,
+    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions},
+};
+
+/// The migrations compiled into this build, from `migrations/`.
+static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
 
 /// Open (creating it if need be) the database at `path`, and bring its schema
 /// up to date.
@@ -14,8 +20,14 @@ pub async fn open(path: &Path) -> Result<SqlitePool, sqlx::Error> {
         .foreign_keys(true)
         .busy_timeout(Duration::from_secs(5));
     let pool = SqlitePoolOptions::new().connect_with(options).await?;
-    sqlx::migrate!("./migrations").run(&pool).await?;
+    MIGRATOR.run(&pool).await?;
     Ok(pool)
+}
+
+/// The newest migration this build knows. A database with a newer one was
+/// made by a newer POP.
+pub fn newest_known_migration() -> i64 {
+    MIGRATOR.iter().map(|m| m.version).max().unwrap_or(0)
 }
 
 /// The newest migration applied, or 0 for none.
