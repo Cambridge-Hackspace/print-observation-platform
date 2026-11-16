@@ -329,8 +329,8 @@ async fn only_an_added_printer_is_retired() {
     let pop = pop().await;
     pop.decide(pop.fake.id("mk4"), "decline", LOCAL).await;
     let bam = Bam::new(pop.fake.url(), TOKEN).unwrap();
-    pop.fake.archive(&pop.fake.id("mk4").to_owned());
-    pop.fake.archive(&pop.fake.id("x1").to_owned());
+    pop.fake.archive(pop.fake.id("mk4"));
+    pop.fake.archive(pop.fake.id("x1"));
     let archived = bam.assets(pop.fake.id("printers"), true).await.unwrap();
     let retired = tower::retire_archived(&pop.db, &archived).await.unwrap();
     assert!(retired.is_empty(), "{retired:?}");

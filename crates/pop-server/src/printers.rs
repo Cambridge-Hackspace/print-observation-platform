@@ -216,30 +216,40 @@ impl HealthCheck for BamLiveHealth {
 
 /// The printer `bam_id` as BAM! has it now, in the category and in use, and
 /// whether it is ready to run; or the answer to give instead.
+/// Why `current` could not say: a status and a sentence, answered as an
+/// error.
+struct Unavailable(StatusCode, String);
+
+impl IntoResponse for Unavailable {
+    fn into_response(self) -> Response {
+        error(self.0, self.1)
+    }
+}
+
 async fn current(
     state: &AppState,
     bam_id: &str,
-) -> Result<(String, Vec<PrinterProblem>), Response> {
+) -> Result<(String, Vec<PrinterProblem>), Unavailable> {
     let Some(bam) = state.bam.as_ref() else {
-        return Err(error(
+        return Err(Unavailable(
             StatusCode::SERVICE_UNAVAILABLE,
-            "POP has no BAM! to read printers from",
+            "POP has no BAM! to read printers from".to_owned(),
         ));
     };
     let assets = bam
         .client
         .assets(&bam.category, false)
         .await
-        .map_err(|e| error(StatusCode::BAD_GATEWAY, e.to_string()))?;
+        .map_err(|e| Unavailable(StatusCode::BAD_GATEWAY, e.to_string()))?;
     let Some(a) = assets.iter().find(|a| a.asset.id == bam_id) else {
-        return Err(error(
+        return Err(Unavailable(
             StatusCode::NOT_FOUND,
-            "no such printer in the BAM! category: it may have been archived or moved",
+            "no such printer in the BAM! category: it may have been archived or moved".to_owned(),
         ));
     };
     let held = Secrets::with_access_codes(&state.db)
         .await
-        .map_err(|e| error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()))?;
+        .map_err(|e| Unavailable(StatusCode::SERVICE_UNAVAILABLE, e.to_string()))?;
     let problems = match printer_from(a, &bam.fields, &|id: &str| held.iter().any(|h| h == id)) {
         Ok(_) => vec![],
         Err(ps) => ps
@@ -262,7 +272,7 @@ pub async fn add(
 ) -> Response {
     let (name, problems) = match current(&state, &bam_id).await {
         Ok(c) => c,
-        Err(r) => return r,
+        Err(r) => return r.into_response(),
     };
     if let Some(p) = problems.first() {
         return error(
@@ -289,7 +299,7 @@ pub async fn decline(
 ) -> Response {
     let (name, _) = match current(&state, &bam_id).await {
         Ok(c) => c,
-        Err(r) => return r,
+        Err(r) => return r.into_response(),
     };
     let summary = format!("{} said {name} is not one for the tower", admin.name);
     let by = Actor::user(admin.id, &admin.name);
