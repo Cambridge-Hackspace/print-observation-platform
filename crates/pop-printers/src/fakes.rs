@@ -4,4 +4,5 @@
 //! faults real printers produce: dropped connections, slow answers,
 //! malformed messages and refused commands.
 
+pub mod bambu;
 pub mod moonraker;
