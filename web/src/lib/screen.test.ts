@@ -2,11 +2,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { follow, FIRST_RETRY_MS, type Source } from './live';
 import { empty, reduce, type ScreenState } from './screen';
 import type { ServerEvent } from './generated/ServerEvent';
+import type { TowerPrinter } from './generated/TowerPrinter';
 
 const status = (n: number): ServerEvent => ({ type: 'status', data: { version: '0.1.0', schema_version: n } });
-const snapshot = (n: number): ServerEvent => ({
+const printer = (name: string, status: 'idle' | 'printing'): TowerPrinter => ({
+  id: name,
+  name,
+  watched: true,
+  materials: ['PLA'],
+  training: null,
+  state: { status, progress: null, layer: null, seconds_left: null, job: null, error: null },
+});
+const snapshot = (n: number, printers: TowerPrinter[] = []): ServerEvent => ({
   type: 'snapshot',
-  data: { status: { version: '0.1.0', schema_version: n } },
+  data: { status: { version: '0.1.0', schema_version: n }, printers },
 });
 
 describe('reduce', () => {
@@ -17,6 +26,16 @@ describe('reduce', () => {
     expect(s.status?.schema_version).toBe(2);
     s = reduce(s, snapshot(9));
     expect(s.status?.schema_version).toBe(9);
+  });
+
+  it('replaces the printers on a printers event, and on a snapshot', () => {
+    let s = reduce(empty(), snapshot(1, [printer('Voron', 'idle')]));
+    expect(s.printers.map((p) => p.state.status)).toEqual(['idle']);
+    s = reduce(s, { type: 'printers', data: [printer('Voron', 'printing'), printer('X1', 'idle')] });
+    expect(s.printers.map((p) => p.name)).toEqual(['Voron', 'X1']);
+    expect(s.status?.schema_version).toBe(1);
+    s = reduce(s, snapshot(2));
+    expect(s.printers).toEqual([]);
   });
 
   it('never changes the state it is given', () => {

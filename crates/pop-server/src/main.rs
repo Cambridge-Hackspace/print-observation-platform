@@ -231,7 +231,22 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
             })
             .with_bam_sync(view.clone());
         // Printers archived in BAM! leave the tower as they go (#23).
-        let _retirer = pop_server::tower::spawn_retirer(state.db.clone(), view);
+        let _retirer = pop_server::tower::spawn_retirer(state.db.clone(), view.clone());
+        // And the tower's printers run, and every screen sees them (#49).
+        let pins = pop_server::pins::DbPins::load(state.db.clone())
+            .await
+            .map_err(|e| format!("cannot read the Bambu certificate pins: {e}"))?;
+        let (tower, _runner) = pop_server::run::spawn(pop_server::run::Runner {
+            db: state.db.clone(),
+            secrets: state.secrets.clone(),
+            fields: config.bam.fields.clone(),
+            view,
+            events: state.events.clone(),
+            decided: state.decided.clone(),
+            pins: Arc::new(pins),
+            backoff: pop_printers::fleet::Backoff::default(),
+        });
+        state = state.with_tower(tower);
     }
     let events = state.events.clone();
     let app = router(state);

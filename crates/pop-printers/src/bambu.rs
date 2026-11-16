@@ -52,7 +52,8 @@ pub trait PinStore: Send + Sync {
     fn pin(&self, serial: &str, fingerprint: &str);
 }
 
-/// Pins kept in memory: for tests, and until the server keeps them (#31).
+/// Pins kept in memory, for tests. The server keeps its pins in its database
+/// (`pop_server::pins`).
 #[derive(Default)]
 pub struct MemoryPins(Mutex<HashMap<String, String>>);
 

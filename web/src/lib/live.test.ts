@@ -63,10 +63,31 @@ const STATUS = '{"type":"status","data":{"version":"0.1.0","schema_version":1}}'
 
 describe('parse', () => {
   it('reads a snapshot', () => {
-    expect(parse('{"type":"snapshot","data":{"status":{"version":"0.1.0","schema_version":1}}}')).toEqual({
+    expect(
+      parse('{"type":"snapshot","data":{"status":{"version":"0.1.0","schema_version":1},"printers":[]}}'),
+    ).toEqual({
       type: 'snapshot',
-      data: { status: { version: '0.1.0', schema_version: 1 } },
+      data: { status: { version: '0.1.0', schema_version: 1 }, printers: [] },
     });
+  });
+  it('reads the printers, as the server sends them', () => {
+    // A frame as pop-server serializes it (tests/run.rs sees the same shape).
+    const voron = {
+      id: '642f57e2',
+      name: 'Voron 2.4',
+      state: {
+        status: 'needs_hand',
+        progress: 0.37,
+        layer: { current: 41, total: null },
+        seconds_left: 2280,
+        job: { name: 'phone_stand.gcode', owner: 'Sam Lee' },
+        error: { words: 'The filament ran out', raw: 'filament runout', known: true },
+      },
+      watched: true,
+      materials: ['PLA', 'PETG'],
+      training: 'advanced',
+    };
+    expect(parse(JSON.stringify({ type: 'printers', data: [voron] }))).toEqual({ type: 'printers', data: [voron] });
   });
   it('reads a status event', () => {
     expect(parse(STATUS)).toEqual({ type: 'status', data: { version: '0.1.0', schema_version: 1 } });
@@ -82,6 +103,17 @@ describe('parse', () => {
       '{"type":"printer","data":{}}',
       '{"type":"snapshot","data":{}}',
       '{"type":"snapshot","data":{"status":{"version":"0.1.0"}}}',
+      '{"type":"snapshot","data":{"status":{"version":"0.1.0","schema_version":1}}}',
+      '{"type":"printers","data":{}}',
+      '{"type":"printers","data":[{"id":"a"}]}',
+      '{"type":"printers","data":[{"id":"a","name":"A","watched":true,"materials":[1],"training":null,"state":{"status":"idle","progress":null,"layer":null,"seconds_left":null,"job":null,"error":null}}]}',
+      '{"type":"printers","data":[{"id":"a","name":"A","watched":"yes","materials":[],"training":null,"state":{"status":"idle","progress":null,"layer":null,"seconds_left":null,"job":null,"error":null}}]}',
+      '{"type":"printers","data":[{"id":"a","name":"A","watched":true,"materials":[],"training":null,"state":{"status":"asleep","progress":null,"layer":null,"seconds_left":null,"job":null,"error":null}}]}',
+      '{"type":"printers","data":[{"id":"a","name":"A","watched":true,"materials":[],"training":null,"state":{"status":"idle","progress":"half","layer":null,"seconds_left":null,"job":null,"error":null}}]}',
+      '{"type":"printers","data":[{"id":"a","name":"A","watched":true,"materials":[],"training":null,"state":{"status":"idle","progress":null,"layer":{"total":3},"seconds_left":null,"job":null,"error":null}}]}',
+      '{"type":"printers","data":[{"id":"a","name":"A","watched":true,"materials":[],"training":null,"state":{"status":"idle","progress":null,"layer":null,"seconds_left":null,"job":{"owner":null},"error":null}}]}',
+      '{"type":"printers","data":[{"id":"a","name":"A","watched":true,"materials":[],"training":null,"state":{"status":"idle","progress":null,"layer":null,"seconds_left":null,"job":null,"error":{"words":"x","raw":"x"}}}]}',
+      '{"type":"printers","data":[{"id":"a","name":"A","watched":true,"materials":[],"training":null,"state":{"status":"idle","progress":null,"layer":null,"job":null,"error":null}}]}',
     ]) {
       expect(parse(raw), raw).toBeNull();
     }

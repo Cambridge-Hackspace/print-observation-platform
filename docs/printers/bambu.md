@@ -19,7 +19,9 @@ prints to them comes in Phase 2 (#32).
 
 A Bambu printer presents a certificate it signed itself, which no authority
 vouches for. POP trusts the certificate it sees the first time it connects
-to a printer, and from then on only that one. If the printer later presents
+to a printer, and from then on only that one. It keeps that certificate's
+fingerprint in its database, so a restart does not trust a new one afresh.
+If the printer later presents
 a different one (the printer was replaced, its firmware reset it, or
 something on the network is pretending to be it), POP refuses to connect
 and the printer shows the reason. An admin has to confirm it is the same

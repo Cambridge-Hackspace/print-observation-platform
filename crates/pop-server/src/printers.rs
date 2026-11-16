@@ -286,7 +286,10 @@ pub async fn add(
     let summary = format!("{} added {name} to the tower", admin.name);
     let by = Actor::user(admin.id, &admin.name);
     match crate::tower::decide(&state.db, &bam_id, &name, TowerState::Added, &by, summary).await {
-        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Ok(()) => {
+            state.decided.notify_one();
+            StatusCode::NO_CONTENT.into_response()
+        }
         Err(e) => error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
     }
 }
@@ -313,7 +316,10 @@ pub async fn decline(
     )
     .await
     {
-        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Ok(()) => {
+            state.decided.notify_one();
+            StatusCode::NO_CONTENT.into_response()
+        }
         Err(e) => error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
     }
 }

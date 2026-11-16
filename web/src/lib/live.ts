@@ -11,6 +11,9 @@
 
 import type { ServerEvent } from './generated/ServerEvent';
 import type { Status } from './generated/Status';
+import type { TowerPrinter } from './generated/TowerPrinter';
+import type { PrinterState } from './generated/PrinterState';
+import type { PrinterStatus } from './generated/PrinterStatus';
 
 export type Connection = 'connecting' | 'live' | 'reconnecting';
 
@@ -43,6 +46,70 @@ function status(v: unknown): Status | null {
     : null;
 }
 
+const STATUSES: readonly PrinterStatus[] = ['offline', 'idle', 'printing', 'paused', 'needs_hand', 'done'];
+
+const obj = (v: unknown): Record<string, unknown> | null =>
+  typeof v === 'object' && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const str = (v: unknown): v is string => typeof v === 'string';
+/** `v` read by `read`, or null when `v` is null; undefined when neither. */
+function nullable<T>(v: unknown, read: (v: unknown) => T | null): T | null | undefined {
+  if (v === null) return null;
+  const r = read(v);
+  return r === null ? undefined : r;
+}
+
+function printerState(v: unknown): PrinterState | null {
+  const o = obj(v);
+  if (!o || !STATUSES.includes(o.status as PrinterStatus)) return null;
+  const progress = nullable(o.progress, (p) => (num(p) ? p : null));
+  const seconds_left = nullable(o.seconds_left, (p) => (num(p) ? p : null));
+  const layer = nullable(o.layer, (l) => {
+    const x = obj(l);
+    if (!x || !num(x.current)) return null;
+    const total = nullable(x.total, (t) => (num(t) ? t : null));
+    return total === undefined ? null : { current: x.current, total };
+  });
+  const job = nullable(o.job, (j) => {
+    const x = obj(j);
+    if (!x || !str(x.name)) return null;
+    const owner = nullable(x.owner, (w) => (str(w) ? w : null));
+    return owner === undefined ? null : { name: x.name, owner };
+  });
+  const error = nullable(o.error, (e) => {
+    const x = obj(e);
+    return x && str(x.words) && str(x.raw) && typeof x.known === 'boolean'
+      ? { words: x.words, raw: x.raw, known: x.known }
+      : null;
+  });
+  if ([progress, seconds_left, layer, job, error].includes(undefined)) return null;
+  return {
+    status: o.status as PrinterStatus,
+    progress: progress!,
+    seconds_left: seconds_left!,
+    layer: layer!,
+    job: job!,
+    error: error!,
+  } as PrinterState;
+}
+
+function printer(v: unknown): TowerPrinter | null {
+  const o = obj(v);
+  if (!o || !str(o.id) || !str(o.name) || typeof o.watched !== 'boolean') return null;
+  if (!Array.isArray(o.materials) || !o.materials.every(str)) return null;
+  const training = nullable(o.training, (t) => (str(t) ? t : null));
+  const state = printerState(o.state);
+  if (training === undefined || !state) return null;
+  return { id: o.id, name: o.name, state, watched: o.watched, materials: [...o.materials], training };
+}
+
+/** Every printer, or null if any is not one. */
+function printers(v: unknown): TowerPrinter[] | null {
+  if (!Array.isArray(v)) return null;
+  const out = v.map(printer);
+  return out.every((p) => p !== null) ? (out as TowerPrinter[]) : null;
+}
+
 /** Parses one message, or returns null if it is not a ServerEvent. */
 export function parse(raw: string): ServerEvent | null {
   let v: unknown;
@@ -57,9 +124,15 @@ export function parse(raw: string): ServerEvent | null {
     const s = status(data);
     return s ? { type, data: s } : null;
   }
+  if (type === 'printers') {
+    const ps = printers(data);
+    return ps ? { type, data: ps } : null;
+  }
   if (type === 'snapshot' && typeof data === 'object' && data !== null) {
-    const s = status((data as Record<string, unknown>).status);
-    return s ? { type, data: { status: s } } : null;
+    const d = data as Record<string, unknown>;
+    const s = status(d.status);
+    const ps = printers(d.printers);
+    return s && ps ? { type, data: { status: s, printers: ps } } : null;
   }
   return null;
 }

@@ -22,9 +22,29 @@ pub struct Status {
 
 /// Everything a screen shows, at one moment. A screen that receives one
 /// replaces its state with it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 pub struct Snapshot {
     pub status: Status,
+    /// The tower's printers, by name (#49).
+    pub printers: Vec<TowerPrinter>,
+}
+
+/// A printer the tower runs, as every screen shows it (#49).
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+pub struct TowerPrinter {
+    /// Its BAM! id.
+    pub id: String,
+    pub name: String,
+    /// As its driver last reported; offline when POP has no driver for it.
+    pub state: pop_printers::PrinterState,
+    /// Whether POP has a driver for how this printer connects. When it has
+    /// not (OctoPrint, PrusaLink and USB, so far), the printer is listed but
+    /// always reads offline.
+    pub watched: bool,
+    /// What it prints with, from BAM!.
+    pub materials: Vec<String>,
+    /// The training it needs, from BAM!, if any.
+    pub training: Option<String>,
 }
 
 /// One message on the live-update stream (`GET /api/events`).
@@ -32,7 +52,7 @@ pub struct Snapshot {
 /// Serialized as `{"type": "...", "data": ...}`, so the web app can switch on
 /// `type` without guessing. A `snapshot` replaces a screen's state; every
 /// other event changes part of it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 #[serde(tag = "type", content = "data", rename_all = "snake_case")]
 pub enum ServerEvent {
     /// Everything, at once: sent to a screen that connects, to one that
@@ -40,6 +60,9 @@ pub enum ServerEvent {
     Snapshot(Snapshot),
     /// The server's status changed.
     Status(Status),
+    /// A printer's state changed, or the tower gained or lost one: every
+    /// printer, by name (#49).
+    Printers(Vec<TowerPrinter>),
 }
 
 /// `GET /healthz`: whether each part POP depends on is working.
