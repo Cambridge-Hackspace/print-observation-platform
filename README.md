@@ -36,6 +36,18 @@ default, and `pop config check` validates a file without starting the server.
 Any key can be overridden from the environment as `POP_<SECTION>_<KEY>`:
 `POP_SERVER_LISTEN` overrides `server.listen`.
 
+## Accounts
+
+Create the first admin from the command line; they create everyone else.
+
+```sh
+pop user create-admin ada --name "Ada Lovelace"   # asks for the password
+```
+
+In a script, give the password on standard input instead. Members and admins
+sign in on the web; an admin can reset anyone's password, which signs that
+person out everywhere.
+
 ## Backing up
 
 `pop backup <file>` writes the database and the stored print files to one

@@ -42,6 +42,19 @@ pub enum Effect {
     /// Sends a print, confirms a cleared bed, starts, pauses, stops or resumes
     /// a printer, or changes a printer's settings.
     ControlsPrinter,
+    /// Signs in or out, or changes an account.
+    Account,
+}
+
+/// Who may use a route (#11).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Who {
+    /// Anyone, signed in or not.
+    Anyone,
+    /// Anyone signed in.
+    Member,
+    /// An admin.
+    Admin,
 }
 
 /// From where a route may be reached.
@@ -57,6 +70,7 @@ pub struct Route {
     pub path: &'static str,
     pub effect: Effect,
     pub reach: Reach,
+    pub who: Who,
     pub handler: MethodRouter<AppState>,
 }
 
@@ -80,19 +94,107 @@ pub fn violations(table: &[Route]) -> Vec<Violation> {
         .collect()
 }
 
-/// A router with every route of `table`, local-only ones guarded.
+/// A router with every route of `table`, each guarded as it declares: only
+/// JSON for a request that changes something, then local-only, then who.
 pub fn build(table: Vec<Route>, state: &AppState) -> Router<AppState> {
     let mut router = Router::new();
     for r in table {
-        let handler = match r.reach {
-            Reach::Anywhere => r.handler,
-            Reach::LocalOnly => r
-                .handler
-                .route_layer(middleware::from_fn_with_state(state.clone(), local_only)),
+        // Layers run outermost first: the last added is checked first.
+        let who = r.who;
+        let mut handler = match who {
+            Who::Anyone => r.handler,
+            _ => r.handler.route_layer(middleware::from_fn_with_state(
+                state.clone(),
+                move |s: State<AppState>, req: Request, next: Next| require(s, who, req, next),
+            )),
         };
+        if r.reach == Reach::LocalOnly {
+            handler =
+                handler.route_layer(middleware::from_fn_with_state(state.clone(), local_only));
+        }
+        if matches!(r.method, Method::POST | Method::PUT | Method::PATCH) {
+            handler = handler.route_layer(middleware::from_fn(json_only));
+        }
         router = router.route(r.path, handler);
     }
     router
+}
+
+fn refuse(code: StatusCode, error: &str) -> Response {
+    (
+        code,
+        Json(ApiError {
+            error: error.to_owned(),
+        }),
+    )
+        .into_response()
+}
+
+/// A request that changes something must be JSON. A form on another site can
+/// post to POP without asking, but cannot send JSON without the browser first
+/// asking POP whether it may, which it never grants: so this, with the
+/// session cookie's SameSite, is what stops another site acting as a member.
+async fn json_only(req: Request, next: Next) -> Response {
+    let json = req
+        .headers()
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(';').next())
+        .is_some_and(|v| v.trim().eq_ignore_ascii_case("application/json"));
+    if json {
+        next.run(req).await
+    } else {
+        refuse(
+            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            "send this as JSON (Content-Type: application/json)",
+        )
+    }
+}
+
+/// The session cookie's name.
+pub const SESSION_COOKIE: &str = "pop_session";
+
+/// The session token from a request's cookies, if it carries one.
+pub fn session_token(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get_all(axum::http::header::COOKIE)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|v| v.split(';'))
+        .filter_map(|c| c.trim().split_once('='))
+        .find(|(k, _)| *k == SESSION_COOKIE)
+        .map(|(_, v)| v.to_owned())
+}
+
+/// Lets through who `who` names, with their account as an extension for the
+/// handler; 401 for no one signed in, 403 for a member on an admin route.
+async fn require(
+    State(state): State<AppState>,
+    who: Who,
+    mut req: Request,
+    next: Next,
+) -> Response {
+    let user = match session_token(req.headers()) {
+        None => None,
+        Some(t) => match crate::users::session_user(&state.db, &t).await {
+            Ok(u) => u,
+            Err(e) => {
+                tracing::error!("reading a session: {e:?}");
+                return refuse(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "sign-in is not working right now",
+                );
+            }
+        },
+    };
+    let Some(user) = user else {
+        return refuse(StatusCode::UNAUTHORIZED, "sign in first");
+    };
+    if who == Who::Admin && user.role != crate::api::Role::Admin {
+        return refuse(StatusCode::FORBIDDEN, "only an admin can do this");
+    }
+    req.extensions_mut().insert(user);
+    next.run(req).await
 }
 
 async fn local_only(State(state): State<AppState>, req: Request, next: Next) -> Response {
@@ -103,13 +205,7 @@ async fn local_only(State(state): State<AppState>, req: Request, next: Next) -> 
     if is_local(&state.access, peer, req.headers()) {
         next.run(req).await
     } else {
-        (
-            StatusCode::FORBIDDEN,
-            Json(ApiError {
-                error: "this can only be done at the space".to_owned(),
-            }),
-        )
-            .into_response()
+        refuse(StatusCode::FORBIDDEN, "this can only be done at the space")
     }
 }
 

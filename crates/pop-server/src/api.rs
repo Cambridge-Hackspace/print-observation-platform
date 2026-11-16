@@ -7,7 +7,7 @@
 
 use std::collections::BTreeMap;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 /// What the server says about itself.
@@ -58,6 +58,52 @@ pub struct CheckResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub error: Option<String>,
+}
+
+/// What an account may do.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "lowercase")]
+pub enum Role {
+    Member,
+    Admin,
+}
+
+/// An account, as the API shows it. Never its password.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct User {
+    #[ts(type = "number")]
+    pub id: i64,
+    pub username: String,
+    pub name: String,
+    pub role: Role,
+}
+
+/// `POST /api/session`.
+#[derive(Debug, Clone, Deserialize, TS)]
+pub struct SignIn {
+    pub username: String,
+    pub password: String,
+}
+
+/// `POST /api/admin/users`.
+#[derive(Debug, Clone, Deserialize, TS)]
+pub struct NewUser {
+    pub username: String,
+    pub name: String,
+    pub role: Role,
+    pub password: String,
+}
+
+/// `PUT /api/admin/users/{id}/password`.
+#[derive(Debug, Clone, Deserialize, TS)]
+pub struct NewPassword {
+    pub password: String,
+}
+
+/// `PUT /api/admin/users/{id}/role`.
+#[derive(Debug, Clone, Deserialize, TS)]
+pub struct NewRole {
+    pub role: Role,
 }
 
 /// The body of every API error.

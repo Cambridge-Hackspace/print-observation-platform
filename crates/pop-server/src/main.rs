@@ -3,6 +3,7 @@ use std::{path::PathBuf, process::ExitCode, sync::Arc};
 use clap::{Parser, Subcommand};
 use pop_server::{
     AppState,
+    api::Role,
     assets::Embedded,
     backup,
     config::{Config, LogFormat},
@@ -39,6 +40,21 @@ enum Command {
     Restore {
         /// The archive `pop backup` wrote.
         file: PathBuf,
+    },
+    /// Work with accounts.
+    #[command(subcommand)]
+    User(UserCommand),
+}
+
+#[derive(Subcommand)]
+enum UserCommand {
+    /// Create an admin: the first one, or another when no admin can sign in.
+    /// Asks for the password, or reads it from standard input in a script.
+    CreateAdmin {
+        username: String,
+        /// The name shown for them. Defaults to the username.
+        #[arg(long)]
+        name: Option<String>,
     },
 }
 
@@ -95,6 +111,18 @@ async fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        Command::User(UserCommand::CreateAdmin { username, name }) => {
+            match create_admin(&config, &username, name.as_deref()).await {
+                Ok(()) => {
+                    println!("Created {username}, an admin. They can sign in now.");
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("pop: user create-admin: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         Command::Serve => {
             init_logs(&config);
             match serve(config).await {
@@ -106,6 +134,52 @@ async fn main() -> ExitCode {
             }
         }
     }
+}
+
+/// The password from a person at a terminal, asked twice and not echoed, or
+/// one line from standard input in a script.
+fn read_password() -> Result<String, String> {
+    use std::io::IsTerminal;
+    if std::io::stdin().is_terminal() {
+        let a = rpassword::prompt_password("Password: ").map_err(|e| e.to_string())?;
+        let b = rpassword::prompt_password("Again: ").map_err(|e| e.to_string())?;
+        if a != b {
+            return Err("the two passwords differ".into());
+        }
+        Ok(a)
+    } else {
+        let mut line = String::new();
+        std::io::stdin()
+            .read_line(&mut line)
+            .map_err(|e| e.to_string())?;
+        Ok(line.trim_end_matches(['\r', '\n']).to_owned())
+    }
+}
+
+async fn create_admin(config: &Config, username: &str, name: Option<&str>) -> Result<(), String> {
+    let password = read_password()?;
+    tokio::fs::create_dir_all(&config.storage.data_dir)
+        .await
+        .map_err(|e| e.to_string())?;
+    let db = db::open(&config.database_path())
+        .await
+        .map_err(|e| format!("cannot open the database: {e}"))?;
+    let account = pop_server::users::NewAccount {
+        username,
+        name: name.unwrap_or(username),
+        role: Role::Admin,
+        password: &password,
+    };
+    pop_server::users::create(&db, account)
+        .await
+        .map(|_| ())
+        .map_err(|e| match e {
+            pop_server::users::UserError::Invalid { field, reason } => format!("{field}: {reason}"),
+            pop_server::users::UserError::UsernameTaken => {
+                format!("{username} already exists; an admin can reset their password")
+            }
+            other => format!("{other:?}"),
+        })
 }
 
 fn init_logs(config: &Config) {
