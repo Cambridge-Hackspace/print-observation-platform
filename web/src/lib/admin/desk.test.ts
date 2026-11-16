@@ -1,6 +1,6 @@
 // The printers table's words (#86).
 import { describe, expect, it } from 'vitest';
-import { connectsBy, fieldsSay, now, offered, training } from './desk';
+import { connectsBy, fieldsSay, midSentence, needsYou, now, offered, training } from './desk';
 import type { AdminPrinter } from '../generated/AdminPrinter';
 import type { PrinterState } from '../generated/PrinterState';
 import type { TowerPrinter } from '../generated/TowerPrinter';
@@ -76,5 +76,72 @@ describe('the printers table', () => {
     expect(fieldsSay(admin({ connection: null, training: null, camera: false }))).toBe(
       'Its fields say no connection, no training needed, no camera.',
     );
+  });
+});
+
+describe('what needs you', () => {
+  const stuck = (id: string, name: string, s: Partial<PrinterState> = {}): TowerPrinter => ({
+    ...live({ status: 'needs_hand', ...s }),
+    id,
+    name,
+  });
+  const at = new Date(2026, 10, 16, 11, 58).getTime() / 1000;
+
+  it('lists a printer that needs a hand, what stopped it, and whether the group chat was told', () => {
+    const ender = stuck('e', 'Ender 3', {
+      error: { words: 'The filament ran out at layer 112.', raw: 'runout', known: true, key: null },
+      job: { name: 'stand.gcode', owner: 'Sam Lee' },
+    });
+    const told = [{ printer: 'e', text: 'Ender 3 needs a hand.', at }];
+    expect(needsYou([], [ender], told)).toEqual([
+      {
+        key: 'e:needs_hand',
+        kind: 'needs_hand',
+        title: 'Ender 3: the filament ran out at layer 112',
+        detail: 'Posted to the group chat at 11:58 AM · Sam’s print',
+      },
+    ]);
+    expect(needsYou([], [stuck('x', 'X1')], [])[0]).toMatchObject({
+      title: 'X1 needs a hand',
+      detail: 'Not posted to the group chat',
+    });
+  });
+
+  it('puts the cause mid-sentence, keeping an acronym’s capitals', () => {
+    expect(midSentence('The filament ran out.')).toBe('the filament ran out');
+    expect(midSentence('PLA jammed.')).toBe('PLA jammed');
+    expect(midSentence('The printer reported: E42')).toBe('the printer reported: E42');
+  });
+
+  it('lists printers that need a hand by name', () => {
+    expect(needsYou([], [stuck('z', 'Voron'), stuck('a', 'Ender 3')], []).map((i) => i.key)).toEqual([
+      'a:needs_hand',
+      'z:needs_hand',
+    ]);
+  });
+
+  it('does not take another printer’s notice for this one', () => {
+    const told = [{ printer: 'other', text: 'Other needs a hand.', at }];
+    expect(needsYou([], [stuck('e', 'Ender 3')], told)[0]!.detail).toBe('Not posted to the group chat');
+  });
+
+  it('leaves out printers that are fine', () => {
+    expect(needsYou([admin()], [live({ status: 'printing' }), live({ status: 'offline' })], [])).toEqual([]);
+  });
+
+  it('lists a printer added to the tower that cannot run, with what to fix, after the ones that need a hand', () => {
+    const broken = admin({
+      bam_id: 'b',
+      name: 'MK4',
+      ready: false,
+      problems: [{ field: 'Connection (connection)', problem: 'missing' }],
+    });
+    const items = needsYou(
+      [broken, admin({ bam_id: 'n', ready: false, tower: 'offered' }), admin({ bam_id: 'd', ready: false, tower: 'declined' })],
+      [stuck('e', 'Ender 3')],
+      [],
+    );
+    expect(items.map((i) => i.key)).toEqual(['e:needs_hand', 'b:fields']);
+    expect(items[1]).toMatchObject({ title: 'MK4 can’t run: fix it in BAM!', detail: 'Connection (connection): missing' });
   });
 });
