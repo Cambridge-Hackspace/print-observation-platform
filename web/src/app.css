@@ -1,0 +1,16 @@
+/* Placeholder tokens until the round 6 design kit is ported (ADR 0001:
+   hand-built components on CSS custom properties). */
+:root {
+  --bg: #f6f5f2;
+  --fg: #1d1c1a;
+  --muted: #6b6862;
+  --live: #1f7a4d;
+  --waiting: #9a6b00;
+  font-family: system-ui, sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+}

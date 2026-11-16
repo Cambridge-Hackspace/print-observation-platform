@@ -1,0 +1,11 @@
+/target/
+/data/
+/out/
+/web/node_modules/
+/web/dist/
+/web/.e2e/
+/web/test-results/
+/web/playwright-report/
+*.db
+*.db-shm
+*.db-wal
