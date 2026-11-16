@@ -253,6 +253,39 @@ async fn a_missing_file_is_a_404_not_the_app() {
 }
 
 #[tokio::test]
+async fn no_screen_is_indexed_but_the_public_guides_when_allowed() {
+    let pop = Pop::new(built_app()).await;
+    for uri in ["/", "/kiosk", "/guides", "/guides/stringing", "/admin"] {
+        let res = pop.get(uri).await;
+        assert_eq!(res.status(), StatusCode::OK, "{uri}");
+        assert_eq!(
+            header_of(&res, "x-robots-tag".parse().unwrap()),
+            "noindex",
+            "{uri}"
+        );
+    }
+    let mut pop = Pop::new(built_app()).await;
+    pop.state = pop.state.clone().with_guides(pop_server::config::Guides {
+        license: String::new(),
+        indexable: true,
+    });
+    for uri in ["/guides", "/guides/stringing"] {
+        assert!(
+            pop.get(uri).await.headers().get("x-robots-tag").is_none(),
+            "{uri}"
+        );
+    }
+    for uri in ["/kiosk", "/", "/guidesx"] {
+        let res = pop.get(uri).await;
+        assert_eq!(
+            header_of(&res, "x-robots-tag".parse().unwrap()),
+            "noindex",
+            "{uri}"
+        );
+    }
+}
+
+#[tokio::test]
 async fn without_a_built_app_screens_say_how_to_build_it() {
     let pop = Pop::new(Fake(HashMap::new())).await;
     let res = pop.get("/kiosk").await;

@@ -8,9 +8,19 @@ import './lib/design/tokens.css';
 import App from './App.svelte';
 import Gallery from './Gallery.svelte';
 import Tower from './lib/tower/Tower.svelte';
+import GuidePage from './lib/guides/GuidePage.svelte';
+import GuidesIndex from './lib/guides/GuidesIndex.svelte';
 
 const target = document.getElementById('app')!;
-// /design shows the design system (#48), /kiosk the tower's home screen
-// (#49); everything else is the app.
-const screens: Record<string, typeof App> = { '/design': Gallery, '/kiosk': Tower };
-mount(screens[location.pathname] ?? App, { target });
+const path = location.pathname.replace(/\/+$/, '') || '/';
+// A guide's slug from /guides/{slug} or /kiosk/guides/{slug}.
+const guide = /^\/(kiosk\/)?guides\/([a-z0-9-]+)$/.exec(path);
+if (guide) {
+  // A guide, for anyone (#94), or at the kiosk (#56).
+  mount(GuidePage, { target, props: { slug: guide[2]!, kiosk: guide[1] !== undefined } });
+} else {
+  // /design shows the design system (#48), /kiosk the tower's home screen
+  // (#49), /guides every published guide (#94); everything else is the app.
+  const screens: Record<string, typeof App> = { '/design': Gallery, '/kiosk': Tower, '/guides': GuidesIndex };
+  mount(screens[path] ?? App, { target });
+}
