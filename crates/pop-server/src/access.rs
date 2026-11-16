@@ -98,6 +98,26 @@ pub fn violations(table: &[Route]) -> Vec<Violation> {
         .collect()
 }
 
+/// Whether a stranger can use `r`: anyone, from anywhere.
+pub fn is_public(r: &Route) -> bool {
+    r.who == Who::Anyone && r.reach == Reach::Anywhere
+}
+
+/// Every public route of `table` that can change something. Signing in is
+/// the one that may: it is how a stranger becomes someone, and it changes
+/// nothing but their own session. Empty is the only other acceptable answer.
+pub fn public_changes(table: &[Route]) -> Vec<Violation> {
+    table
+        .iter()
+        .filter(|r| is_public(r) && r.effect != Effect::Read)
+        .filter(|r| !(r.method == Method::POST && r.path == "/api/session"))
+        .map(|r| Violation {
+            method: r.method.clone(),
+            path: r.path,
+        })
+        .collect()
+}
+
 /// A router with every route of `table`, each guarded as it declares: only
 /// JSON for a request that changes something, then local-only, then who.
 pub fn build(table: Vec<Route>, state: &AppState) -> Router<AppState> {

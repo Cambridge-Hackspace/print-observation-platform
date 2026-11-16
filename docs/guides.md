@@ -73,3 +73,32 @@ that changes something. They are kept under the data directory's
 
 Admins only, from anywhere: nothing here reaches a printer. Writing, editing,
 renaming, publishing and adding an image are in the audit log.
+
+## For everyone
+
+Published guides can be read by anyone, without signing in, from anywhere, so
+CS:S, Discord messages and anyone else can link to them:
+
+| | |
+|---|---|
+| `GET /api/public/guides` | the published guides, by title |
+| `GET /api/public/guides/{slug}` | one published guide |
+| `GET /api/public/guides/{slug}/images/{id}` | a published guide's image |
+
+A draft is not there at all: its slug, its old slugs and its images all answer
+`404`. An old slug of a published guide redirects (`308`) to its slug now.
+Every answer carries an `ETag`, and a request with `If-None-Match` gets `304`
+while nothing has changed, so CS:S or a proxy can ask often and cheaply.
+
+These routes only read. The route table holds every route a stranger can reach
+to changing nothing but their own sign-in (#7), and a test tries each other
+method on them and finds the guide unchanged.
+
+Two settings, in `[guides]`:
+
+- `license`: shown on each guide (`"CC BY-SA 4.0"`); empty shows none.
+- `indexable`: whether search engines may index the guides. Off by default:
+  every public answer says `X-Robots-Tag: noindex`.
+
+The public pages at `/guides` and `/guides/{slug}` come with the guide viewers
+(#56, #72), which render the same walk-through.

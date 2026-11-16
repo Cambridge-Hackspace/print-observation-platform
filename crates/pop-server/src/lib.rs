@@ -69,6 +69,8 @@ pub struct AppState {
     pub http: reqwest::Client,
     /// Where stored files live: the data directory's files/ (#3, #71).
     pub files_dir: Option<std::path::PathBuf>,
+    /// How published guides are offered to everyone (#94).
+    pub guides: config::Guides,
 }
 
 impl AppState {
@@ -88,7 +90,14 @@ impl AppState {
             notifier: None,
             http: reqwest::Client::new(),
             files_dir: None,
+            guides: config::Guides::default(),
         }
+    }
+
+    /// Offer published guides under these settings (#94).
+    pub fn with_guides(mut self, guides: config::Guides) -> Self {
+        self.guides = guides;
+        self
     }
 
     /// Keep stored files (guide images) under `dir`.
@@ -281,6 +290,32 @@ pub fn routes() -> Vec<Route> {
             reach: Reach::LocalOnly,
             who: Who::Admin,
             handler: post(printers::decline),
+        },
+        // Published guides, for anyone, from anywhere (#94): read-only, like
+        // every route a stranger can reach (ADR 0001).
+        Route {
+            method: Method::GET,
+            path: "/api/public/guides",
+            effect: Effect::Read,
+            reach: Reach::Anywhere,
+            who: Who::Anyone,
+            handler: get(guides::public_list),
+        },
+        Route {
+            method: Method::GET,
+            path: "/api/public/guides/{slug}",
+            effect: Effect::Read,
+            reach: Reach::Anywhere,
+            who: Who::Anyone,
+            handler: get(guides::public_get),
+        },
+        Route {
+            method: Method::GET,
+            path: "/api/public/guides/{slug}/images/{id}",
+            effect: Effect::Read,
+            reach: Reach::Anywhere,
+            who: Who::Anyone,
+            handler: get(guides::public_image),
         },
         // Guides (#71): written by admins, from anywhere; nothing here
         // reaches a printer.
