@@ -11,7 +11,8 @@ test('the app goes live and shows what the server reports', async ({ page, reque
   expect(api.ok()).toBe(true);
   const status = await api.json();
 
-  await page.goto('/');
+  // The phone app (#60) says it under You.
+  await page.goto('/#you');
   await expect(page.getByTestId('connection')).toHaveText('Live');
   await expect(page.getByTestId('version')).toHaveText(status.version);
   await expect(page.getByTestId('schema')).toHaveText(String(status.schema_version));
@@ -48,11 +49,33 @@ test('the server reports its health, naming the database', async ({ request }) =
   expect(health.checks.database).toEqual({ ok: true });
 });
 
-test('a screen of the app passes an accessibility check', async ({ page }) => {
+test('the phone app passes an accessibility check at phone width, on each section', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const at of ['/', '/#you']) {
+    await page.goto(at);
+    await expect(page.getByTestId('phone')).toBeVisible();
+    if (at === '/') await expect(page.getByText(/an admin adds them from BAM!/)).toBeVisible();
+    else await expect(page.getByTestId('connection')).toHaveText('Live');
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+    expect(results.violations, `${at}: ${JSON.stringify(results.violations, null, 1)}`).toEqual([]);
+  }
+});
+
+test('the phone app is installable: its manifest and icons are served as a browser needs them', async ({ page, request }) => {
+  const res = await request.get('/manifest.webmanifest');
+  expect(res.status()).toBe(200);
+  expect(res.headers()['content-type']).toContain('application/manifest+json');
+  const manifest = await res.json();
+  for (const icon of manifest.icons as { src: string; type: string }[]) {
+    const i = await request.get(icon.src);
+    expect(i.status(), icon.src).toBe(200);
+    expect(i.headers()['content-type'], icon.src).toContain(icon.type);
+  }
+  // And the page the browser installs from links it.
   await page.goto('/');
-  await expect(page.getByTestId('connection')).toHaveText('Live');
-  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
-  expect(results.violations, JSON.stringify(results.violations, null, 1)).toEqual([]);
+  await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', '/manifest.webmanifest');
+  const touch = await request.get('/icon-180.png');
+  expect(touch.status()).toBe(200);
 });
 
 test('the public guides open signed out, and pass an accessibility check', async ({ page }) => {

@@ -4,7 +4,17 @@
   import { call } from '../api';
   import type { User } from '../generated/User';
 
-  let { onsignedin }: { onsignedin: (u: User) => void } = $props();
+  let {
+    onsignedin,
+    subtitle = 'Printer admin',
+    oncancel,
+  }: {
+    onsignedin: (u: User) => void;
+    /** Beside the name: which part of POP this signs in to. */
+    subtitle?: string;
+    /** Offered as "Not now" when given. */
+    oncancel?: () => void;
+  } = $props();
 
   let username = $state('');
   let password = $state('');
@@ -23,7 +33,7 @@
 </script>
 
 <main class="signin">
-  <div class="brand"><Logo size={40} /><span class="name">POP</span><span class="muted">Printer admin</span></div>
+  <div class="brand"><Logo size={40} /><span class="name">POP</span><span class="muted">{subtitle}</span></div>
   <form onsubmit={submit} data-testid="signin">
     <h1>Sign in</h1>
     <label for="signin-username">Username</label>
@@ -32,6 +42,7 @@
     <input id="signin-password" type="password" autocomplete="current-password" bind:value={password} required />
     {#if problem}<p class="problem" role="alert">{problem}</p>{/if}
     <Button variant="primary" type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</Button>
+    {#if oncancel}<Button onclick={oncancel}>Not now</Button>{/if}
   </form>
 </main>
 
