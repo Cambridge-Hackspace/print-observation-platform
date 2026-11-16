@@ -21,4 +21,16 @@ problems: Array<PrinterProblem>,
 /**
  * Whether the tower runs it, or it waits for an admin to say (#23).
  */
-tower: TowerState, };
+tower: TowerState, 
+/**
+ * The BAM! categories it is in, by name (#86).
+ */
+categories: Array<string>, 
+/**
+ * The training it needs, as BAM! says, if any.
+ */
+training: string | null, 
+/**
+ * Whether BAM! gives it a camera.
+ */
+camera: boolean, };

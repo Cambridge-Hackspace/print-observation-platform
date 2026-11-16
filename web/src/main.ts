@@ -10,6 +10,7 @@ import Gallery from './Gallery.svelte';
 import Tower from './lib/tower/Tower.svelte';
 import GuidePage from './lib/guides/GuidePage.svelte';
 import GuidesIndex from './lib/guides/GuidesIndex.svelte';
+import Admin from './lib/admin/Admin.svelte';
 
 const target = document.getElementById('app')!;
 const path = location.pathname.replace(/\/+$/, '') || '/';
@@ -20,7 +21,13 @@ if (guide) {
   mount(GuidePage, { target, props: { slug: guide[2]!, kiosk: guide[1] !== undefined } });
 } else {
   // /design shows the design system (#48), /kiosk the tower's home screen
-  // (#49), /guides every published guide (#94); everything else is the app.
-  const screens: Record<string, typeof App> = { '/design': Gallery, '/kiosk': Tower, '/guides': GuidesIndex };
+  // (#49), /guides every published guide (#94), /admin the admin desk (#86);
+  // everything else is the app.
+  const screens: Record<string, typeof App> = {
+    '/design': Gallery,
+    '/kiosk': Tower,
+    '/guides': GuidesIndex,
+    '/admin': Admin,
+  };
   mount(screens[path] ?? App, { target });
 }
