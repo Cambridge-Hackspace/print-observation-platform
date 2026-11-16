@@ -19,7 +19,7 @@ use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
 
 use crate::{
-    api::{AuditKind, Role, User},
+    api::{Account, AuditKind, Role, User},
     audit::{self, Actor, Event},
 };
 
@@ -239,19 +239,20 @@ pub async fn authenticate(
     username: &str,
     password: &str,
 ) -> Result<Option<User>, UserError> {
-    let row: Option<(i64, String)> =
-        sqlx::query_as("SELECT id, password_hash FROM users WHERE username = ?")
+    let row: Option<(i64, String, bool)> =
+        sqlx::query_as("SELECT id, password_hash, active FROM users WHERE username = ?")
             .bind(username)
             .fetch_optional(db)
             .await?;
-    let (id, phc) = match &row {
-        Some((id, phc)) => (Some(*id), phc.as_str()),
-        None => (None, decoy()),
+    let (id, phc, active) = match &row {
+        Some((id, phc, active)) => (Some(*id), phc.as_str(), *active),
+        None => (None, decoy(), false),
     };
-    // Hash before deciding, whichever way it goes.
+    // Hash before deciding, whichever way it goes, so a deactivated account
+    // answers in the same time as a wrong password.
     let ok = verify(password, phc);
-    match (id, ok) {
-        (Some(id), true) => Ok(Some(get(db, id).await?)),
+    match (id, ok, active) {
+        (Some(id), true, true) => Ok(Some(get(db, id).await?)),
         _ => Ok(None),
     }
 }
@@ -309,13 +310,9 @@ pub async fn set_role(db: &SqlitePool, id: i64, role: Role, by: &Actor) -> Resul
         tx.commit().await?;
         return get(db, id).await;
     }
-    if current == "admin" && role == Role::Member {
-        let admins: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE role = 'admin'")
-            .fetch_one(&mut *tx)
-            .await?;
-        if admins <= 1 {
-            return Err(UserError::LastAdmin);
-        }
+    if current == "admin" && role == Role::Member && active_admins_besides(&mut tx, id).await? == 0
+    {
+        return Err(UserError::LastAdmin);
     }
     sqlx::query("UPDATE users SET role = ? WHERE id = ?")
         .bind(role_str(role))
@@ -342,6 +339,240 @@ pub async fn set_role(db: &SqlitePool, id: i64, role: Role, by: &Actor) -> Resul
     .await?;
     tx.commit().await?;
     get(db, id).await
+}
+
+/// How many active admins there are other than `id`: a change that would
+/// leave none is refused, since nobody could then manage POP.
+async fn active_admins_besides(
+    conn: &mut sqlx::SqliteConnection,
+    id: i64,
+) -> Result<i64, UserError> {
+    Ok(sqlx::query_scalar(
+        "SELECT COUNT(*) FROM users WHERE role = 'admin' AND active = 1 AND id != ?",
+    )
+    .bind(id)
+    .fetch_one(conn)
+    .await?)
+}
+
+/// The most training an account can hold, and the longest name for one.
+const MOST_TRAINING: usize = 32;
+const LONGEST_TRAINING: usize = 40;
+
+/// Every account, as an admin manages it (#90).
+pub async fn accounts(db: &SqlitePool) -> Result<Vec<Account>, UserError> {
+    let rows: Vec<(i64, String, String, String, bool)> = sqlx::query_as(
+        "SELECT id, username, name, role, active FROM users ORDER BY username COLLATE NOCASE",
+    )
+    .fetch_all(db)
+    .await?;
+    let held: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT user_id, training FROM user_training ORDER BY training COLLATE NOCASE",
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|(id, username, name, role, active)| Account {
+            id,
+            username,
+            name,
+            role: if role == "admin" {
+                Role::Admin
+            } else {
+                Role::Member
+            },
+            active,
+            training: held
+                .iter()
+                .filter(|(u, _)| *u == id)
+                .map(|(_, t)| t.clone())
+                .collect(),
+        })
+        .collect())
+}
+
+/// One account, as an admin manages it.
+pub async fn account(db: &SqlitePool, id: i64) -> Result<Account, UserError> {
+    accounts(db)
+        .await?
+        .into_iter()
+        .find(|a| a.id == id)
+        .ok_or(UserError::NotFound)
+}
+
+/// Rename an account. Its username, which it signs in with, stays.
+pub async fn set_name(
+    db: &SqlitePool,
+    id: i64,
+    name: &str,
+    by: &Actor,
+) -> Result<Account, UserError> {
+    check_name(name)?;
+    let name = name.trim();
+    let mut tx = db.begin().await?;
+    let was: Option<String> = sqlx::query_scalar("SELECT name FROM users WHERE id = ?")
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?;
+    let was = was.ok_or(UserError::NotFound)?;
+    if was != name {
+        sqlx::query("UPDATE users SET name = ? WHERE id = ?")
+            .bind(name)
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        audit::record(
+            &mut tx,
+            by,
+            Event {
+                kind: AuditKind::NameChanged,
+                printer: None,
+                subject: Some((id, name)),
+                summary: format!("{} renamed {was} to {name}", by_name(by)),
+            },
+        )
+        .await?;
+    }
+    tx.commit().await?;
+    account(db, id).await
+}
+
+/// Deactivate an account, ending every sign-in it has, or reactivate it. The
+/// last active admin cannot be deactivated.
+pub async fn set_active(
+    db: &SqlitePool,
+    id: i64,
+    active: bool,
+    by: &Actor,
+) -> Result<Account, UserError> {
+    let mut tx = db.begin().await?;
+    let current: Option<(String, String, bool)> =
+        sqlx::query_as("SELECT name, role, active FROM users WHERE id = ?")
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await?;
+    let (name, role, was) = current.ok_or(UserError::NotFound)?;
+    if was != active {
+        if !active && role == "admin" && active_admins_besides(&mut tx, id).await? == 0 {
+            return Err(UserError::LastAdmin);
+        }
+        sqlx::query("UPDATE users SET active = ? WHERE id = ?")
+            .bind(active)
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        let summary = if active {
+            format!("{} reactivated {name}'s account", by_name(by))
+        } else {
+            let ended = sqlx::query("DELETE FROM sessions WHERE user_id = ?")
+                .bind(id)
+                .execute(&mut *tx)
+                .await?
+                .rows_affected();
+            format!(
+                "{} deactivated {name}'s account, ending {ended} sign-in(s)",
+                by_name(by)
+            )
+        };
+        audit::record(
+            &mut tx,
+            by,
+            Event {
+                kind: if active {
+                    AuditKind::AccountReactivated
+                } else {
+                    AuditKind::AccountDeactivated
+                },
+                printer: None,
+                subject: Some((id, &name)),
+                summary,
+            },
+        )
+        .await?;
+    }
+    tx.commit().await?;
+    account(db, id).await
+}
+
+/// Set every training an account holds. Each is trimmed, and one named twice
+/// (in any case) is held once.
+pub async fn set_training(
+    db: &SqlitePool,
+    id: i64,
+    training: &[String],
+    by: &Actor,
+) -> Result<Account, UserError> {
+    let mut wanted: Vec<String> = Vec::new();
+    for t in training {
+        let t = t.trim();
+        if t.is_empty() || t.chars().count() > LONGEST_TRAINING || t.chars().any(char::is_control) {
+            return Err(UserError::Invalid {
+                field: "training",
+                reason: format!(
+                    "each is 1 to {LONGEST_TRAINING} characters, as the printer's BAM! training field names it"
+                ),
+            });
+        }
+        if !wanted.iter().any(|w| w.eq_ignore_ascii_case(t)) {
+            wanted.push(t.to_owned());
+        }
+    }
+    if wanted.len() > MOST_TRAINING {
+        return Err(UserError::Invalid {
+            field: "training",
+            reason: format!("at most {MOST_TRAINING}"),
+        });
+    }
+    wanted.sort_by_key(|t| t.to_lowercase());
+    let before = account(db, id).await?;
+    let same = before.training.len() == wanted.len()
+        && before
+            .training
+            .iter()
+            .zip(&wanted)
+            .all(|(a, b)| a.eq_ignore_ascii_case(b));
+    if same {
+        return Ok(before);
+    }
+    let mut tx = db.begin().await?;
+    sqlx::query("DELETE FROM user_training WHERE user_id = ?")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    for t in &wanted {
+        sqlx::query("INSERT INTO user_training (user_id, training) VALUES (?, ?)")
+            .bind(id)
+            .bind(t)
+            .execute(&mut *tx)
+            .await?;
+    }
+    let shown = |v: &[String]| {
+        if v.is_empty() {
+            "none".to_owned()
+        } else {
+            v.join(", ")
+        }
+    };
+    audit::record(
+        &mut tx,
+        by,
+        Event {
+            kind: AuditKind::TrainingChanged,
+            printer: None,
+            subject: Some((id, &before.name)),
+            summary: format!(
+                "{} set {}'s training to {} (was {})",
+                by_name(by),
+                before.name,
+                shown(&wanted),
+                shown(&before.training)
+            ),
+        },
+    )
+    .await?;
+    tx.commit().await?;
+    account(db, id).await
 }
 
 fn token_hash(token: &str) -> String {
@@ -404,7 +635,7 @@ pub async fn session_user(db: &SqlitePool, token: &str) -> Result<Option<User>, 
     Ok(sqlx::query_as::<_, Row>(
         "SELECT u.id, u.username, u.name, u.role
            FROM sessions s JOIN users u ON u.id = s.user_id
-          WHERE s.token_hash = ? AND s.expires_at > ?",
+          WHERE s.token_hash = ? AND s.expires_at > ? AND u.active = 1",
     )
     .bind(token_hash(token))
     .bind(now())

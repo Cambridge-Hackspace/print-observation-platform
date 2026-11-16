@@ -10,10 +10,10 @@ use std::{
 };
 
 use pop_server::api::{
-    AccessCode, AdminPrinter, ApiError, AuditEntry, AuditKind, DiscordWebhook, ErrorGuide, Guide,
-    GuideImage, GuideProblems, GuideSummary, Health, LinkGuide, NewGuideImage, NewPassword,
-    NewRole, NewUser, NotifySettings, PublicGuide, PublicGuideList, Role, ServerEvent, SignIn,
-    Snapshot, Status, TowerPrinter, TowerState, User,
+    AccessCode, Account, AdminPrinter, ApiError, AuditEntry, AuditKind, DiscordWebhook, ErrorGuide,
+    Guide, GuideImage, GuideProblems, GuideSummary, Health, LinkGuide, NewActive, NewGuideImage,
+    NewName, NewPassword, NewRole, NewTraining, NewUser, NotifySettings, PublicGuide,
+    PublicGuideList, Role, ServerEvent, SignIn, Snapshot, Status, TowerPrinter, TowerState, User,
 };
 use ts_rs::TS;
 
@@ -56,6 +56,10 @@ fn export(dir: &Path) {
     NewUser::export_all_to(dir).unwrap();
     NewPassword::export_all_to(dir).unwrap();
     NewRole::export_all_to(dir).unwrap();
+    Account::export_all_to(dir).unwrap();
+    NewName::export_all_to(dir).unwrap();
+    NewActive::export_all_to(dir).unwrap();
+    NewTraining::export_all_to(dir).unwrap();
 }
 
 fn read_dir(dir: &Path) -> BTreeMap<String, String> {

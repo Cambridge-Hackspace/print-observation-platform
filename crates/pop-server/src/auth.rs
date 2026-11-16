@@ -10,7 +10,10 @@ use axum::{
 use crate::{
     AppState,
     access::{SESSION_COOKIE, session_token},
-    api::{ApiError, AuditKind, NewPassword, NewRole, NewUser, SignIn, User},
+    api::{
+        ApiError, AuditKind, NewActive, NewName, NewPassword, NewRole, NewTraining, NewUser,
+        SignIn, User,
+    },
     audit::{self, Actor, Filter},
     users::{self, NewAccount, SESSION_SECS, UserError},
 };
@@ -121,7 +124,7 @@ pub async fn me(Extension(user): Extension<User>) -> Json<User> {
 
 /// `GET /api/admin/users`.
 pub async fn list(State(state): State<AppState>) -> Response {
-    match users::list(&state.db).await {
+    match users::accounts(&state.db).await {
         Ok(u) => Json(u).into_response(),
         Err(e) => e.into_response(),
     }
@@ -187,6 +190,64 @@ pub async fn set_role(
     };
     match users::set_role(&state.db, id, b.role, &Actor::user(admin.id, &admin.name)).await {
         Ok(u) => Json(u).into_response(),
+        Err(e) => e.into_response(),
+    }
+}
+
+/// `PUT /api/admin/users/{id}/name`.
+pub async fn set_name(
+    State(state): State<AppState>,
+    Extension(admin): Extension<User>,
+    Path(id): Path<i64>,
+    b: Result<Json<NewName>, JsonRejection>,
+) -> Response {
+    let b = match body(b) {
+        Ok(b) => b,
+        Err(r) => return r.into_response(),
+    };
+    match users::set_name(&state.db, id, &b.name, &Actor::user(admin.id, &admin.name)).await {
+        Ok(a) => Json(a).into_response(),
+        Err(e) => e.into_response(),
+    }
+}
+
+/// `PUT /api/admin/users/{id}/active`.
+pub async fn set_active(
+    State(state): State<AppState>,
+    Extension(admin): Extension<User>,
+    Path(id): Path<i64>,
+    b: Result<Json<NewActive>, JsonRejection>,
+) -> Response {
+    let b = match body(b) {
+        Ok(b) => b,
+        Err(r) => return r.into_response(),
+    };
+    match users::set_active(&state.db, id, b.active, &Actor::user(admin.id, &admin.name)).await {
+        Ok(a) => Json(a).into_response(),
+        Err(e) => e.into_response(),
+    }
+}
+
+/// `PUT /api/admin/users/{id}/training`.
+pub async fn set_training(
+    State(state): State<AppState>,
+    Extension(admin): Extension<User>,
+    Path(id): Path<i64>,
+    b: Result<Json<NewTraining>, JsonRejection>,
+) -> Response {
+    let b = match body(b) {
+        Ok(b) => b,
+        Err(r) => return r.into_response(),
+    };
+    match users::set_training(
+        &state.db,
+        id,
+        &b.training,
+        &Actor::user(admin.id, &admin.name),
+    )
+    .await
+    {
+        Ok(a) => Json(a).into_response(),
         Err(e) => e.into_response(),
     }
 }

@@ -6,6 +6,7 @@
   import type { GroupNotice } from '../generated/GroupNotice';
   import type { TowerPrinter } from '../generated/TowerPrinter';
   import type { User } from '../generated/User';
+  import People from './People.svelte';
   import { connectsBy, fieldsSay, needsYou, now, offered, training, type Now } from './desk';
 
   let {
@@ -121,6 +122,8 @@
     {/each}
   </aside>
   </div>
+
+  <People printers={printers ?? []} {me} />
 </div>
 
 <style>

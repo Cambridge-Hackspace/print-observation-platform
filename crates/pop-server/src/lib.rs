@@ -274,6 +274,31 @@ pub fn routes() -> Vec<Route> {
             who: Who::Admin,
             handler: put(auth::set_role),
         },
+        // ---- managing local users (#90) ----
+        Route {
+            method: Method::PUT,
+            path: "/api/admin/users/{id}/name",
+            effect: Effect::Account,
+            reach: Reach::Anywhere,
+            who: Who::Admin,
+            handler: put(auth::set_name),
+        },
+        Route {
+            method: Method::PUT,
+            path: "/api/admin/users/{id}/active",
+            effect: Effect::Account,
+            reach: Reach::Anywhere,
+            who: Who::Admin,
+            handler: put(auth::set_active),
+        },
+        Route {
+            method: Method::PUT,
+            path: "/api/admin/users/{id}/training",
+            effect: Effect::Account,
+            reach: Reach::Anywhere,
+            who: Who::Admin,
+            handler: put(auth::set_training),
+        },
         // ---- printers from BAM! (#21) ----
         Route {
             method: Method::GET,

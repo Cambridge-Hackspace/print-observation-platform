@@ -80,6 +80,7 @@ function pop(start: { me: User | null; printers: AdminPrinter[]; refuse?: string
       }
       if (me?.role !== 'admin') return json({ error: 'admins only' }, 403);
       if (url === '/api/admin/printers') return json(printers);
+      if (url === '/api/admin/users' && method === 'GET') return json([]);
       const act = /^\/api\/admin\/printers\/([^/]+)\/(add|decline)$/.exec(url);
       if (act && method === 'POST') {
         if (start.refuse) return json({ error: start.refuse }, 403);
