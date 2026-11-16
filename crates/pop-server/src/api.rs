@@ -18,6 +18,8 @@ pub struct Status {
     /// The newest database migration applied.
     #[ts(type = "number")]
     pub schema_version: i64,
+    /// The address phones reach POP at, when it is set (#49).
+    pub public_url: Option<String>,
 }
 
 /// Everything a screen shows, at one moment. A screen that receives one

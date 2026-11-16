@@ -57,12 +57,16 @@ pub struct Secrets {
 pub struct Server {
     /// The address and port the server listens on.
     pub listen: SocketAddr,
+    /// The address phones reach POP at: https://pop.example.org. The tower
+    /// shows it as a QR code (#49). Empty: no QR code.
+    pub public_url: String,
 }
 
 impl Default for Server {
     fn default() -> Self {
         Self {
             listen: SocketAddr::from(([127, 0, 0, 1], 8080)),
+            public_url: String::new(),
         }
     }
 }
@@ -239,6 +243,7 @@ impl Config {
                 *slot = v;
             }
         };
+        set("POP_SERVER_PUBLIC_URL", &mut self.server.public_url);
         set("POP_BAM_URL", &mut self.bam.url);
         set("POP_BAM_TOKEN", &mut self.bam.token);
         set("POP_BAM_CATEGORY", &mut self.bam.category);
@@ -253,6 +258,18 @@ impl Config {
         set("POP_SECRETS_KEY", &mut self.secrets.key);
         // Each override that has a form is checked here, so its error names
         // the variable rather than the file's key.
+        if env("POP_SERVER_PUBLIC_URL").is_some()
+            && !self.server.public_url.is_empty()
+            && !is_http(&self.server.public_url)
+        {
+            return Err(err(
+                "POP_SERVER_PUBLIC_URL",
+                format!(
+                    "{:?}: expected the http:// or https:// address phones reach POP at",
+                    self.server.public_url
+                ),
+            ));
+        }
         if env("POP_BAM_URL").is_some() && !self.bam.url.is_empty() && !is_http(&self.bam.url) {
             return Err(err(
                 "POP_BAM_URL",
@@ -277,6 +294,13 @@ impl Config {
     /// Checks across keys, once the environment's overrides are in: a file
     /// may leave a secret to the environment.
     fn validate_whole(&self) -> Result<(), ConfigError> {
+        let u = &self.server.public_url;
+        if !u.is_empty() && !is_http(u) {
+            return Err(err(
+                "server.public_url",
+                format!("{u:?}: expected the http:// or https:// address phones reach POP at"),
+            ));
+        }
         let b = &self.bam;
         if !b.url.is_empty() {
             if !is_http(&b.url) {
@@ -578,6 +602,23 @@ mod tests {
         )
         .unwrap();
         assert_eq!(c.bam.token, "bam_x");
+    }
+
+    #[test]
+    fn the_public_address_must_be_one_and_its_error_names_where_it_came_from() {
+        let e = env_err(&[("POP_SERVER_PUBLIC_URL", "pop.example.org")]);
+        assert_eq!(e.key, "POP_SERVER_PUBLIC_URL");
+        let e = Config::parse("[server]\npublic_url = \"pop.example.org\"\n")
+            .and_then(|c| c.validate_whole().map(|()| c))
+            .unwrap_err();
+        assert_eq!(e.key, "server.public_url");
+        let c = Config::parse("[server]\npublic_url = \"https://pop.example.org\"\n").unwrap();
+        assert_eq!(c.server.public_url, "https://pop.example.org");
+        let c = Config::load(None, |k| {
+            (k == "POP_SERVER_PUBLIC_URL").then(|| "http://10.0.0.5:8080".to_owned())
+        })
+        .unwrap();
+        assert_eq!(c.server.public_url, "http://10.0.0.5:8080");
     }
 
     #[test]

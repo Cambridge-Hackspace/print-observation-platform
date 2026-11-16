@@ -40,9 +40,11 @@ export const MAX_RETRY_MS = 30_000;
 
 function status(v: unknown): Status | null {
   if (typeof v !== 'object' || v === null) return null;
-  const { version, schema_version } = v as Record<string, unknown>;
-  return typeof version === 'string' && typeof schema_version === 'number'
-    ? { version, schema_version }
+  const { version, schema_version, public_url } = v as Record<string, unknown>;
+  return typeof version === 'string' &&
+    typeof schema_version === 'number' &&
+    (public_url === null || typeof public_url === 'string')
+    ? { version, schema_version, public_url }
     : null;
 }
 

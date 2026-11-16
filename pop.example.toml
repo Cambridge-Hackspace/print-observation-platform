@@ -12,6 +12,9 @@
 [server]
 # The address and port to listen on. 0.0.0.0:8080 listens on every network.
 listen = "127.0.0.1:8080"
+# The address phones reach POP at, shown on the tower as a QR code:
+# "https://pop.example.org". Empty: no QR code.
+public_url = ""
 
 [storage]
 # Where the database and the stored print files live. Back it up with

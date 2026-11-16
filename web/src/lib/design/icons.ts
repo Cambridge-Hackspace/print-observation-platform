@@ -12,6 +12,8 @@ export const icons = {
   spool: 'M5 4h14v4H5zM5 16h14v4H5zM8 8h8v8H8z',
   plus: 'M12 5v14M5 12h14',
   upload: 'M12 19V6M6 11l6-6 6 6M5 21h14',
+  /** The tower's tap prompt, pointing at the card reader below the screen. */
+  down: 'M12 4v15M6 13l6 6 6-6',
 } as const;
 
 export type IconName = keyof typeof icons;
