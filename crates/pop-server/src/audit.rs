@@ -55,6 +55,9 @@ pub fn kind_str(k: AuditKind) -> &'static str {
         AuditKind::PasswordReset => "password_reset",
         AuditKind::RoleChanged => "role_changed",
         AuditKind::AccessCodeSet => "access_code_set",
+        AuditKind::PrinterAdded => "printer_added",
+        AuditKind::PrinterDeclined => "printer_declined",
+        AuditKind::PrinterRetired => "printer_retired",
         AuditKind::Other => "other",
     }
 }
@@ -70,6 +73,9 @@ fn kind_from(s: &str) -> AuditKind {
         AuditKind::PasswordReset,
         AuditKind::RoleChanged,
         AuditKind::AccessCodeSet,
+        AuditKind::PrinterAdded,
+        AuditKind::PrinterDeclined,
+        AuditKind::PrinterRetired,
     ]
     .into_iter()
     .find(|k| kind_str(*k) == s)

@@ -229,7 +229,9 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
                 category: config.bam.category.clone(),
                 fields: config.bam.fields.clone(),
             })
-            .with_bam_sync(view);
+            .with_bam_sync(view.clone());
+        // Printers archived in BAM! leave the tower as they go (#23).
+        let _retirer = pop_server::tower::spawn_retirer(state.db.clone(), view);
     }
     let events = state.events.clone();
     let app = router(state);
