@@ -41,3 +41,30 @@ local_networks = []
 #
 # trusted_proxies = ["127.0.0.1/32"]
 trusted_proxies = []
+
+[bam]
+# Where POP reads its printers (docs/integrations/bam.md). Empty: no BAM!.
+url = ""
+# POP's BAM! API token. A secret: give it as POP_BAM_TOKEN, not here.
+token = ""
+# The id of the BAM! category whose assets are the printers.
+category = ""
+
+[bam.fields]
+# Which field of the printer category, by its key, gives each printer's
+# connection (moonraker, octoprint, prusalink, bambu or usb_serial), address,
+# camera, model, materials (comma-separated), training level, and a Bambu
+# printer's serial number.
+connection = "connection"
+address = "address"
+camera = "camera"
+model = "model"
+materials = "materials"
+training = "training"
+serial = "serial"
+
+[secrets]
+# Seals the secrets POP keeps, such as a Bambu printer's access code: 32
+# random bytes in base64, as `openssl rand -base64 32` makes. A secret: give
+# it as POP_SECRETS_KEY, not here. Empty: POP refuses to keep secrets.
+key = ""

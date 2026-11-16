@@ -87,13 +87,20 @@ impl Pop {
         if let Some(c) = cookie {
             req = req.header(header::COOKIE, c);
         }
-        let req = match body {
+        let mut req = match body {
             Some(b) => req
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(b.to_string())),
             None => req.body(Body::empty()),
         }
         .unwrap();
+        // From this machine: these tests are about who, not where (#7's
+        // tests are about where).
+        req.extensions_mut()
+            .insert(axum::extract::ConnectInfo(std::net::SocketAddr::from((
+                [127, 0, 0, 1],
+                4000,
+            ))));
         let res = self.app.clone().oneshot(req).await.unwrap();
         let code = res.status();
         let cookie = res

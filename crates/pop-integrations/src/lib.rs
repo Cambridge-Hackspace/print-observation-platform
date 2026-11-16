@@ -4,6 +4,7 @@
 //! for inventory, and Throne for funding.
 
 pub mod bam;
+pub mod printers;
 
 #[cfg(feature = "fakes")]
 pub mod fakes;

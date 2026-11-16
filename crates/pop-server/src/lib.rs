@@ -11,6 +11,8 @@ pub mod config;
 pub mod db;
 pub mod events;
 pub mod health;
+pub mod printers;
+pub mod secrets;
 pub mod users;
 
 use std::sync::Arc;
@@ -43,6 +45,10 @@ pub struct AppState {
     pub checks: Arc<Vec<Arc<dyn HealthCheck>>>,
     /// Which requests are local (#7).
     pub access: config::Access,
+    /// Where the printers come from (#20, #21), when BAM! is configured.
+    pub bam: Option<Arc<printers::BamSource>>,
+    /// Seals the secrets POP keeps for printers (#21).
+    pub secrets: secrets::Secrets,
 }
 
 impl AppState {
@@ -53,7 +59,22 @@ impl AppState {
             events: Events::new(),
             assets,
             access: config::Access::default(),
+            bam: None,
+            secrets: secrets::Secrets::none(),
         }
+    }
+
+    /// Read printers from this BAM!, and check it on /healthz.
+    pub fn with_bam(mut self, source: printers::BamSource) -> Self {
+        let source = Arc::new(source);
+        self.bam = Some(source.clone());
+        self.with_check(printers::BamHealth(source))
+    }
+
+    /// Seal secrets with this.
+    pub fn with_secrets(mut self, secrets: secrets::Secrets) -> Self {
+        self.secrets = secrets;
+        self
     }
 
     /// Use these networks and proxies to tell local requests from remote ones.
@@ -169,6 +190,24 @@ pub fn routes() -> Vec<Route> {
             reach: Reach::Anywhere,
             who: Who::Admin,
             handler: put(auth::set_role),
+        },
+        // ---- printers from BAM! (#21) ----
+        Route {
+            method: Method::GET,
+            path: "/api/admin/printers",
+            effect: Effect::Read,
+            reach: Reach::Anywhere,
+            who: Who::Admin,
+            handler: get(printers::list),
+        },
+        Route {
+            method: Method::PUT,
+            path: "/api/admin/printers/{bam_id}/access-code",
+            // A printer's settings: from inside the space only (#7).
+            effect: Effect::ControlsPrinter,
+            reach: Reach::LocalOnly,
+            who: Who::Admin,
+            handler: put(printers::set_access_code),
         },
         // ---- the audit log (#8) ----
         Route {

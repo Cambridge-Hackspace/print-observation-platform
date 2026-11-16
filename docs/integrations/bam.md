@@ -30,6 +30,34 @@ POP retires (#23). Which of the category's fields give each printer's
 connection, address, camera, model, materials and training is set in POP
 (#21).
 
+## Which fields say what
+
+The `[bam.fields]` section of POP's configuration names, by key, the field
+of the printer category that gives each printer's settings
+(`pop.example.toml` has the defaults):
+
+| Setting | Default key | What POP needs in it |
+| --- | --- | --- |
+| connection | `connection` | `moonraker`, `octoprint`, `prusalink`, `bambu` or `usb_serial` |
+| address | `address` | Moonraker: its host, or a ws:// or http:// address. OctoPrint and PrusaLink: an http:// address. Bambu: its IP address or name alone. USB: the device, such as /dev/ttyACM0 |
+| camera | `camera` | an rtsp, rtsps, http or https address (optional) |
+| model | `model` | the model, as people say it (optional) |
+| materials | `materials` | the materials it prints, comma-separated (optional) |
+| training | `training` | the training level it needs (optional) |
+| serial | `serial` | a Bambu printer's serial number |
+
+A printer whose fields are missing or wrong is not run: POP's admin list
+(`GET /api/admin/printers`) shows it with each problem, naming the field, so
+it can be put right in BAM!.
+
+## Secrets stay in POP
+
+A Bambu printer's LAN access code never goes in BAM!. An admin enters it in
+POP, at the space (it changes a printer's settings), and POP keeps it sealed
+with ChaCha20-Poly1305 under the key in `POP_SECRETS_KEY` (`openssl rand
+-base64 32`). Without a key, POP refuses to keep it, rather than keep it in
+plain text. Changing the key means entering the codes again.
+
 ## What POP was tested against
 
 `crates/pop-integrations/tests/recordings` holds a real BAM! v0.20.0's

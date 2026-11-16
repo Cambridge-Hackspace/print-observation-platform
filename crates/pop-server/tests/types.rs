@@ -10,8 +10,8 @@ use std::{
 };
 
 use pop_server::api::{
-    ApiError, AuditEntry, AuditKind, Health, NewPassword, NewRole, NewUser, Role, ServerEvent,
-    SignIn, Snapshot, Status, User,
+    AccessCode, AdminPrinter, ApiError, AuditEntry, AuditKind, Health, NewPassword, NewRole,
+    NewUser, Role, ServerEvent, SignIn, Snapshot, Status, User,
 };
 use ts_rs::TS;
 
@@ -30,6 +30,8 @@ fn export(dir: &Path) {
     Role::export_all_to(dir).unwrap();
     AuditKind::export_all_to(dir).unwrap();
     AuditEntry::export_all_to(dir).unwrap();
+    AdminPrinter::export_all_to(dir).unwrap();
+    AccessCode::export_all_to(dir).unwrap();
     // The printer state model (#25), from pop-printers.
     pop_printers::PrinterState::export_all_to(dir).unwrap();
     pop_printers::Capabilities::export_all_to(dir).unwrap();

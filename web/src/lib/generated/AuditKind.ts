@@ -3,4 +3,4 @@
 /**
  * What an audit entry records.
  */
-export type AuditKind = "signed_in" | "sign_in_failed" | "signed_out" | "user_created" | "password_reset" | "role_changed" | "other";
+export type AuditKind = "signed_in" | "sign_in_failed" | "signed_out" | "user_created" | "password_reset" | "role_changed" | "access_code_set" | "other";
