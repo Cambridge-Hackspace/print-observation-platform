@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
 // The whole wiring, end to end: the binary serves the app it was built with,
 // the app opens the live stream, and what it shows is what the API reports.
@@ -34,4 +35,11 @@ test('the server reports its health, naming the database', async ({ request }) =
   const health = await res.json();
   expect(health.ok).toBe(true);
   expect(health.checks.database).toEqual({ ok: true });
+});
+
+test('a screen of the app passes an accessibility check', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('connection')).toHaveText('Live');
+  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+  expect(results.violations, JSON.stringify(results.violations, null, 1)).toEqual([]);
 });
