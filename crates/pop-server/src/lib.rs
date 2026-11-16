@@ -4,6 +4,7 @@
 pub mod access;
 pub mod api;
 pub mod assets;
+pub mod audit;
 pub mod auth;
 pub mod backup;
 pub mod config;
@@ -168,6 +169,15 @@ pub fn routes() -> Vec<Route> {
             reach: Reach::Anywhere,
             who: Who::Admin,
             handler: put(auth::set_role),
+        },
+        // ---- the audit log (#8) ----
+        Route {
+            method: Method::GET,
+            path: "/api/admin/audit",
+            effect: Effect::Read,
+            reach: Reach::Anywhere,
+            who: Who::Admin,
+            handler: get(auth::audit_log),
         },
     ]
 }

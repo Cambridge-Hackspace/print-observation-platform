@@ -18,7 +18,10 @@ use rand::RngCore;
 use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
 
-use crate::api::{Role, User};
+use crate::{
+    api::{AuditKind, Role, User},
+    audit::{self, Actor, Event},
+};
 
 /// How long a sign-in lasts. Kiosk sessions, with their own timeout, are #12.
 pub const SESSION_SECS: i64 = 30 * 24 * 60 * 60;
@@ -159,11 +162,12 @@ fn role_str(r: Role) -> &'static str {
     }
 }
 
-pub async fn create(db: &SqlitePool, a: NewAccount<'_>) -> Result<User, UserError> {
+pub async fn create(db: &SqlitePool, a: NewAccount<'_>, by: &Actor) -> Result<User, UserError> {
     check_username(a.username)?;
     check_name(a.name)?;
     check_password(a.password)?;
     let hash = hash_password(a.password);
+    let mut tx = db.begin().await?;
     let r = sqlx::query_as::<_, Row>(
         "INSERT INTO users (username, name, role, password_hash, created_at)
          VALUES (?, ?, ?, ?, ?)
@@ -174,13 +178,39 @@ pub async fn create(db: &SqlitePool, a: NewAccount<'_>) -> Result<User, UserErro
     .bind(role_str(a.role))
     .bind(hash)
     .bind(now())
-    .fetch_one(db)
+    .fetch_one(&mut *tx)
     .await;
-    match r {
-        Ok(row) => Ok(row.into()),
-        Err(sqlx::Error::Database(e)) if e.is_unique_violation() => Err(UserError::UsernameTaken),
-        Err(e) => Err(e.into()),
-    }
+    let user: User = match r {
+        Ok(row) => row.into(),
+        Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+            return Err(UserError::UsernameTaken);
+        }
+        Err(e) => return Err(e.into()),
+    };
+    audit::record(
+        &mut tx,
+        by,
+        Event {
+            kind: AuditKind::UserCreated,
+            printer: None,
+            subject: Some((user.id, &user.name)),
+            summary: format!(
+                "{} created {}'s account ({}, {})",
+                by_name(by),
+                user.name,
+                user.username,
+                role_str(user.role)
+            ),
+        },
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(user)
+}
+
+/// How an actor is named in a summary.
+fn by_name(by: &Actor) -> &str {
+    by.name.as_deref().unwrap_or("someone")
 }
 
 pub async fn list(db: &SqlitePool) -> Result<Vec<User>, UserError> {
@@ -228,34 +258,57 @@ pub async fn authenticate(
 
 /// Set a new password, and end every session the account has, so whoever
 /// knew the old one is signed out.
-pub async fn reset_password(db: &SqlitePool, id: i64, password: &str) -> Result<(), UserError> {
+pub async fn reset_password(
+    db: &SqlitePool,
+    id: i64,
+    password: &str,
+    by: &Actor,
+) -> Result<(), UserError> {
     check_password(password)?;
     let hash = hash_password(password);
     let mut tx = db.begin().await?;
-    let n = sqlx::query("UPDATE users SET password_hash = ? WHERE id = ?")
-        .bind(hash)
+    let name: Option<String> =
+        sqlx::query_scalar("UPDATE users SET password_hash = ? WHERE id = ? RETURNING name")
+            .bind(hash)
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await?;
+    let name = name.ok_or(UserError::NotFound)?;
+    let ended = sqlx::query("DELETE FROM sessions WHERE user_id = ?")
         .bind(id)
         .execute(&mut *tx)
         .await?
         .rows_affected();
-    if n == 0 {
-        return Err(UserError::NotFound);
-    }
-    sqlx::query("DELETE FROM sessions WHERE user_id = ?")
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
+    audit::record(
+        &mut tx,
+        by,
+        Event {
+            kind: AuditKind::PasswordReset,
+            printer: None,
+            subject: Some((id, &name)),
+            summary: format!(
+                "{} reset {name}'s password, ending {ended} sign-in(s)",
+                by_name(by)
+            ),
+        },
+    )
+    .await?;
     tx.commit().await?;
     Ok(())
 }
 
-pub async fn set_role(db: &SqlitePool, id: i64, role: Role) -> Result<User, UserError> {
+pub async fn set_role(db: &SqlitePool, id: i64, role: Role, by: &Actor) -> Result<User, UserError> {
     let mut tx = db.begin().await?;
-    let current: Option<String> = sqlx::query_scalar("SELECT role FROM users WHERE id = ?")
-        .bind(id)
-        .fetch_optional(&mut *tx)
-        .await?;
-    let current = current.ok_or(UserError::NotFound)?;
+    let current: Option<(String, String)> =
+        sqlx::query_as("SELECT role, name FROM users WHERE id = ?")
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await?;
+    let (current, name) = current.ok_or(UserError::NotFound)?;
+    if current == role_str(role) {
+        tx.commit().await?;
+        return get(db, id).await;
+    }
     if current == "admin" && role == Role::Member {
         let admins: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE role = 'admin'")
             .fetch_one(&mut *tx)
@@ -269,6 +322,24 @@ pub async fn set_role(db: &SqlitePool, id: i64, role: Role) -> Result<User, User
         .bind(id)
         .execute(&mut *tx)
         .await?;
+    audit::record(
+        &mut tx,
+        by,
+        Event {
+            kind: AuditKind::RoleChanged,
+            printer: None,
+            subject: Some((id, &name)),
+            summary: format!(
+                "{} made {name} {} (was {current})",
+                by_name(by),
+                match role {
+                    Role::Admin => "an admin",
+                    Role::Member => "a member",
+                }
+            ),
+        },
+    )
+    .await?;
     tx.commit().await?;
     get(db, id).await
 }
@@ -278,21 +349,54 @@ fn token_hash(token: &str) -> String {
 }
 
 /// Start a session for `user`, returning the token for its cookie.
-pub async fn start_session(db: &SqlitePool, user: i64) -> Result<String, UserError> {
+pub async fn start_session(db: &SqlitePool, user: &User) -> Result<String, UserError> {
     let mut b = [0u8; 32];
     rand::rngs::OsRng.fill_bytes(&mut b);
     let token = URL_SAFE_NO_PAD.encode(b);
     let t = now();
+    let mut tx = db.begin().await?;
     sqlx::query(
         "INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
     )
     .bind(token_hash(&token))
-    .bind(user)
+    .bind(user.id)
     .bind(t)
     .bind(t + SESSION_SECS)
-    .execute(db)
+    .execute(&mut *tx)
     .await?;
+    audit::record(
+        &mut tx,
+        &Actor::user(user.id, &user.name),
+        Event {
+            kind: AuditKind::SignedIn,
+            printer: None,
+            subject: Some((user.id, &user.name)),
+            summary: format!("{} signed in", user.name),
+        },
+    )
+    .await?;
+    tx.commit().await?;
     Ok(token)
+}
+
+/// A sign-in that failed, for the username given. Recorded so an admin can
+/// see someone guessing; the password tried is never recorded.
+pub async fn sign_in_failed(db: &SqlitePool, username: &str) -> Result<(), UserError> {
+    let mut conn = db.acquire().await?;
+    // At most 64 characters of what was typed, so the log cannot be stuffed.
+    let shown: String = username.chars().take(64).collect();
+    audit::record(
+        &mut conn,
+        &Actor::default(),
+        Event {
+            kind: AuditKind::SignInFailed,
+            printer: None,
+            subject: None,
+            summary: format!("a sign-in as {shown:?} failed"),
+        },
+    )
+    .await?;
+    Ok(())
 }
 
 /// The account a session token belongs to, if the session is live.
@@ -309,10 +413,27 @@ pub async fn session_user(db: &SqlitePool, token: &str) -> Result<Option<User>, 
     .map(Into::into))
 }
 
-pub async fn end_session(db: &SqlitePool, token: &str) -> Result<(), UserError> {
-    sqlx::query("DELETE FROM sessions WHERE token_hash = ?")
+/// End the session `token`, signing out `user`.
+pub async fn end_session(db: &SqlitePool, token: &str, user: &User) -> Result<(), UserError> {
+    let mut tx = db.begin().await?;
+    let n = sqlx::query("DELETE FROM sessions WHERE token_hash = ?")
         .bind(token_hash(token))
-        .execute(db)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+    if n > 0 {
+        audit::record(
+            &mut tx,
+            &Actor::user(user.id, &user.name),
+            Event {
+                kind: AuditKind::SignedOut,
+                printer: None,
+                subject: Some((user.id, &user.name)),
+                summary: format!("{} signed out", user.name),
+            },
+        )
         .await?;
+    }
+    tx.commit().await?;
     Ok(())
 }

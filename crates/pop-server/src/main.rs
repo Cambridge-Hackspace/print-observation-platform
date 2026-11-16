@@ -170,7 +170,7 @@ async fn create_admin(config: &Config, username: &str, name: Option<&str>) -> Re
         role: Role::Admin,
         password: &password,
     };
-    pop_server::users::create(&db, account)
+    pop_server::users::create(&db, account, &pop_server::audit::Actor::command_line())
         .await
         .map(|_| ())
         .map_err(|e| match e {

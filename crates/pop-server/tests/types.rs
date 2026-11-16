@@ -10,8 +10,8 @@ use std::{
 };
 
 use pop_server::api::{
-    ApiError, Health, NewPassword, NewRole, NewUser, Role, ServerEvent, SignIn, Snapshot, Status,
-    User,
+    ApiError, AuditEntry, AuditKind, Health, NewPassword, NewRole, NewUser, Role, ServerEvent,
+    SignIn, Snapshot, Status, User,
 };
 use ts_rs::TS;
 
@@ -28,6 +28,8 @@ fn export(dir: &Path) {
     ApiError::export_all_to(dir).unwrap();
     Health::export_all_to(dir).unwrap();
     Role::export_all_to(dir).unwrap();
+    AuditKind::export_all_to(dir).unwrap();
+    AuditEntry::export_all_to(dir).unwrap();
     User::export_all_to(dir).unwrap();
     SignIn::export_all_to(dir).unwrap();
     NewUser::export_all_to(dir).unwrap();
