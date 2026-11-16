@@ -1,0 +1,13 @@
+<!-- POP's app icon (#60): the mark (#48) on the forest ground, inside the
+     middle 80% so a maskable crop never cuts it. tools/web/icons.sh renders
+     web/public's PNGs from this. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 36 36">
+  <rect width="36" height="36" fill="#1c2620"/>
+  <g transform="translate(7.2 6.4) scale(0.6)">
+    <circle cx="18" cy="15" r="12" fill="#F7B294" stroke="#121a14" stroke-width="1.8"/>
+    <circle cx="18" cy="15" r="8.5" fill="none" stroke="#F1DB98" stroke-width="1.6"/>
+    <circle cx="18" cy="15" r="5" fill="#121a14"/>
+    <rect x="14.5" y="27" width="7" height="4" fill="#F1DB98" stroke="#121a14" stroke-width="1.2"/>
+    <path d="M16 31h4l-2 3z" fill="#C3D7BB"/>
+  </g>
+</svg>

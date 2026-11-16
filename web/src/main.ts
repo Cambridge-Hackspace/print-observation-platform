@@ -5,12 +5,12 @@ import '@fontsource/lexend/400.css';
 import '@fontsource/lexend/500.css';
 import '@fontsource/lexend/600.css';
 import './lib/design/tokens.css';
-import App from './App.svelte';
 import Gallery from './Gallery.svelte';
 import Tower from './lib/tower/Tower.svelte';
 import GuidePage from './lib/guides/GuidePage.svelte';
 import GuidesIndex from './lib/guides/GuidesIndex.svelte';
 import Admin from './lib/admin/Admin.svelte';
+import Phone from './lib/phone/Phone.svelte';
 
 const target = document.getElementById('app')!;
 const path = location.pathname.replace(/\/+$/, '') || '/';
@@ -22,12 +22,13 @@ if (guide) {
 } else {
   // /design shows the design system (#48), /kiosk the tower's home screen
   // (#49), /guides every published guide (#94), /admin the admin desk (#86);
-  // everything else is the app.
-  const screens: Record<string, typeof App> = {
+  // everything else is the phone app (#60), which is what the public address
+  // and the kiosk's QR codes open.
+  const screens: Record<string, typeof Phone> = {
     '/design': Gallery,
     '/kiosk': Tower,
     '/guides': GuidesIndex,
     '/admin': Admin,
   };
-  mount(screens[path] ?? App, { target });
+  mount(screens[path] ?? Phone, { target });
 }
