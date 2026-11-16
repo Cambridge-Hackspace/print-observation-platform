@@ -102,3 +102,19 @@ Two settings, in `[guides]`:
 
 The public pages at `/guides` and `/guides/{slug}` come with the guide viewers
 (#56, #72), which render the same walk-through.
+
+## Errors link to the right guide
+
+Each error the catalog knows (#35) has a stable key, such as
+`klipper-must-home`, and a printer's error carries the key of the entry that
+explained it. An admin links a guide to a key:
+
+| | |
+|---|---|
+| `GET /api/admin/error-guides` | every error the catalog knows, its source, and its guide |
+| `PUT /api/admin/error-guides/{key}` | `{"guide": "<slug>"}` to link one, `{"guide": null}` to unlink |
+
+`GET /api/public/error-guides` gives each key's guide, `{"klipper-must-home":
+"homing"}`, for "Show me how" on the needs-a-hand screen. Only published guides
+are in it: a link to a draft is never shown. A link follows its guide through a
+rename.

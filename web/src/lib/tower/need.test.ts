@@ -105,7 +105,7 @@ describe('the words', () => {
         status: 'needs_hand',
         progress: 0.37,
         job: { name: 'phone_stand.3mf', owner: 'Sam' },
-        error: { words: 'The filament ran out', raw: 'runout', known: true },
+        error: { words: 'The filament ran out', raw: 'runout', known: true, key: null },
       }),
     );
     expect(card(p, NOW)).toMatchObject({

@@ -15,4 +15,9 @@ raw: string,
 /**
  * Whether the catalog knew it. When it did not, `words` carry `raw`.
  */
-known: boolean, };
+known: boolean, 
+/**
+ * The catalog entry that explained it, which a guide can be linked to
+ * (#73); none when the catalog did not know it.
+ */
+key: string | null, };

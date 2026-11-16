@@ -317,6 +317,30 @@ pub fn routes() -> Vec<Route> {
             who: Who::Anyone,
             handler: get(guides::public_image),
         },
+        Route {
+            method: Method::GET,
+            path: "/api/public/error-guides",
+            effect: Effect::Read,
+            reach: Reach::Anywhere,
+            who: Who::Anyone,
+            handler: get(guides::public_error_guides),
+        },
+        Route {
+            method: Method::GET,
+            path: "/api/admin/error-guides",
+            effect: Effect::Read,
+            reach: Reach::Anywhere,
+            who: Who::Admin,
+            handler: get(guides::admin_error_guides),
+        },
+        Route {
+            method: Method::PUT,
+            path: "/api/admin/error-guides/{key}",
+            effect: Effect::Content,
+            reach: Reach::Anywhere,
+            who: Who::Admin,
+            handler: put(guides::admin_link_error_guide),
+        },
         // Guides (#71): written by admins, from anywhere; nothing here
         // reaches a printer.
         Route {

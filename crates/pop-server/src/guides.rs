@@ -877,3 +877,123 @@ pub async fn public_image(
         Err(e) => error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
     }
 }
+
+// ---- errors link to the right guide (#73) ------------------------------------
+
+use crate::api::{ErrorGuide, LinkGuide};
+
+/// Each catalog key's linked guide: its slug and whether it is published.
+async fn links(db: &SqlitePool) -> Result<HashMap<String, (String, bool)>, sqlx::Error> {
+    let rows: Vec<(String, String, String)> = sqlx::query_as(
+        "SELECT e.key, g.slug, g.status FROM error_guides e JOIN guides g ON g.id = e.guide_id",
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|(k, slug, status)| (k, (slug, status == "published")))
+        .collect())
+}
+
+/// `GET /api/admin/error-guides`: every error the catalog knows, and its guide.
+pub async fn admin_error_guides(State(state): State<AppState>) -> Response {
+    let linked = match links(&state.db).await {
+        Ok(l) => l,
+        Err(e) => return error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
+    };
+    let out: Vec<ErrorGuide> = pop_printers::catalog()
+        .into_iter()
+        .map(|e| ErrorGuide {
+            guide: linked.get(&e.key).map(|(slug, _)| slug.clone()),
+            key: e.key,
+            words: e.words,
+            source: e.source,
+        })
+        .collect();
+    Json(out).into_response()
+}
+
+/// `PUT /api/admin/error-guides/{key}`: the guide that fixes this error.
+pub async fn admin_link_error_guide(
+    State(state): State<AppState>,
+    Extension(admin): Extension<User>,
+    UrlPath(key): UrlPath<String>,
+    body: Result<Json<LinkGuide>, JsonRejection>,
+) -> Response {
+    let Json(body) = match body {
+        Ok(b) => b,
+        Err(e) => return error(StatusCode::BAD_REQUEST, e.body_text()),
+    };
+    let Some(entry) = pop_printers::catalog().into_iter().find(|e| e.key == key) else {
+        return error(
+            StatusCode::NOT_FOUND,
+            "the error catalog has no entry with that key",
+        );
+    };
+    let summary = match &body.guide {
+        Some(slug) => {
+            let id = match find(&state.db, slug).await {
+                // An old slug names the guide as well as its slug now.
+                Ok(Some((id, _))) => id,
+                Ok(None) => {
+                    return error(
+                        StatusCode::BAD_REQUEST,
+                        format!("guide: no guide has the slug {slug:?}"),
+                    );
+                }
+                Err(e) => return error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
+            };
+            let r = sqlx::query(
+                "INSERT INTO error_guides (key, guide_id) VALUES (?, ?)
+                 ON CONFLICT (key) DO UPDATE SET guide_id = excluded.guide_id",
+            )
+            .bind(&key)
+            .bind(id)
+            .execute(&state.db)
+            .await;
+            if let Err(e) = r {
+                return error(StatusCode::SERVICE_UNAVAILABLE, e.to_string());
+            }
+            format!(
+                "{} linked the guide {slug} to the error \"{}\"",
+                admin.name, entry.words
+            )
+        }
+        None => {
+            let r = sqlx::query("DELETE FROM error_guides WHERE key = ?")
+                .bind(&key)
+                .execute(&state.db)
+                .await;
+            match r {
+                Ok(d) if d.rows_affected() == 0 => return StatusCode::NO_CONTENT.into_response(),
+                Ok(_) => {}
+                Err(e) => return error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
+            }
+            format!(
+                "{} unlinked the guide from the error \"{}\"",
+                admin.name, entry.words
+            )
+        }
+    };
+    if let Err(e) = record(&state, &admin, AuditKind::ErrorGuideLinked, summary).await {
+        return error(StatusCode::SERVICE_UNAVAILABLE, e);
+    }
+    StatusCode::NO_CONTENT.into_response()
+}
+
+/// `GET /api/public/error-guides`: each error's guide, by catalog key, for
+/// "Show me how" (#55). Published guides only: a link to a draft is left
+/// out, never shown.
+pub async fn public_error_guides(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let linked = match links(&state.db).await {
+        Ok(l) => l,
+        Err(e) => return error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
+    };
+    let map: std::collections::BTreeMap<String, String> = linked
+        .into_iter()
+        .filter(|(_, (_, published))| *published)
+        .map(|(k, (slug, _))| (k, slug))
+        .collect();
+    let bytes = serde_json::to_vec(&map).expect("a map serializes");
+    public_answer(&state, &headers, "application/json", bytes)
+}

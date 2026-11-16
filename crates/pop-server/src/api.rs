@@ -160,6 +160,8 @@ pub enum AuditKind {
     /// An admin edited, renamed, published or unpublished a guide, or added
     /// an image to it.
     GuideEdited,
+    /// An admin linked a guide to an error the catalog knows, or unlinked it.
+    ErrorGuideLinked,
     /// A kind this build does not know, written by a newer POP. Shown, never
     /// hidden.
     Other,
@@ -367,4 +369,22 @@ pub struct PublicGuideSummary {
     pub slug: String,
     pub title: String,
     pub summary: String,
+}
+
+/// An error the catalog knows, and the guide that fixes it (#73).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct ErrorGuide {
+    /// The catalog entry's stable key.
+    pub key: String,
+    pub words: String,
+    pub source: String,
+    /// The guide's slug, when one is linked.
+    pub guide: Option<String>,
+}
+
+/// `PUT /api/admin/error-guides/{key}`: link a guide, or none.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct LinkGuide {
+    pub guide: Option<String>,
 }

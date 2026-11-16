@@ -35,7 +35,7 @@ const NOW = new Date(2026, 10, 16, 12, 11);
 const TOWER = [
   printer('Voron 2.4', state({ status: 'idle' }), { training: 'advanced' }),
   printer('Mk4 Left', state({ status: 'printing', progress: 0.81, seconds_left: 2280, job: { name: 'gear_housing.gcode', owner: 'Dev Patel' } })),
-  printer('Ender 3', state({ status: 'needs_hand', progress: 0.37, error: { words: 'The filament ran out', raw: 'runout', known: true } })),
+  printer('Ender 3', state({ status: 'needs_hand', progress: 0.37, error: { words: 'The filament ran out', raw: 'runout', known: true, key: null } })),
   printer('Mini+', state({ status: 'done', job: { name: 'keycap_set.gcode', owner: 'Jo' } })),
 ];
 
