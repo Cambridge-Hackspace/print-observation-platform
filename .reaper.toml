@@ -1,0 +1,56 @@
+# POP as a reaper tenant (reaper's docs/tenants.md).
+#
+# The battery is tools/check.sh, the same script CI runs: the Rust workspace,
+# the web app's checks and unit tests, and Playwright against a release
+# binary. Every tool comes from a digest-pinned image (tools/images.sh), so
+# the guest needs only its container engine.
+
+schema = 1
+project = "print-observation-platform"
+
+guests = ["ubuntu-26.04"]
+exec = "container"
+
+[build]
+# rust:1.97-bookworm, as tools/images.sh pins it. Compiling here, before the
+# battery, fails a change that does not build in the time a build takes,
+# rather than after the web app's install.
+image = "docker.io/library/rust@sha256:0e2bcaef56d041a486784e54104a81aebe0da44bd03019bd70bc0401e42e4a97"
+cmd = "CARGO_HOME=$REAPER_CACHE_CARGO CARGO_TARGET_DIR=$REAPER_CACHE_TARGET cargo build --locked --workspace --all-targets"
+# Named by us. Off the guest's root disk, which has under 4 GiB free.
+cache = ["cargo", "target", "npm", "node-modules"]
+
+[run]
+# Starts containers of its own, which a containerized verb cannot.
+exec = "host"
+cmd = "tools/reaper/run.sh"
+images = [
+  "docker.io/library/rust@sha256:0e2bcaef56d041a486784e54104a81aebe0da44bd03019bd70bc0401e42e4a97",
+  "docker.io/library/node@sha256:2c752226d477b4a886378baa95b9af252be59301b725fdb0b7e15208131505a8",
+  "mcr.microsoft.com/playwright@sha256:bc72a8df40831ded821e3cbc79c318c21b44d6e51dff9fd89ace7a8249c5b462",
+]
+
+[sync]
+exclude = [
+  "/target/",
+  "/out/",
+  "/data/",
+  "/web/node_modules/",
+  "/web/dist/",
+  "/web/.e2e/",
+  "/web/test-results/",
+  "/web/playwright-report/",
+]
+
+[resources]
+cores = 4
+ram_gb = 8
+
+[profiles.dev]
+ttl = "2h"
+warm_cache = true
+
+[profiles.nightly]
+ttl = "4h"
+# A cold cache, so the build is proven from nothing.
+warm_cache = false
