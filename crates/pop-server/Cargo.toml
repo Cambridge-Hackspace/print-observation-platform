@@ -16,11 +16,13 @@ path = "src/main.rs"
 argon2 = { version = "0.5", features = ["std"] }
 axum = "0.8"
 base64 = "0.22"
+chacha20poly1305 = "0.10"
 clap = { version = "4", features = ["derive", "env"] }
 flate2 = "1"
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 hex = "0.4"
 ipnet = { version = "2", features = ["serde"] }
+pop-integrations = { version = "0.1.0", path = "../pop-integrations" }
 rand = "0.8"
 rpassword = "7"
 rust-embed = { version = "8", features = ["mime-guess"] }
@@ -41,6 +43,7 @@ ts-rs = "11"
 
 [dev-dependencies]
 http-body-util = "0.1"
+pop-integrations = { path = "../pop-integrations", features = ["fakes"] }
 pop-printers = { path = "../pop-printers" }
 tempfile = "3"
 tower = { version = "0.5", features = ["util"] }

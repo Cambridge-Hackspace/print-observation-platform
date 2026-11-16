@@ -210,7 +210,18 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
             "built without the web app: run tools/web/build.sh, then build the server again"
         );
     }
-    let state = AppState::new(pool, Arc::new(Embedded)).with_access(config.access.clone());
+    let mut state = AppState::new(pool, Arc::new(Embedded))
+        .with_access(config.access.clone())
+        .with_secrets(pop_server::secrets::Secrets::new(&config.secrets.key));
+    if !config.bam.url.is_empty() {
+        let client = pop_integrations::bam::Bam::new(&config.bam.url, &config.bam.token)
+            .map_err(|e| format!("BAM!: {e}"))?;
+        state = state.with_bam(pop_server::printers::BamSource {
+            client,
+            category: config.bam.category.clone(),
+            fields: config.bam.fields.clone(),
+        });
+    }
     let events = state.events.clone();
     let app = router(state);
     let listen = config.server.listen;

@@ -25,6 +25,31 @@ pub struct Config {
     pub storage: Storage,
     pub log: Log,
     pub access: Access,
+    pub bam: Bam,
+    pub secrets: Secrets,
+}
+
+/// Where POP reads its printers (#20, #21). Off while `url` is empty.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Default)]
+#[serde(deny_unknown_fields, default)]
+pub struct Bam {
+    /// BAM!'s address: https://bam.example.org. Empty: no BAM!.
+    pub url: String,
+    /// POP's API token. A secret: give it as POP_BAM_TOKEN rather than here.
+    pub token: String,
+    /// The id of the BAM! category whose assets are the printers.
+    pub category: String,
+    /// Which of the category's fields give each printer's settings.
+    pub fields: pop_integrations::printers::FieldMap,
+}
+
+/// Where secrets POP keeps (a Bambu printer's access code) are sealed.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Default)]
+#[serde(deny_unknown_fields, default)]
+pub struct Secrets {
+    /// 32 random bytes in base64 (`openssl rand -base64 32`). A secret: give
+    /// it as POP_SECRETS_KEY. Empty: POP refuses to keep secrets.
+    pub key: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -175,6 +200,7 @@ impl Config {
         };
         config.apply_env(env)?;
         config.validate()?;
+        config.validate_whole()?;
         Ok(config)
     }
 
@@ -208,6 +234,93 @@ impl Config {
         if let Some(v) = env("POP_ACCESS_TRUSTED_PROXIES") {
             self.access.trusted_proxies = networks("POP_ACCESS_TRUSTED_PROXIES", &v)?;
         }
+        let set = |var: &str, slot: &mut String| {
+            if let Some(v) = env(var) {
+                *slot = v;
+            }
+        };
+        set("POP_BAM_URL", &mut self.bam.url);
+        set("POP_BAM_TOKEN", &mut self.bam.token);
+        set("POP_BAM_CATEGORY", &mut self.bam.category);
+        let f = &mut self.bam.fields;
+        set("POP_BAM_FIELDS_CONNECTION", &mut f.connection);
+        set("POP_BAM_FIELDS_ADDRESS", &mut f.address);
+        set("POP_BAM_FIELDS_CAMERA", &mut f.camera);
+        set("POP_BAM_FIELDS_MODEL", &mut f.model);
+        set("POP_BAM_FIELDS_MATERIALS", &mut f.materials);
+        set("POP_BAM_FIELDS_TRAINING", &mut f.training);
+        set("POP_BAM_FIELDS_SERIAL", &mut f.serial);
+        set("POP_SECRETS_KEY", &mut self.secrets.key);
+        // Each override that has a form is checked here, so its error names
+        // the variable rather than the file's key.
+        if env("POP_BAM_URL").is_some() && !self.bam.url.is_empty() && !is_http(&self.bam.url) {
+            return Err(err(
+                "POP_BAM_URL",
+                format!(
+                    "{:?}: expected an http:// or https:// address",
+                    self.bam.url
+                ),
+            ));
+        }
+        if env("POP_SECRETS_KEY").is_some()
+            && !self.secrets.key.is_empty()
+            && !is_key(&self.secrets.key)
+        {
+            return Err(err(
+                "POP_SECRETS_KEY",
+                "must be 32 bytes in base64, as `openssl rand -base64 32` makes",
+            ));
+        }
+        Ok(())
+    }
+
+    /// Checks across keys, once the environment's overrides are in: a file
+    /// may leave a secret to the environment.
+    fn validate_whole(&self) -> Result<(), ConfigError> {
+        let b = &self.bam;
+        if !b.url.is_empty() {
+            if !is_http(&b.url) {
+                return Err(err(
+                    "bam.url",
+                    format!("{:?}: expected an http:// or https:// address", b.url),
+                ));
+            }
+            if b.token.is_empty() {
+                return Err(err(
+                    "bam.token",
+                    "is empty, with bam.url set: give POP's BAM! token as POP_BAM_TOKEN",
+                ));
+            }
+            if b.category.is_empty() {
+                return Err(err(
+                    "bam.category",
+                    "is empty, with bam.url set: name the printer category's id",
+                ));
+            }
+        }
+        let f = &b.fields;
+        for (key, v) in [
+            ("bam.fields.connection", &f.connection),
+            ("bam.fields.address", &f.address),
+            ("bam.fields.camera", &f.camera),
+            ("bam.fields.model", &f.model),
+            ("bam.fields.materials", &f.materials),
+            ("bam.fields.training", &f.training),
+            ("bam.fields.serial", &f.serial),
+        ] {
+            if v.is_empty() {
+                return Err(err(
+                    key,
+                    "is empty: name the BAM! field's key, or leave it out for the default",
+                ));
+            }
+        }
+        if !self.secrets.key.is_empty() && !is_key(&self.secrets.key) {
+            return Err(err(
+                "secrets.key",
+                "must be 32 bytes in base64, as `openssl rand -base64 32` makes",
+            ));
+        }
         Ok(())
     }
 
@@ -225,6 +338,18 @@ impl Config {
     pub fn database_path(&self) -> PathBuf {
         self.storage.data_dir.join("pop.db")
     }
+}
+
+fn is_http(url: &str) -> bool {
+    url.starts_with("http://") || url.starts_with("https://")
+}
+
+/// 32 bytes in base64.
+fn is_key(k: &str) -> bool {
+    use base64::Engine;
+    base64::engine::general_purpose::STANDARD
+        .decode(k)
+        .is_ok_and(|k| k.len() == 32)
 }
 
 /// A comma-separated list of networks from an environment variable.
@@ -355,6 +480,8 @@ mod tests {
             ("POP_LOG_FORMAT", "xml"),
             ("POP_ACCESS_LOCAL_NETWORKS", "10.0.0.0/8, the-shop"),
             ("POP_ACCESS_TRUSTED_PROXIES", "a-proxy"),
+            ("POP_SECRETS_KEY", "c2hvcnQ="),
+            ("POP_BAM_URL", "bam.example.org"),
         ] {
             assert_eq!(env_err(&[(var, value)]).key, var, "{var}={value:?}");
         }
@@ -409,5 +536,90 @@ mod tests {
     fn the_sample_documents_exactly_the_defaults() {
         let sample = include_str!("../../../pop.example.toml");
         assert_eq!(Config::parse(sample).unwrap(), Config::default());
+    }
+
+    #[test]
+    fn bam_needs_its_token_and_category_once_it_has_an_address() {
+        let env = |pairs: &'static [(&'static str, &'static str)]| {
+            move |k: &str| {
+                pairs
+                    .iter()
+                    .find(|(n, _)| *n == k)
+                    .map(|(_, v)| (*v).to_owned())
+            }
+        };
+        let e = Config::load(None, env(&[("POP_BAM_URL", "https://bam.example.org")])).unwrap_err();
+        assert_eq!(e.key, "bam.token");
+        let e = Config::load(
+            None,
+            env(&[
+                ("POP_BAM_URL", "https://bam.example.org"),
+                ("POP_BAM_TOKEN", "bam_x"),
+            ]),
+        )
+        .unwrap_err();
+        assert_eq!(e.key, "bam.category");
+        let e = Config::load(None, env(&[("POP_BAM_URL", "bam.example.org")])).unwrap_err();
+        assert_eq!(
+            e.key, "POP_BAM_URL",
+            "an override's error names its variable"
+        );
+        let e = Config::parse("[bam]\nurl = \"bam.example.org\"\n")
+            .and_then(|c| c.validate_whole().map(|()| c))
+            .unwrap_err();
+        assert_eq!(e.key, "bam.url", "and the file's names its key");
+        let c = Config::load(
+            None,
+            env(&[
+                ("POP_BAM_URL", "https://bam.example.org"),
+                ("POP_BAM_TOKEN", "bam_x"),
+                ("POP_BAM_CATEGORY", "c1"),
+            ]),
+        )
+        .unwrap();
+        assert_eq!(c.bam.token, "bam_x");
+    }
+
+    #[test]
+    fn a_file_may_leave_bams_token_to_the_environment() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pop.toml");
+        std::fs::write(
+            &path,
+            "[bam]\nurl = \"https://bam.example.org\"\ncategory = \"c1\"\n",
+        )
+        .unwrap();
+        let c = Config::load(Some(&path), |k| {
+            (k == "POP_BAM_TOKEN").then(|| "bam_x".to_owned())
+        })
+        .unwrap();
+        assert_eq!(c.bam.token, "bam_x");
+    }
+
+    #[test]
+    fn a_renamed_bam_field_is_used_and_an_empty_one_named() {
+        let c = Config::parse("[bam.fields]\nconnection = \"link\"\n").unwrap();
+        assert_eq!(c.bam.fields.connection, "link");
+        assert_eq!(
+            c.bam.fields.address, "address",
+            "the rest keep their defaults"
+        );
+        let e =
+            Config::load(None, |k| (k == "POP_BAM_FIELDS_ADDRESS").then(String::new)).unwrap_err();
+        assert_eq!(e.key, "bam.fields.address");
+    }
+
+    #[test]
+    fn a_secrets_key_must_be_32_bytes() {
+        let key = |v: &'static str| move |k: &str| (k == "POP_SECRETS_KEY").then(|| v.to_owned());
+        assert_eq!(
+            Config::load(None, key("dG9vIHNob3J0")).unwrap_err().key,
+            "POP_SECRETS_KEY"
+        );
+        let e = Config::parse("[secrets]\nkey = \"dG9vIHNob3J0\"\n")
+            .and_then(|c| c.validate_whole().map(|()| c))
+            .unwrap_err();
+        assert_eq!(e.key, "secrets.key");
+        assert!(Config::load(None, key("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")).is_ok());
     }
 }

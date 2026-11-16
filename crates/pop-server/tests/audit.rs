@@ -46,6 +46,11 @@ const WRITE_ROUTES: &[(&str, &str, &str)] = &[
         "/api/admin/users/{id}/role",
         "a_role_change_is_recorded_and_a_change_to_the_same_role_is_not",
     ),
+    (
+        "PUT",
+        "/api/admin/printers/{bam_id}/access-code",
+        "tests/printers.rs: entering_an_access_code_is_recorded_without_the_code",
+    ),
 ];
 
 #[test]

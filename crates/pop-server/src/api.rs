@@ -116,6 +116,8 @@ pub enum AuditKind {
     UserCreated,
     PasswordReset,
     RoleChanged,
+    /// A printer's LAN access code was entered in POP (never the code).
+    AccessCodeSet,
     /// A kind this build does not know, written by a newer POP. Shown, never
     /// hidden.
     Other,
@@ -141,6 +143,32 @@ pub struct AuditEntry {
     pub subject_name: Option<String>,
     /// One line a person reads.
     pub summary: String,
+}
+
+/// A printer from BAM!, as admins see it (#21).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct AdminPrinter {
+    pub bam_id: String,
+    pub name: String,
+    /// Every field right, every secret held: POP can run it.
+    pub ready: bool,
+    /// How POP reaches it, as BAM! says, when it says.
+    pub connection: Option<String>,
+    /// What is wrong, each naming the field. Empty when ready.
+    pub problems: Vec<PrinterProblem>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct PrinterProblem {
+    /// The BAM! field, as BAM! labels it, with its key.
+    pub field: String,
+    pub problem: String,
+}
+
+/// `PUT /api/admin/printers/{bam_id}/access-code`.
+#[derive(Debug, Clone, Deserialize, TS)]
+pub struct AccessCode {
+    pub access_code: String,
 }
 
 /// The body of every API error.

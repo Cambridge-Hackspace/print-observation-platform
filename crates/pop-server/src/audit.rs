@@ -54,6 +54,7 @@ pub fn kind_str(k: AuditKind) -> &'static str {
         AuditKind::UserCreated => "user_created",
         AuditKind::PasswordReset => "password_reset",
         AuditKind::RoleChanged => "role_changed",
+        AuditKind::AccessCodeSet => "access_code_set",
         AuditKind::Other => "other",
     }
 }
@@ -68,6 +69,7 @@ fn kind_from(s: &str) -> AuditKind {
         AuditKind::UserCreated,
         AuditKind::PasswordReset,
         AuditKind::RoleChanged,
+        AuditKind::AccessCodeSet,
     ]
     .into_iter()
     .find(|k| kind_str(*k) == s)
