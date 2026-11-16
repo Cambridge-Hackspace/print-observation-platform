@@ -162,6 +162,27 @@ describe('the admin desk', () => {
     await waitFor(() => expect(r.getByTestId('row').textContent).toContain('Printing · Alex'));
   });
 
+  it('lists what needs an admin now, and says when nothing does', async () => {
+    const stuck: TowerPrinter = {
+      id: 'id-Ender 3',
+      name: 'Ender 3',
+      state: { status: 'needs_hand', progress: 0.4, layer: null, seconds_left: null, job: null, error: null, held: false },
+      watched: true,
+      materials: [],
+      training: null,
+    };
+    pop({ me: ASH, printers: [printer('Ender 3')], live: [stuck] });
+    const r = render(Admin);
+    await waitFor(() => expect(r.getAllByTestId('attention').map((a) => a.dataset.kind)).toEqual(['needs_hand']));
+    expect(r.getByTestId('attention').textContent).toContain('Ender 3 needs a hand');
+    expect(r.queryByTestId('all-clear')).toBeNull();
+    cleanup();
+    pop({ me: ASH, printers: [printer('Voron 2.4')], live: [] });
+    const calm = render(Admin);
+    await waitFor(() => calm.getByTestId('all-clear'));
+    expect(calm.queryByTestId('attention')).toBeNull();
+  });
+
   it('adds a new printer to the tower, as JSON, and shows it added', async () => {
     const calls = pop({ me: ASH, printers: [printer('Core One', { tower: 'offered', camera: true })] });
     const r = render(Admin);

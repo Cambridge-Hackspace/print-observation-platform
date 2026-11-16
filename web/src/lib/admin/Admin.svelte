@@ -71,6 +71,7 @@
     {me}
     {printers}
     live={screen.printers}
+    told={screen.told}
     {problem}
     {busy}
     onadd={(id) => act(id, 'add')}

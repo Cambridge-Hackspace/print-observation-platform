@@ -1,16 +1,18 @@
 <script lang="ts">
   // The admin desk (#86), as given: Admin.svelte fetches it and acts. The
   // "New in BAM!" banners (#23), then every printer in BAM!'s category.
-  import { Button, Logo, PrinterDrawing, StatusSquare } from '../design';
+  import { Button, Icon, Logo, PrinterDrawing, StatusSquare } from '../design';
   import type { AdminPrinter } from '../generated/AdminPrinter';
+  import type { GroupNotice } from '../generated/GroupNotice';
   import type { TowerPrinter } from '../generated/TowerPrinter';
   import type { User } from '../generated/User';
-  import { connectsBy, fieldsSay, now, offered, training, type Now } from './desk';
+  import { connectsBy, fieldsSay, needsYou, now, offered, training, type Now } from './desk';
 
   let {
     me,
     printers,
     live,
+    told = [],
     problem = null,
     busy = null,
     onadd = () => {},
@@ -22,6 +24,8 @@
     printers: AdminPrinter[] | null;
     /** The tower's printers, as the live stream has them. */
     live: TowerPrinter[];
+    /** What the group chat was told about printers that need a hand (#55). */
+    told?: GroupNotice[];
     /** What went wrong last, in POP's words. */
     problem?: string | null;
     /** The printer an action is waiting on, by BAM! id. */
@@ -41,6 +45,7 @@
     off: 'var(--pop-dim)',
   };
   const fresh = $derived(printers ? offered(printers) : []);
+  const attention = $derived(needsYou(printers ?? [], live, told));
 </script>
 
 <div class="desk" data-testid="desk">
@@ -72,6 +77,7 @@
     </section>
   {/each}
 
+  <div class="main">
   <section class="printers">
     <div class="head"><h2>Printers</h2><span class="muted">Everything in BAM!’s printer category</span></div>
     {#if printers === null}
@@ -102,6 +108,19 @@
     {/if}
     <span class="muted foot">Change a printer’s category or fields in BAM! and POP follows.</span>
   </section>
+
+  <aside class="needs" aria-labelledby="needs-you">
+    <h2 id="needs-you">Needs you</h2>
+    {#each attention as a (a.key)}
+      <div class="item" data-testid="attention" data-kind={a.kind}>
+        <Icon name="warn" size={22} color={a.kind === 'needs_hand' ? 'var(--pop-coral)' : 'var(--pop-butter)'} />
+        <div class="say"><span class="what">{a.title}</span><span class="muted">{a.detail}</span></div>
+      </div>
+    {:else}
+      <p class="muted" data-testid="all-clear">Nothing needs you right now.</p>
+    {/each}
+  </aside>
+  </div>
 </div>
 
 <style>
@@ -165,6 +184,39 @@
   .title {
     font-size: 19px;
     font-weight: 600;
+  }
+  .main {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 22px;
+    align-items: flex-start;
+  }
+  .main > .printers {
+    flex: 1 1 40rem;
+    min-width: 0;
+  }
+  .needs {
+    flex: 0 1 26rem;
+    min-width: 16rem;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 12px 14px;
+    background: var(--pop-panel);
+    border-radius: var(--pop-radius);
+  }
+  .item .say {
+    min-width: 0;
+    font-size: 13.5px;
+  }
+  .what {
+    font-size: 16px;
+    font-weight: 500;
   }
   .printers {
     display: flex;
