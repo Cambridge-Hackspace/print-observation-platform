@@ -12,13 +12,26 @@
 //! driver restarting, POP restarting) is not a new trouble, and a printer
 //! first seen already needing a hand, as after POP restarts, is not
 //! announced again.
+//!
+//! What Discord took about a printer that needs a hand stands for its screen
+//! to show (#55), until the printer no longer needs one.
 
-use std::collections::HashMap;
+use std::{
+    collections::{BTreeMap, HashMap},
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use pop_printers::PrinterStatus;
-use tokio::{sync::watch, task::JoinHandle};
+use tokio::{
+    sync::{mpsc, oneshot, watch},
+    task::JoinHandle,
+};
 
-use crate::{api::TowerPrinter, notify::Notifier};
+use crate::{
+    api::{GroupNotice, ServerEvent, TowerPrinter},
+    events::Events,
+    notify::Notifier,
+};
 
 /// "the filament ran out at layer 112" from "The filament ran out at layer
 /// 112.": the catalog's words, to go mid-sentence. A leading acronym ("PLA")
@@ -40,7 +53,9 @@ fn first_name(owner: &str) -> Option<&str> {
     owner.split_whitespace().next()
 }
 
-/// The notice for a printer that needs a hand.
+/// The notice for a printer that needs a hand. A held print is "paused"; one
+/// the printer has given up on "stopped" (#55), so nobody is told a print is
+/// safe that is not.
 pub fn needs_a_hand(p: &TowerPrinter) -> String {
     let mut s = match &p.state.error {
         Some(e) => format!("{} needs a hand: {}.", p.name, mid_sentence(&e.words)),
@@ -53,7 +68,8 @@ pub fn needs_a_hand(p: &TowerPrinter) -> String {
         .and_then(|j| j.owner.as_deref())
         .and_then(first_name)
     {
-        s.push_str(&format!(" {who}'s print is paused."));
+        let what = if p.state.held { "is paused" } else { "stopped" };
+        s.push_str(&format!(" {who}'s print {what}."));
     }
     s
 }
@@ -66,6 +82,21 @@ pub fn fixed(p: &TowerPrinter) -> String {
     }
 }
 
+/// A notice for the group, about one printer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Notice {
+    NeedsHand { printer: String, text: String },
+    Fixed { printer: String, text: String },
+}
+
+impl Notice {
+    pub fn text(&self) -> &str {
+        match self {
+            Self::NeedsHand { text, .. } | Self::Fixed { text, .. } => text,
+        }
+    }
+}
+
 /// What each printer last needed, to notice changes once.
 #[derive(Debug, Default)]
 pub struct Watcher {
@@ -75,7 +106,7 @@ pub struct Watcher {
 
 impl Watcher {
     /// The notices for the change from what was seen before to `printers`.
-    pub fn see(&mut self, printers: &[TowerPrinter]) -> Vec<String> {
+    pub fn see(&mut self, printers: &[TowerPrinter]) -> Vec<Notice> {
         let mut out = Vec::new();
         for p in printers {
             let now = match p.state.status {
@@ -90,8 +121,14 @@ impl Watcher {
                 PrinterStatus::Idle | PrinterStatus::Printing | PrinterStatus::Done => false,
             };
             match self.needs_hand.insert(p.id.clone(), now) {
-                Some(false) if now => out.push(needs_a_hand(p)),
-                Some(true) if !now => out.push(fixed(p)),
+                Some(false) if now => out.push(Notice::NeedsHand {
+                    printer: p.id.clone(),
+                    text: needs_a_hand(p),
+                }),
+                Some(true) if !now => out.push(Notice::Fixed {
+                    printer: p.id.clone(),
+                    text: fixed(p),
+                }),
                 // First seen, or no change.
                 _ => {}
             }
@@ -100,20 +137,122 @@ impl Watcher {
     }
 }
 
-/// Post the group's notices as the tower's printers change.
-pub fn spawn(mut tower: watch::Receiver<Vec<TowerPrinter>>, notifier: Notifier) -> JoinHandle<()> {
-    tokio::spawn(async move {
+/// The needs-a-hand notices Discord has, while each trouble lasts.
+///
+/// Each trouble is numbered, so a notice that reaches Discord late (after
+/// retries, say) stands only if its trouble is still the printer's current
+/// one: never after the printer was fixed, nor over a newer trouble.
+#[derive(Debug, Default)]
+pub struct Told {
+    trouble: HashMap<String, u64>,
+    standing: BTreeMap<String, GroupNotice>,
+}
+
+impl Told {
+    /// A printer's new trouble begins: its number, for [`Told::sent`].
+    pub fn begin(&mut self, printer: &str) -> u64 {
+        self.standing.remove(printer);
+        let n = self.trouble.entry(printer.to_owned()).or_default();
+        *n += 1;
+        *n
+    }
+
+    /// A printer's trouble ends.
+    pub fn end(&mut self, printer: &str) {
+        self.standing.remove(printer);
+        *self.trouble.entry(printer.to_owned()).or_default() += 1;
+    }
+
+    /// Discord has the notice for trouble `n`.
+    pub fn sent(&mut self, n: u64, notice: GroupNotice) {
+        if self.trouble.get(&notice.printer) == Some(&n) {
+            self.standing.insert(notice.printer.clone(), notice);
+        }
+    }
+
+    /// Forget printers the tower no longer has.
+    pub fn keep(&mut self, printers: &[TowerPrinter]) {
+        self.standing
+            .retain(|id, _| printers.iter().any(|p| &p.id == id));
+    }
+
+    /// Every notice standing, by printer id.
+    pub fn standing(&self) -> Vec<GroupNotice> {
+        self.standing.values().cloned().collect()
+    }
+}
+
+fn unix_now() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or_default()
+}
+
+/// Post the group's notices as the tower's printers change. The receiver has
+/// the needs-a-hand notices Discord took, as every screen is sent them.
+pub fn spawn(
+    mut tower: watch::Receiver<Vec<TowerPrinter>>,
+    notifier: Notifier,
+    events: Events,
+) -> (watch::Receiver<Vec<GroupNotice>>, JoinHandle<()>) {
+    let (tx, rx) = watch::channel(Vec::new());
+    let task = tokio::spawn(async move {
         let mut watcher = Watcher::default();
+        let mut told = Told::default();
+        let (sent_tx, mut sent_rx) = mpsc::unbounded_channel::<(u64, GroupNotice)>();
         loop {
             let printers = tower.borrow_and_update().clone();
             for notice in watcher.see(&printers) {
-                notifier.post(notice);
+                match notice {
+                    Notice::NeedsHand { printer, text } => {
+                        let n = told.begin(&printer);
+                        let (sent, taken) = oneshot::channel();
+                        notifier.post_then(text.clone(), sent);
+                        let back = sent_tx.clone();
+                        tokio::spawn(async move {
+                            if taken.await.is_ok() {
+                                let at = unix_now();
+                                let _ = back.send((n, GroupNotice { printer, text, at }));
+                            }
+                        });
+                    }
+                    Notice::Fixed { printer, text } => {
+                        told.end(&printer);
+                        notifier.post(text);
+                    }
+                }
             }
-            if tower.changed().await.is_err() {
-                return;
+            told.keep(&printers);
+            publish(&events, &tx, told.standing());
+            loop {
+                tokio::select! {
+                    changed = tower.changed() => {
+                        if changed.is_err() {
+                            return;
+                        }
+                        break;
+                    }
+                    Some((n, notice)) = sent_rx.recv() => {
+                        told.sent(n, notice);
+                        publish(&events, &tx, told.standing());
+                    }
+                }
             }
         }
-    })
+    });
+    (rx, task)
+}
+
+/// Send every screen what the group was told, if it changed.
+fn publish(events: &Events, tx: &watch::Sender<Vec<GroupNotice>>, standing: Vec<GroupNotice>) {
+    if *tx.borrow() == standing {
+        return;
+    }
+    tx.send_replace(standing.clone());
+    // After the receiver has them, so a snapshot taken at this event's id
+    // includes them.
+    events.publish(ServerEvent::Told(standing));
 }
 
 #[cfg(test)]
@@ -152,7 +291,12 @@ mod tests {
             known: true,
             key: None,
         });
+        p.state.held = true;
         p
+    }
+
+    fn texts(n: Vec<Notice>) -> Vec<String> {
+        n.iter().map(|n| n.text().to_owned()).collect()
     }
 
     #[test]
@@ -177,6 +321,16 @@ mod tests {
     }
 
     #[test]
+    fn a_print_the_printer_gave_up_on_is_stopped_not_paused() {
+        let mut p = stuck("Ender 3");
+        p.state.held = false;
+        assert_eq!(
+            needs_a_hand(&p),
+            "Ender 3 needs a hand: the filament ran out at layer 112. Sam's print stopped."
+        );
+    }
+
+    #[test]
     fn a_trouble_is_noticed_once_and_its_fix_once() {
         let mut w = Watcher::default();
         assert!(
@@ -190,7 +344,10 @@ mod tests {
         );
         assert_eq!(
             w.see(&[printer("Ender 3", PrinterStatus::Printing)]),
-            ["Ender 3 is printing again."]
+            [Notice::Fixed {
+                printer: "id-Ender 3".into(),
+                text: "Ender 3 is printing again.".into()
+            }]
         );
         assert!(
             w.see(&[printer("Ender 3", PrinterStatus::Printing)])
@@ -213,7 +370,7 @@ mod tests {
                 .is_empty()
         );
         assert_eq!(
-            w.see(&[printer("Ender 3", PrinterStatus::Idle)]),
+            texts(w.see(&[printer("Ender 3", PrinterStatus::Idle)])),
             ["Ender 3 is fixed and ready."]
         );
     }
@@ -259,6 +416,61 @@ mod tests {
         ]);
         let n = w.see(&[stuck("A"), printer("B", PrinterStatus::Done)]);
         assert_eq!(n.len(), 1);
-        assert!(n[0].starts_with("A needs a hand"));
+        assert!(matches!(&n[0], Notice::NeedsHand { printer, text }
+            if printer == "id-A" && text.starts_with("A needs a hand")));
+    }
+
+    fn told(printer: &str, text: &str) -> GroupNotice {
+        GroupNotice {
+            printer: printer.into(),
+            text: text.into(),
+            at: 1,
+        }
+    }
+
+    #[test]
+    fn what_discord_took_stands_while_the_trouble_lasts() {
+        let mut t = Told::default();
+        let n = t.begin("a");
+        assert!(t.standing().is_empty(), "nothing until Discord has it");
+        t.sent(n, told("a", "A needs a hand."));
+        assert_eq!(t.standing(), [told("a", "A needs a hand.")]);
+        t.end("a");
+        assert!(t.standing().is_empty(), "fixed: nothing stands");
+    }
+
+    #[test]
+    fn a_notice_taken_late_does_not_outlive_its_trouble() {
+        let mut t = Told::default();
+        let first = t.begin("a");
+        t.end("a");
+        t.sent(first, told("a", "late"));
+        assert!(t.standing().is_empty(), "not after the fix");
+        let first = t.begin("a");
+        t.end("a");
+        let second = t.begin("a");
+        t.sent(first, told("a", "the old trouble"));
+        assert!(t.standing().is_empty(), "not over a newer trouble");
+        t.sent(second, told("a", "the new trouble"));
+        assert_eq!(t.standing(), [told("a", "the new trouble")]);
+    }
+
+    #[test]
+    fn a_new_trouble_clears_the_last_ones_notice() {
+        let mut t = Told::default();
+        let n = t.begin("a");
+        t.sent(n, told("a", "the first"));
+        t.begin("a");
+        assert!(t.standing().is_empty());
+    }
+
+    #[test]
+    fn a_printer_the_tower_no_longer_has_is_forgotten() {
+        let mut t = Told::default();
+        let (a, b) = (t.begin("id-A"), t.begin("id-B"));
+        t.sent(a, told("id-A", "A"));
+        t.sent(b, told("id-B", "B"));
+        t.keep(&[printer("A", PrinterStatus::NeedsHand)]);
+        assert_eq!(t.standing(), [told("id-A", "A")]);
     }
 }

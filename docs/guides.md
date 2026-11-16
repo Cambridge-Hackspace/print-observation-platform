@@ -118,3 +118,12 @@ explained it. An admin links a guide to a key:
 "homing"}`, for "Show me how" on the needs-a-hand screen. Only published guides
 are in it: a link to a draft is never shown. A link follows its guide through a
 rename.
+
+On that screen (#55), the guide's first steps are numbered, from its start for
+as long as each leads straight to the next (up to five). A guide that opens
+with a yes/no question, or goes on past that, shows what it can and offers
+"The rest of the guide". So write a guide's opening as plain steps where you
+can: they are what someone at the kiosk reads first. The list always ends at
+the printer, which POP never controls: "Press Resume on the printer's screen"
+when the printer is holding the print, or "Clear the error on the printer's
+screen" when the print has stopped.

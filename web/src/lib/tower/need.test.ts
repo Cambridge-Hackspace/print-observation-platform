@@ -9,6 +9,7 @@ const state = (s: Partial<PrinterState> & Pick<PrinterState, 'status'>): Printer
   seconds_left: null,
   job: null,
   error: null,
+  held: false,
   ...s,
 });
 const printer = (name: string, s: PrinterState, more: Partial<TowerPrinter> = {}): TowerPrinter => ({
@@ -108,10 +109,11 @@ describe('the words', () => {
         error: { words: 'The filament ran out', raw: 'runout', known: true, key: null },
       }),
     );
-    expect(card(p, NOW)).toMatchObject({
+    expect(card(p, NOW)).toEqual({
       state: 'Needs a hand',
       job: 'Sam’s phone_stand',
       left: 'Stopped at 37% · The filament ran out',
+      right: 'tap to see what to do',
     });
   });
 

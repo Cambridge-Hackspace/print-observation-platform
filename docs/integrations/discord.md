@@ -23,6 +23,18 @@ token. Saving, removing and testing it are in the audit log, without the URL.
 One plain sentence, naming the printer and the person. Nothing POP posts can
 ping anyone: a name such as `@everyone` stays text.
 
+A printer that needs a hand: "Ender 3 needs a hand: the filament ran out at
+layer 112. Sam's print is paused." The print is "paused" only when the printer
+is holding it to be resumed there (a Bambu printer pausing for an error); when
+the printer has given up on it (a Klipper error or shutdown, a failed Bambu
+print) it "stopped", so nobody is told a print is safe that is not. When it is
+fixed: "Ender 3 is printing again."
+
+The printer's screen at the kiosk shows the needs-a-hand notice as the group
+chat saw it, with the time Discord took it, while the printer still needs a
+hand. A notice Discord never took (no webhook, or POP gave up) is not shown;
+the screen says POP hasn't posted it instead.
+
 ## When Discord does not answer
 
 Notices go out one at a time, in order. A failure is tried again after a wait

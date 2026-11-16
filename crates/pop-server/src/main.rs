@@ -259,8 +259,10 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
         pop_server::notify::Options::default(),
     );
     // The group hears when a printer needs a hand, and when it is fixed (#69).
-    let _notices = pop_server::notices::spawn(state.tower.clone(), notifier.clone());
-    state = state.with_notifier(notifier);
+    // And its screen shows what the group was told (#55).
+    let (told, _notices) =
+        pop_server::notices::spawn(state.tower.clone(), notifier.clone(), state.events.clone());
+    state = state.with_notifier(notifier).with_told(told);
     let events = state.events.clone();
     let app = router(state);
     let listen = config.server.listen;

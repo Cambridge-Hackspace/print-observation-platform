@@ -53,6 +53,12 @@ pub struct PrinterState {
     /// What is wrong: the printer's own words, and the catalog's plain ones
     /// (#35).
     pub error: Option<PrinterError>,
+    /// The printer holds the print, waiting for it to be resumed at the
+    /// printer, as a Bambu printer pauses for an error. When a printer needs a
+    /// hand and this is false, the print has stopped and is gone (#55): the
+    /// screens say which, and POP never resumes either.
+    #[serde(default)]
+    pub held: bool,
 }
 
 impl PrinterState {
@@ -65,6 +71,7 @@ impl PrinterState {
             seconds_left: None,
             job: None,
             error: None,
+            held: false,
         }
     }
 

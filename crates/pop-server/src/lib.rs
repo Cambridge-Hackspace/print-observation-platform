@@ -59,6 +59,8 @@ pub struct AppState {
     pub bam_view: Option<tokio::sync::watch::Receiver<pop_integrations::sync::View>>,
     /// The tower's printers, as every screen is sent them (#49).
     pub tower: tokio::sync::watch::Receiver<Vec<api::TowerPrinter>>,
+    /// What the group chat was told about printers needing a hand (#55).
+    pub told: tokio::sync::watch::Receiver<Vec<api::GroupNotice>>,
     /// Told when an admin decides about a printer, so the runner looks again.
     pub decided: Arc<tokio::sync::Notify>,
     /// The address phones reach POP at, if set (#49).
@@ -85,6 +87,7 @@ impl AppState {
             secrets: secrets::Secrets::none(),
             bam_view: None,
             tower: tokio::sync::watch::channel(Vec::new()).1,
+            told: tokio::sync::watch::channel(Vec::new()).1,
             decided: Arc::new(tokio::sync::Notify::new()),
             public_url: None,
             notifier: None,
@@ -124,6 +127,12 @@ impl AppState {
         tower: tokio::sync::watch::Receiver<Vec<api::TowerPrinter>>,
     ) -> Self {
         self.tower = tower;
+        self
+    }
+
+    /// Show what the group chat was told, as these notices tell it (#55).
+    pub fn with_told(mut self, told: tokio::sync::watch::Receiver<Vec<api::GroupNotice>>) -> Self {
+        self.told = told;
         self
     }
 

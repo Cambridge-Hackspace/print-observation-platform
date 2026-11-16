@@ -29,6 +29,23 @@ pub struct Snapshot {
     pub status: Status,
     /// The tower's printers, by name (#49).
     pub printers: Vec<TowerPrinter>,
+    /// What the group chat was told about each printer that needs a hand
+    /// (#55).
+    pub told: Vec<GroupNotice>,
+}
+
+/// A notice Discord has from POP about a printer that needs a hand (#55), so
+/// its screen can show what the group chat saw. Only one Discord took: a
+/// notice that was never posted is not shown as if it were. It goes when the
+/// printer no longer needs a hand.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct GroupNotice {
+    /// The printer's BAM! id.
+    pub printer: String,
+    pub text: String,
+    /// When Discord took it, in seconds since 1970.
+    #[ts(type = "number")]
+    pub at: i64,
 }
 
 /// A printer the tower runs, as every screen shows it (#49).
@@ -65,6 +82,9 @@ pub enum ServerEvent {
     /// A printer's state changed, or the tower gained or lost one: every
     /// printer, by name (#49).
     Printers(Vec<TowerPrinter>),
+    /// What the group chat has been told changed: every notice still standing,
+    /// by printer (#55).
+    Told(Vec<GroupNotice>),
 }
 
 /// `GET /healthz`: whether each part POP depends on is working.

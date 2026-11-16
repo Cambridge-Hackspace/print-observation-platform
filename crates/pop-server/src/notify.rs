@@ -16,7 +16,10 @@
 use std::time::Duration;
 
 use sqlx::SqlitePool;
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::{
+    sync::{mpsc, oneshot},
+    task::JoinHandle,
+};
 
 use crate::secrets::{SecretError, Secrets};
 
@@ -178,14 +181,23 @@ fn without_url(e: &reqwest::Error) -> String {
 /// Posts group notices, in order, in the background.
 #[derive(Clone)]
 pub struct Notifier {
-    tx: mpsc::UnboundedSender<String>,
+    tx: mpsc::UnboundedSender<(String, Option<oneshot::Sender<()>>)>,
 }
 
 impl Notifier {
     /// Post `text` to the group, when it can be.
     pub fn post(&self, text: impl Into<String>) {
-        let text = text.into();
-        if self.tx.send(text.clone()).is_err() {
+        self.send(text.into(), None);
+    }
+
+    /// Post `text`, and say on `sent` once Discord has it. A notice that is
+    /// never posted drops `sent` unanswered.
+    pub fn post_then(&self, text: impl Into<String>, sent: oneshot::Sender<()>) {
+        self.send(text.into(), Some(sent));
+    }
+
+    fn send(&self, text: String, sent: Option<oneshot::Sender<()>>) {
+        if let Err(mpsc::error::SendError((text, _))) = self.tx.send((text, sent)) {
             tracing::error!("group notice not posted: the notifier has stopped: {text}");
         }
     }
@@ -198,23 +210,28 @@ pub fn spawn(
     http: reqwest::Client,
     opts: Options,
 ) -> (Notifier, JoinHandle<()>) {
-    let (tx, mut rx) = mpsc::unbounded_channel::<String>();
+    let (tx, mut rx) = mpsc::unbounded_channel::<(String, Option<oneshot::Sender<()>>)>();
     let task = tokio::spawn(async move {
-        while let Some(text) = rx.recv().await {
-            deliver(&db, &secrets, &http, opts, &text).await;
+        while let Some((text, sent)) = rx.recv().await {
+            if deliver(&db, &secrets, &http, opts, &text).await
+                && let Some(sent) = sent
+            {
+                // Whoever asked may have stopped listening; that is theirs.
+                let _ = sent.send(());
+            }
         }
     });
     (Notifier { tx }, task)
 }
 
-/// Deliver one notice, trying again as it should.
+/// Deliver one notice, trying again as it should. True once Discord has it.
 async fn deliver(
     db: &SqlitePool,
     secrets: &Secrets,
     http: &reqwest::Client,
     opts: Options,
     text: &str,
-) {
+) -> bool {
     let mut wait = opts.first_retry;
     for n in 1..=opts.attempts {
         // Read each time, so a webhook put right while a notice waits is used.
@@ -222,11 +239,11 @@ async fn deliver(
             Ok(Some(u)) => u,
             Ok(None) => {
                 tracing::warn!("group notice not posted: no Discord webhook is set: {text}");
-                return;
+                return false;
             }
             Err(e @ (SecretError::NoKey | SecretError::WillNotOpen)) => {
                 tracing::error!("group notice not posted: the Discord webhook: {e}: {text}");
-                return;
+                return false;
             }
             Err(e) => {
                 tracing::warn!("group notice: reading the Discord webhook (try {n}): {e}");
@@ -236,7 +253,7 @@ async fn deliver(
             }
         };
         match attempt(http, &url, text, opts.timeout).await {
-            Outcome::Sent => return,
+            Outcome::Sent => return true,
             Outcome::RateLimited(d) => {
                 tracing::warn!(
                     "group notice rate limited by Discord; trying again in {:.1} s (try {n})",
@@ -254,7 +271,7 @@ async fn deliver(
             }
             Outcome::Refused(why) => {
                 tracing::error!("group notice not posted: {why}: {text}");
-                return;
+                return false;
             }
         }
     }
@@ -262,6 +279,7 @@ async fn deliver(
         "group notice not posted: gave up after {} tries: {text}",
         opts.attempts
     );
+    false
 }
 
 /// Post a test message now, once, and say how it went (#68's button).

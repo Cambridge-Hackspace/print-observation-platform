@@ -14,6 +14,7 @@ import type { Status } from './generated/Status';
 import type { TowerPrinter } from './generated/TowerPrinter';
 import type { PrinterState } from './generated/PrinterState';
 import type { PrinterStatus } from './generated/PrinterStatus';
+import type { GroupNotice } from './generated/GroupNotice';
 
 export type Connection = 'connecting' | 'live' | 'reconnecting';
 
@@ -87,9 +88,13 @@ function printerState(v: unknown): PrinterState | null {
   });
   if (progress === undefined || seconds_left === undefined || layer === undefined) return null;
   if (job === undefined || error === undefined) return null;
+  // Whether the printer holds the print (#55); absent from a server older
+  // than it, which never said so.
+  if (o.held !== undefined && typeof o.held !== 'boolean') return null;
+  const held = o.held ?? false;
   // Built field by field, with no cast, so a field the server adds fails the
   // type check here until it is read.
-  const state: PrinterState = { status: o.status as PrinterStatus, progress, seconds_left, layer, job, error };
+  const state: PrinterState = { status: o.status as PrinterStatus, progress, seconds_left, layer, job, error, held };
   return state;
 }
 
@@ -108,6 +113,18 @@ function printers(v: unknown): TowerPrinter[] | null {
   if (!Array.isArray(v)) return null;
   const out = v.map(printer);
   return out.every((p) => p !== null) ? (out as TowerPrinter[]) : null;
+}
+
+function notice(v: unknown): GroupNotice | null {
+  const o = obj(v);
+  return o && str(o.printer) && str(o.text) && num(o.at) ? { printer: o.printer, text: o.text, at: o.at } : null;
+}
+
+/** Every notice, or null if any is not one. */
+function told(v: unknown): GroupNotice[] | null {
+  if (!Array.isArray(v)) return null;
+  const out = v.map(notice);
+  return out.every((n) => n !== null) ? (out as GroupNotice[]) : null;
 }
 
 /** Parses one message, or returns null if it is not a ServerEvent. */
@@ -132,7 +149,13 @@ export function parse(raw: string): ServerEvent | null {
     const d = data as Record<string, unknown>;
     const s = status(d.status);
     const ps = printers(d.printers);
-    return s && ps ? { type, data: { status: s, printers: ps } } : null;
+    // Absent from a server older than #55.
+    const t = d.told === undefined ? [] : told(d.told);
+    return s && ps && t ? { type, data: { status: s, printers: ps, told: t } } : null;
+  }
+  if (type === 'told') {
+    const t = told(data);
+    return t ? { type, data: t } : null;
   }
   return null;
 }

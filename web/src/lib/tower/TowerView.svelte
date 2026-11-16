@@ -15,11 +15,14 @@
     screen,
     connection,
     now,
+    onopen = () => {},
   }: {
     screen: ScreenState;
     connection: Connection;
     /** The time shown, and that "done about" counts from. */
     now: Date;
+    /** A printer that needs a hand was tapped, by id (#55). */
+    onopen?: (id: string) => void;
   } = $props();
 
   const printers = $derived(byNeed(screen.printers));
@@ -102,6 +105,10 @@
       {@const w = card(p, now)}
       {@const [body, nozzle] = colors(p)}
       <article class="card" class:hi={n === 'needs_hand'} data-testid="printer" data-need={n}>
+        {#if n === 'needs_hand'}
+          <!-- The whole card opens what it needs (#55). -->
+          <button type="button" class="open" aria-label="See what {p.name} needs" onclick={() => onopen(p.id)}></button>
+        {/if}
         <div class="tile">
           <PrinterDrawing
             kind="open"
@@ -241,6 +248,22 @@
   }
   .card.hi {
     box-shadow: var(--pop-shadow);
+  }
+  .card {
+    position: relative;
+  }
+  .open {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    background: transparent;
+    border: 0;
+    border-radius: var(--pop-radius);
+    cursor: pointer;
+  }
+  .open:focus-visible {
+    outline: 3px solid var(--pop-cream);
+    outline-offset: 3px;
   }
   .tile {
     width: 104px;

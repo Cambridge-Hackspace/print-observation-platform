@@ -132,6 +132,7 @@ async fn a_print_error_needs_a_hand_and_says_what_klipper_said() {
         s.error.as_ref().map(|e| e.raw.as_str()),
         Some("Heater extruder not heating at expected rate")
     );
+    assert!(!s.held, "Klipper's error state has ended the print");
 }
 
 #[tokio::test]
@@ -145,6 +146,7 @@ async fn klipper_shut_down_needs_a_hand_without_dropping_the_connection() {
         s.error.as_ref().map(|e| e.raw.as_str()),
         Some("MCU 'mcu' shutdown: Timer too close")
     );
+    assert!(!s.held, "a shutdown has ended the print");
     r.fake.notify("notify_klippy_shutdown");
     tokio::time::sleep(Duration::from_millis(300)).await;
     assert_eq!(

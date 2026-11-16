@@ -20,4 +20,11 @@ seconds_left: number | null, job: Job | null,
  * What is wrong: the printer's own words, and the catalog's plain ones
  * (#35).
  */
-error: PrinterError | null, };
+error: PrinterError | null, 
+/**
+ * The printer holds the print, waiting for it to be resumed at the
+ * printer, as a Bambu printer pauses for an error. When a printer needs a
+ * hand and this is false, the print has stopped and is gone (#55): the
+ * screens say which, and POP never resumes either.
+ */
+held: boolean, };

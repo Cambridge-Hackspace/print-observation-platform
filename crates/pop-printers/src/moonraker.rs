@@ -180,6 +180,9 @@ impl Objects {
             seconds_left,
             job,
             error,
+            // Klipper's error state has ended the print; a pause it can
+            // resume from reads as paused, not as needing a hand.
+            held: false,
         }
     }
 }
