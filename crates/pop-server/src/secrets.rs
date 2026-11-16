@@ -55,6 +55,7 @@ pub struct Secrets {
 }
 
 const ACCESS_CODE: &str = "access_code";
+const SETTING: &str = "setting";
 
 impl Secrets {
     /// From [secrets] key, already checked to be 32 bytes in base64; empty
@@ -148,6 +149,75 @@ impl Secrets {
         String::from_utf8(plain)
             .map(Some)
             .map_err(|_| SecretError::WillNotOpen)
+    }
+
+    /// Keep a tower-wide secret setting (#68), replacing any before it.
+    pub async fn set_setting(
+        &self,
+        db: &SqlitePool,
+        key: &str,
+        value: &str,
+    ) -> Result<(), SecretError> {
+        let cipher = self.cipher.as_ref().ok_or(SecretError::NoKey)?;
+        let nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
+        let sealed = cipher
+            .encrypt(
+                &nonce,
+                Payload {
+                    msg: value.as_bytes(),
+                    aad: &Self::aad(key, SETTING),
+                },
+            )
+            .map_err(|_| SecretError::WillNotOpen)?;
+        sqlx::query(
+            "INSERT INTO sealed_settings (key, nonce, sealed, updated_at) VALUES (?, ?, ?, ?)
+             ON CONFLICT (key) DO UPDATE SET nonce = excluded.nonce, sealed = excluded.sealed,
+                                             updated_at = excluded.updated_at",
+        )
+        .bind(key)
+        .bind(nonce.as_slice())
+        .bind(sealed)
+        .bind(now())
+        .execute(db)
+        .await?;
+        Ok(())
+    }
+
+    /// A tower-wide secret setting, if one is kept.
+    pub async fn setting(&self, db: &SqlitePool, key: &str) -> Result<Option<String>, SecretError> {
+        let row: Option<(Vec<u8>, Vec<u8>)> =
+            sqlx::query_as("SELECT nonce, sealed FROM sealed_settings WHERE key = ?")
+                .bind(key)
+                .fetch_optional(db)
+                .await?;
+        let Some((nonce, sealed)) = row else {
+            return Ok(None);
+        };
+        let cipher = self.cipher.as_ref().ok_or(SecretError::NoKey)?;
+        if nonce.len() != 12 {
+            return Err(SecretError::WillNotOpen);
+        }
+        let plain = cipher
+            .decrypt(
+                chacha20poly1305::Nonce::from_slice(&nonce),
+                Payload {
+                    msg: &sealed,
+                    aad: &Self::aad(key, SETTING),
+                },
+            )
+            .map_err(|_| SecretError::WillNotOpen)?;
+        String::from_utf8(plain)
+            .map(Some)
+            .map_err(|_| SecretError::WillNotOpen)
+    }
+
+    /// Forget a tower-wide secret setting. True if there was one.
+    pub async fn clear_setting(db: &SqlitePool, key: &str) -> Result<bool, SecretError> {
+        let done = sqlx::query("DELETE FROM sealed_settings WHERE key = ?")
+            .bind(key)
+            .execute(db)
+            .await?;
+        Ok(done.rows_affected() > 0)
     }
 
     /// The BAM! ids of every printer whose access code POP holds.

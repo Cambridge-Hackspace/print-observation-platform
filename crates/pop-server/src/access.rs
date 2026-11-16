@@ -44,6 +44,8 @@ pub enum Effect {
     ControlsPrinter,
     /// Signs in or out, or changes an account.
     Account,
+    /// Changes a tower-wide setting, such as where group notices go (#68).
+    Settings,
 }
 
 /// Who may use a route (#11).

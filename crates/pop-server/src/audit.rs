@@ -58,6 +58,9 @@ pub fn kind_str(k: AuditKind) -> &'static str {
         AuditKind::PrinterAdded => "printer_added",
         AuditKind::PrinterDeclined => "printer_declined",
         AuditKind::PrinterRetired => "printer_retired",
+        AuditKind::WebhookSet => "webhook_set",
+        AuditKind::WebhookCleared => "webhook_cleared",
+        AuditKind::WebhookTested => "webhook_tested",
         AuditKind::Other => "other",
     }
 }
@@ -76,6 +79,9 @@ fn kind_from(s: &str) -> AuditKind {
         AuditKind::PrinterAdded,
         AuditKind::PrinterDeclined,
         AuditKind::PrinterRetired,
+        AuditKind::WebhookSet,
+        AuditKind::WebhookCleared,
+        AuditKind::WebhookTested,
     ]
     .into_iter()
     .find(|k| kind_str(*k) == s)

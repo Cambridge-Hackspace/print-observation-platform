@@ -25,6 +25,7 @@ ipnet = { version = "2", features = ["serde"] }
 pop-integrations = { version = "0.1.0", path = "../pop-integrations" }
 pop-printers = { version = "0.1.0", path = "../pop-printers" }
 rand = "0.8"
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
 rpassword = "7"
 rust-embed = { version = "8", features = ["mime-guess"] }
 serde = { version = "1", features = ["derive"] }

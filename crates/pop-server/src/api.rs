@@ -149,6 +149,12 @@ pub enum AuditKind {
     PrinterDeclined,
     /// A printer archived in BAM! was retired from the tower.
     PrinterRetired,
+    /// An admin set the group's Discord webhook (never the URL itself).
+    WebhookSet,
+    /// An admin removed the group's Discord webhook.
+    WebhookCleared,
+    /// An admin sent a test message to the group.
+    WebhookTested,
     /// A kind this build does not know, written by a newer POP. Shown, never
     /// hidden.
     Other,
@@ -221,4 +227,19 @@ pub struct AccessCode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 pub struct ApiError {
     pub error: String,
+}
+
+/// `GET /api/admin/notify`: where group notices go (#68).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct NotifySettings {
+    /// The Discord webhook, without its token; none when unset.
+    pub discord_webhook: Option<String>,
+}
+
+/// `PUT /api/admin/notify/discord`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct DiscordWebhook {
+    /// As Discord's channel settings copy it.
+    pub webhook_url: String,
 }
