@@ -234,8 +234,7 @@ impl Report {
         let error = self.error();
         let status = match self.0.get("gcode_state").and_then(Value::as_str) {
             Some("PREPARE" | "SLICING" | "RUNNING") => PrinterStatus::Printing,
-            // A pause with an error is the printer waiting for a person:
-            // filament run out, a jam, a nozzle clog.
+            // A pause with an error is the printer waiting for a person.
             Some("PAUSE") if self.u64("print_error").is_some_and(|c| c != 0) => {
                 PrinterStatus::NeedsHand
             }
@@ -440,7 +439,7 @@ mod tests {
 
     #[test]
     fn a_pause_with_an_error_needs_a_hand_and_names_the_code() {
-        // 0x07008011: filament ran out.
+        // Some print error; what each code means is the catalog's (#35).
         let s = report(json!({"gcode_state": "PAUSE", "print_error": 0x0700_8011u64})).state();
         assert_eq!(s.status, PrinterStatus::NeedsHand);
         assert_eq!(s.error.as_deref(), Some("Bambu error 0700_8011"));

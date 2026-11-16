@@ -117,7 +117,7 @@ async fn a_partial_report_keeps_the_rest() {
 }
 
 #[tokio::test]
-async fn filament_running_out_needs_a_hand_and_names_the_code() {
+async fn a_pause_with_a_print_error_needs_a_hand_and_names_the_code() {
     let r = rig().await;
     r.fake
         .set(json!({"gcode_state": "PAUSE", "print_error": 0x0700_8011u64}));
