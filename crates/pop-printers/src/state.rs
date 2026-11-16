@@ -3,6 +3,8 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::errors::PrinterError;
+
 /// Where a printer is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
@@ -48,9 +50,9 @@ pub struct PrinterState {
     #[ts(type = "number | null")]
     pub seconds_left: Option<u64>,
     pub job: Option<Job>,
-    /// What is wrong, as the driver read it. Plain words come from the error
-    /// catalog (#35).
-    pub error: Option<String>,
+    /// What is wrong: the printer's own words, and the catalog's plain ones
+    /// (#35).
+    pub error: Option<PrinterError>,
 }
 
 impl PrinterState {

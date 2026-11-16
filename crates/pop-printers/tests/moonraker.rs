@@ -129,7 +129,7 @@ async fn a_print_error_needs_a_hand_and_says_what_klipper_said() {
         .until(|s| s.status == PrinterStatus::NeedsHand, "needing a hand")
         .await;
     assert_eq!(
-        s.error.as_deref(),
+        s.error.as_ref().map(|e| e.raw.as_str()),
         Some("Heater extruder not heating at expected rate")
     );
 }
@@ -142,7 +142,7 @@ async fn klipper_shut_down_needs_a_hand_without_dropping_the_connection() {
         .until(|s| s.status == PrinterStatus::NeedsHand, "needing a hand")
         .await;
     assert_eq!(
-        s.error.as_deref(),
+        s.error.as_ref().map(|e| e.raw.as_str()),
         Some("MCU 'mcu' shutdown: Timer too close")
     );
     r.fake.notify("notify_klippy_shutdown");
@@ -267,5 +267,40 @@ async fn an_api_key_is_sent_when_the_printer_needs_one() {
     assert_eq!(
         r.fleet.state("keyless").unwrap().status,
         PrinterStatus::Offline
+    );
+}
+
+#[tokio::test]
+async fn an_error_is_explained_in_plain_words_with_its_layer() {
+    let r = rig().await;
+    r.fake.set(json!({"print_stats": {"state": "error", "message": "Heater extruder not heating at expected rate",
+                                       "info": {"current_layer": 112, "total_layer": 300}}}));
+    let s = r
+        .until(|s| s.status == PrinterStatus::NeedsHand, "needing a hand")
+        .await;
+    let e = s.error.unwrap();
+    assert!(e.known);
+    assert_eq!(
+        e.words,
+        "The extruder heater is not warming up as fast as it should at layer 112."
+    );
+    assert_eq!(e.raw, "Heater extruder not heating at expected rate");
+}
+
+#[tokio::test]
+async fn an_error_the_catalog_does_not_know_is_shown_as_the_printer_said_it() {
+    let r = rig().await;
+    r.fake.set(
+        json!({"print_stats": {"state": "error", "message": "Probe triggered prior to movement"}}),
+    );
+    let s = r
+        .until(|s| s.status == PrinterStatus::NeedsHand, "needing a hand")
+        .await;
+    let e = s.error.unwrap();
+    assert!(!e.known);
+    assert!(
+        e.words.contains("Probe triggered prior to movement"),
+        "{}",
+        e.words
     );
 }
