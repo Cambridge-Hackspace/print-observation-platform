@@ -30,6 +30,9 @@ fn export(dir: &Path) {
     Role::export_all_to(dir).unwrap();
     AuditKind::export_all_to(dir).unwrap();
     AuditEntry::export_all_to(dir).unwrap();
+    // The printer state model (#25), from pop-printers.
+    pop_printers::PrinterState::export_all_to(dir).unwrap();
+    pop_printers::Capabilities::export_all_to(dir).unwrap();
     User::export_all_to(dir).unwrap();
     SignIn::export_all_to(dir).unwrap();
     NewUser::export_all_to(dir).unwrap();

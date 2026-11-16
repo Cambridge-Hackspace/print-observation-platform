@@ -27,6 +27,3 @@ strip = "symbols"
 # rest of a debug build debuggable.
 [profile.dev.package.argon2]
 opt-level = 3
-
-[profile.dev.package.blake2]
-opt-level = 3

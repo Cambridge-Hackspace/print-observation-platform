@@ -41,6 +41,7 @@ ts-rs = "11"
 
 [dev-dependencies]
 http-body-util = "0.1"
+pop-printers = { path = "../pop-printers" }
 tempfile = "3"
 tower = { version = "0.5", features = ["util"] }
 
