@@ -118,6 +118,12 @@ pub enum AuditKind {
     RoleChanged,
     /// A printer's LAN access code was entered in POP (never the code).
     AccessCodeSet,
+    /// A printer from BAM! was added to the tower.
+    PrinterAdded,
+    /// An admin said a printer in BAM! is not one for the tower.
+    PrinterDeclined,
+    /// A printer archived in BAM! was retired from the tower.
+    PrinterRetired,
     /// A kind this build does not know, written by a newer POP. Shown, never
     /// hidden.
     Other,
@@ -156,6 +162,21 @@ pub struct AdminPrinter {
     pub connection: Option<String>,
     /// What is wrong, each naming the field. Empty when ready.
     pub problems: Vec<PrinterProblem>,
+    /// Whether the tower runs it, or it waits for an admin to say (#23).
+    pub tower: TowerState,
+}
+
+/// Where a printer from BAM! stands with the tower (#23).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum TowerState {
+    /// New in BAM!, or back from retirement: waiting for an admin to say.
+    Offered,
+    Added,
+    /// An admin said it is not one for the tower.
+    Declined,
+    /// Archived in BAM!: out of the tower, its history kept.
+    Retired,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]

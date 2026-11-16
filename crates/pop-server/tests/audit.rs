@@ -51,6 +51,16 @@ const WRITE_ROUTES: &[(&str, &str, &str)] = &[
         "/api/admin/printers/{bam_id}/access-code",
         "tests/printers.rs: entering_an_access_code_is_recorded_without_the_code",
     ),
+    (
+        "POST",
+        "/api/admin/printers/{bam_id}/add",
+        "tests/tower.rs: adding_and_declining_are_recorded",
+    ),
+    (
+        "POST",
+        "/api/admin/printers/{bam_id}/decline",
+        "tests/tower.rs: adding_and_declining_are_recorded",
+    ),
 ];
 
 #[test]

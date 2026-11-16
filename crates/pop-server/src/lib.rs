@@ -13,6 +13,7 @@ pub mod events;
 pub mod health;
 pub mod printers;
 pub mod secrets;
+pub mod tower;
 pub mod users;
 
 use std::sync::Arc;
@@ -212,6 +213,23 @@ pub fn routes() -> Vec<Route> {
             reach: Reach::Anywhere,
             who: Who::Admin,
             handler: get(printers::list),
+        },
+        Route {
+            method: Method::POST,
+            path: "/api/admin/printers/{bam_id}/add",
+            // Which printers the tower runs: from inside the space only.
+            effect: Effect::ControlsPrinter,
+            reach: Reach::LocalOnly,
+            who: Who::Admin,
+            handler: post(printers::add),
+        },
+        Route {
+            method: Method::POST,
+            path: "/api/admin/printers/{bam_id}/decline",
+            effect: Effect::ControlsPrinter,
+            reach: Reach::LocalOnly,
+            who: Who::Admin,
+            handler: post(printers::decline),
         },
         Route {
             method: Method::PUT,
