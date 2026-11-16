@@ -2,7 +2,7 @@
 
 use axum::{
     Extension, Json,
-    extract::{Path, State, rejection::JsonRejection},
+    extract::{Path, Query, State, rejection::JsonRejection},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
@@ -10,7 +10,8 @@ use axum::{
 use crate::{
     AppState,
     access::{SESSION_COOKIE, session_token},
-    api::{ApiError, NewPassword, NewRole, NewUser, SignIn, User},
+    api::{ApiError, AuditKind, NewPassword, NewRole, NewUser, SignIn, User},
+    audit::{self, Actor, Filter},
     users::{self, NewAccount, SESSION_SECS, UserError},
 };
 
@@ -77,10 +78,15 @@ pub async fn sign_in(
     let user = match users::authenticate(&state.db, &b.username, &b.password).await {
         Ok(Some(u)) => u,
         // The same answer whichever was wrong.
-        Ok(None) => return error(StatusCode::UNAUTHORIZED, "wrong username or password"),
+        Ok(None) => {
+            if let Err(e) = users::sign_in_failed(&state.db, &b.username).await {
+                return e.into_response();
+            }
+            return error(StatusCode::UNAUTHORIZED, "wrong username or password");
+        }
         Err(e) => return e.into_response(),
     };
-    match users::start_session(&state.db, user.id).await {
+    match users::start_session(&state.db, &user).await {
         Ok(token) => {
             let mut res = Json(user).into_response();
             res.headers_mut()
@@ -92,9 +98,13 @@ pub async fn sign_in(
 }
 
 /// `DELETE /api/session`: sign out.
-pub async fn sign_out(State(state): State<AppState>, headers: HeaderMap) -> Response {
+pub async fn sign_out(
+    State(state): State<AppState>,
+    Extension(user): Extension<User>,
+    headers: HeaderMap,
+) -> Response {
     if let Some(t) = session_token(&headers)
-        && let Err(e) = users::end_session(&state.db, &t).await
+        && let Err(e) = users::end_session(&state.db, &t, &user).await
     {
         return e.into_response();
     }
@@ -120,6 +130,7 @@ pub async fn list(State(state): State<AppState>) -> Response {
 /// `POST /api/admin/users`.
 pub async fn create(
     State(state): State<AppState>,
+    Extension(admin): Extension<User>,
     b: Result<Json<NewUser>, JsonRejection>,
 ) -> Response {
     let b = match body(b) {
@@ -132,7 +143,7 @@ pub async fn create(
         role: b.role,
         password: &b.password,
     };
-    match users::create(&state.db, account).await {
+    match users::create(&state.db, account, &Actor::user(admin.id, &admin.name)).await {
         Ok(u) => (StatusCode::CREATED, Json(u)).into_response(),
         Err(e) => e.into_response(),
     }
@@ -142,6 +153,7 @@ pub async fn create(
 /// the account had ends.
 pub async fn reset_password(
     State(state): State<AppState>,
+    Extension(admin): Extension<User>,
     Path(id): Path<i64>,
     b: Result<Json<NewPassword>, JsonRejection>,
 ) -> Response {
@@ -149,7 +161,14 @@ pub async fn reset_password(
         Ok(b) => b,
         Err(r) => return r.into_response(),
     };
-    match users::reset_password(&state.db, id, &b.password).await {
+    match users::reset_password(
+        &state.db,
+        id,
+        &b.password,
+        &Actor::user(admin.id, &admin.name),
+    )
+    .await
+    {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(e) => e.into_response(),
     }
@@ -158,6 +177,7 @@ pub async fn reset_password(
 /// `PUT /api/admin/users/{id}/role`.
 pub async fn set_role(
     State(state): State<AppState>,
+    Extension(admin): Extension<User>,
     Path(id): Path<i64>,
     b: Result<Json<NewRole>, JsonRejection>,
 ) -> Response {
@@ -165,8 +185,49 @@ pub async fn set_role(
         Ok(b) => b,
         Err(r) => return r.into_response(),
     };
-    match users::set_role(&state.db, id, b.role).await {
+    match users::set_role(&state.db, id, b.role, &Actor::user(admin.id, &admin.name)).await {
         Ok(u) => Json(u).into_response(),
         Err(e) => e.into_response(),
+    }
+}
+
+/// The query `GET /api/admin/audit` takes.
+#[derive(serde::Deserialize)]
+pub struct AuditQuery {
+    /// An account: entries where it acted or was acted on.
+    pub person: Option<i64>,
+    pub printer: Option<String>,
+    pub kind: Option<AuditKind>,
+    /// Entries older than this one, to page back.
+    pub before: Option<i64>,
+    /// How many, at most 500; 100 if not given.
+    pub limit: Option<i64>,
+}
+
+/// `GET /api/admin/audit`: the newest entries first.
+pub async fn audit_log(
+    State(state): State<AppState>,
+    q: Result<Query<AuditQuery>, axum::extract::rejection::QueryRejection>,
+) -> Response {
+    let Query(q) = match q {
+        Ok(q) => q,
+        Err(e) => return error(StatusCode::BAD_REQUEST, e.body_text()),
+    };
+    let f = Filter {
+        person: q.person,
+        printer: q.printer,
+        kind: q.kind,
+        before: q.before,
+        limit: q.limit.unwrap_or(100).clamp(1, 500),
+    };
+    match audit::read(&state.db, &f).await {
+        Ok(entries) => Json(entries).into_response(),
+        Err(e) => {
+            tracing::error!("audit: {e}");
+            error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "the audit log is not working right now",
+            )
+        }
     }
 }

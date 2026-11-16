@@ -13,6 +13,7 @@ use pop_server::{
     access::Who,
     api::Role,
     assets::Embedded,
+    audit::Actor,
     db, router, routes,
     users::{self, NewAccount},
 };
@@ -42,6 +43,7 @@ async fn pop() -> Pop {
             role: Role::Admin,
             password: ADMIN_PW,
         },
+        &Actor::command_line(),
     )
     .await
     .unwrap();
@@ -53,6 +55,7 @@ async fn pop() -> Pop {
             role: Role::Member,
             password: MEMBER_PW,
         },
+        &Actor::command_line(),
     )
     .await
     .unwrap();

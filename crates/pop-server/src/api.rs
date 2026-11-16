@@ -106,6 +106,43 @@ pub struct NewRole {
     pub role: Role,
 }
 
+/// What an audit entry records.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum AuditKind {
+    SignedIn,
+    SignInFailed,
+    SignedOut,
+    UserCreated,
+    PasswordReset,
+    RoleChanged,
+    /// A kind this build does not know, written by a newer POP. Shown, never
+    /// hidden.
+    Other,
+}
+
+/// One entry of the audit log (#8).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct AuditEntry {
+    #[ts(type = "number")]
+    pub id: i64,
+    /// Seconds since the Unix epoch.
+    #[ts(type = "number")]
+    pub at: i64,
+    /// Who acted; absent for the command line or no one signed in.
+    #[ts(type = "number | null")]
+    pub actor_id: Option<i64>,
+    pub actor_name: Option<String>,
+    pub kind: AuditKind,
+    pub printer: Option<String>,
+    /// The account it concerned.
+    #[ts(type = "number | null")]
+    pub subject_id: Option<i64>,
+    pub subject_name: Option<String>,
+    /// One line a person reads.
+    pub summary: String,
+}
+
 /// The body of every API error.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 pub struct ApiError {
