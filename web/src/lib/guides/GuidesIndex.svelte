@@ -19,7 +19,7 @@
 </script>
 
 <main class="page">
-  <header><Logo /><h1>Guides</h1></header>
+  <header><Logo /><h1>Guides</h1><a class="app" href="/">Printers</a></header>
   {#if list}
     {#if list.guides.length === 0}
       <p class="muted">No guides are published yet.</p>
@@ -59,8 +59,15 @@
   }
   header {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 14px;
+  }
+  .app {
+    margin-left: auto;
+    padding: 8px 0;
+    color: var(--pop-butter);
+    font-size: 16px;
   }
   h1 {
     margin: 0;
