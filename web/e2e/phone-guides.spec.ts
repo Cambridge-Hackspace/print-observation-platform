@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 // The guides on a phone (#72), in a real browser at phone width: what jsdom
@@ -26,13 +26,27 @@ const GUIDE = {
   ],
 };
 
-test.beforeAll(async ({ request }) => {
+async function signIn(request: APIRequestContext) {
   const password = process.env.POP_E2E_ADMIN_PASSWORD;
   expect(password, 'tools/web/e2e.sh makes the admin these tests sign in as').toBeTruthy();
-  const signIn = await request.post('/api/session', { data: { username: 'e2e', password } });
-  expect(signIn.status()).toBe(200);
+  const res = await request.post('/api/session', { data: { username: 'e2e', password } });
+  expect(res.status()).toBe(200);
+}
+
+test.beforeAll(async ({ request }) => {
+  await signIn(request);
   const made = await request.post('/api/admin/guides', { data: GUIDE });
-  expect([200, 201, 409], await made.text()).toContain(made.status());
+  expect(made.status(), await made.text()).toBe(201);
+});
+
+// Unpublished again, so every other spec sees a POP with no published guides,
+// as a new one has (smoke.spec.ts says so).
+test.afterAll(async ({ request }) => {
+  await signIn(request);
+  const res = await request.put(`/api/admin/guides/${SLUG}`, { data: { ...GUIDE, status: 'draft' } });
+  expect(res.ok(), await res.text()).toBe(true);
+  const list = await (await request.get('/api/public/guides')).json();
+  expect(list.guides).toEqual([]);
 });
 
 /** The page itself never scrolls sideways at phone width. */

@@ -71,7 +71,18 @@
       <summary>The whole guide</summary>
       <!-- At its own size, scrolled sideways if it is wider than the screen:
            shrunk to fit a phone, its words are too small to read (#72). -->
-      <div class="scroll" data-testid="map-scroll">
+      <!-- Focusable, so a keyboard can scroll it too: a scrollable region must
+           be (WCAG 2.1.1; axe scrollable-region-focusable, which the phone e2e
+           runs). Svelte's rule judges the div alone and cannot see that it
+           scrolls, so it is excused here, on this element only. -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <div
+        class="scroll"
+        data-testid="map-scroll"
+        role="region"
+        aria-label="The whole flowchart: scroll sideways to see all of it"
+        tabindex="0"
+      >
         <GuideMap {guide} {walk} fit={false} label="The {title} flowchart, with your path so far marked" />
       </div>
     </details>
@@ -139,6 +150,10 @@
   .scroll {
     overflow-x: auto;
     max-width: 100%;
+  }
+  .scroll:focus-visible {
+    outline: 3px solid var(--pop-cream);
+    outline-offset: 3px;
   }
   details.whole summary {
     cursor: pointer;
