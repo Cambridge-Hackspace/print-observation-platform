@@ -28,6 +28,12 @@ export class AutoScroll {
   private restUntil = 0;
   /** Already rested at the bottom: next, back to the top. */
   private restedAtBottom = false;
+  /**
+   * Where it has scrolled to, kept here as a fraction. A browser keeps
+   * scrollTop in whole pixels, and a frame's step is under one, so adding each
+   * step to what scrollTop reads back would never move at all (#59).
+   */
+  private pos = 0;
   constructor(
     private readonly el: Scroller,
     now: number,
@@ -56,17 +62,20 @@ export class AutoScroll {
       if (!this.restedAtBottom) {
         this.restedAtBottom = true;
       } else {
-        this.el.scrollTop = 0;
+        this.el.scrollTop = this.pos = 0;
         this.restedAtBottom = false;
       }
       this.restUntil = now + this.o.restMs;
       return;
     }
+    // Moved by something else, so carry on from there.
+    if (Math.abs(this.el.scrollTop - this.pos) >= 1) this.pos = this.el.scrollTop;
     if (this.o.reducedMotion) {
-      this.el.scrollTop = Math.min(bottom, this.el.scrollTop + this.el.clientHeight);
+      this.el.scrollTop = this.pos = Math.min(bottom, this.pos + this.el.clientHeight);
       this.restUntil = now + this.o.restMs;
       return;
     }
-    this.el.scrollTop = Math.min(bottom, this.el.scrollTop + (this.o.speed * dt) / 1000);
+    this.pos = Math.min(bottom, this.pos + (this.o.speed * dt) / 1000);
+    this.el.scrollTop = this.pos;
   }
 }

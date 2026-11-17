@@ -57,6 +57,37 @@ describe('AutoScroll', () => {
     expect(a.active(10_000)).toBe(false);
   });
 
+  it('scrolls at its real speed in a browser, which keeps scrollTop in whole pixels', () => {
+    // A frame at 24 px/s moves 0.4 px. A browser rounds what it is given, so
+    // adding each step to what it reads back never moves at all: the tower
+    // stood still in Chromium (#59) while every test above passed.
+    let top = 0;
+    const el = {
+      get scrollTop() {
+        return top;
+      },
+      set scrollTop(v: number) {
+        top = Math.round(v);
+      },
+      scrollHeight: 1000,
+      clientHeight: 400,
+    };
+    const a = new AutoScroll(el, 0, { ...O, speed: 24 });
+    for (let t = 1000; t <= 3000; t += 16) a.tick(t, 16);
+    // Two seconds at 24 px/s.
+    expect(el.scrollTop).toBeGreaterThanOrEqual(46);
+    expect(el.scrollTop).toBeLessThanOrEqual(50);
+  });
+
+  it('carries on from where someone else scrolled it', () => {
+    const el = list();
+    const a = new AutoScroll(el, 0, O);
+    run(a, 0, 1500);
+    el.scrollTop = 300;
+    a.tick(1600, 100);
+    expect(el.scrollTop).toBeCloseTo(310, 5);
+  });
+
   it('moves a screenful at a time when motion is reduced', () => {
     const el = list();
     const a = new AutoScroll(el, 0, { ...O, reducedMotion: true });

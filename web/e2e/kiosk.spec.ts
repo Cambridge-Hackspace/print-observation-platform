@@ -75,7 +75,8 @@ test('the printers added at the space are on the tower, and change as the printe
     display_status: { progress: 0.4 },
   });
   await expect(voron).toHaveAttribute('data-need', 'printing');
-  await expect(voron).toContainText('gear_housing.gcode');
+  // As people say it: without the .gcode (need.ts).
+  await expect(voron).toContainText('gear_housing');
   await expect(voron.getByRole('progressbar')).toHaveAttribute('aria-valuenow', /^40/);
 
   await set('Voron 2.4', { print_stats: { state: 'complete' }, display_status: { progress: 1 } });
