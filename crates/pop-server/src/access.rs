@@ -264,11 +264,21 @@ pub fn is_local(access: &Access, peer: Option<IpAddr>, headers: &HeaderMap) -> b
 /// The addresses a forwarding header names, oldest first, or None if the
 /// request carries no forwarding header. A header present but unreadable is
 /// an empty chain, which no request passes as local.
+///
+/// So is a request carrying both `Forwarded` and `X-Forwarded-For`. Nothing
+/// says how the two interleave, so neither order can be trusted: a proxy that
+/// adds `Forwarded` but passes on the client's own `X-Forwarded-For` would
+/// otherwise let a client outside the space name an address inside it, and
+/// have that taken as where it came from. A proxy in front of POP should set
+/// one of them.
 fn forwarded_for(headers: &HeaderMap) -> Option<Vec<IpAddr>> {
     let xff: Vec<_> = headers.get_all("x-forwarded-for").iter().collect();
     let fwd: Vec<_> = headers.get_all("forwarded").iter().collect();
     if xff.is_empty() && fwd.is_empty() {
         return None;
+    }
+    if !xff.is_empty() && !fwd.is_empty() {
+        return Some(Vec::new());
     }
     let mut chain = Vec::new();
     let mut unreadable = false;
@@ -426,6 +436,31 @@ mod tests {
         let a = access(SHOP, &["127.0.0.1/32"]);
         let h = headers(&[("x-forwarded-for", "192.168.1.40, 203.0.113.9")]);
         assert!(!is_local(&a, ip("127.0.0.1"), &h));
+    }
+
+    #[test]
+    fn a_request_with_both_forwarding_headers_is_remote() {
+        // The proxy wrote where the request really came from in `Forwarded`
+        // and passed on the `X-Forwarded-For` the client wrote itself.
+        let a = access(SHOP, &["127.0.0.1/32"]);
+        let forged = headers(&[
+            ("forwarded", "for=203.0.113.9"),
+            ("x-forwarded-for", "192.168.1.40"),
+        ]);
+        assert!(!is_local(&a, ip("127.0.0.1"), &forged));
+        // Even when both name an address inside the space.
+        let both_local = headers(&[
+            ("forwarded", "for=192.168.1.40"),
+            ("x-forwarded-for", "192.168.1.40"),
+        ]);
+        assert!(!is_local(&a, ip("127.0.0.1"), &both_local));
+        // Either one alone still passes the space on.
+        for h in [
+            headers(&[("forwarded", "for=192.168.1.40")]),
+            headers(&[("x-forwarded-for", "192.168.1.40")]),
+        ] {
+            assert!(is_local(&a, ip("127.0.0.1"), &h));
+        }
     }
 
     #[test]

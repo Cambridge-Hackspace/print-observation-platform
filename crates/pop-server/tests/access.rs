@@ -175,6 +175,38 @@ async fn a_local_only_route_refuses_what_an_unnamed_proxy_passes_on() {
     assert_eq!(code, StatusCode::FORBIDDEN);
 }
 
+/// A trusted proxy that adds `Forwarded` but passes on the client's own
+/// `X-Forwarded-For`: the client's claim to be inside the space is refused.
+#[tokio::test]
+async fn a_local_only_route_refuses_a_client_that_forges_one_forwarding_header_beside_another() {
+    let mut behind = shop();
+    behind.trusted_proxies = vec!["127.0.0.1/32".parse().unwrap()];
+    let (_d, app) = app(vec![start_print(Reach::LocalOnly)], behind).await;
+    let (code, _) = send(
+        &app,
+        Method::POST,
+        "/api/printers/x1/start",
+        Some("127.0.0.1:4000"),
+        &[
+            ("forwarded", "for=203.0.113.9"),
+            ("x-forwarded-for", "192.168.1.40"),
+        ],
+    )
+    .await;
+    assert_eq!(code, StatusCode::FORBIDDEN);
+    // The same proxy passing on a real local address in one header is served,
+    // so the refusal above is the two headers, not the proxy.
+    let (code, _) = send(
+        &app,
+        Method::POST,
+        "/api/printers/x1/start",
+        Some("127.0.0.1:4000"),
+        &[("forwarded", "for=192.168.1.40")],
+    )
+    .await;
+    assert_eq!(code, StatusCode::OK);
+}
+
 #[tokio::test]
 async fn a_route_reachable_from_anywhere_serves_a_remote_request() {
     let (_d, app) = app(vec![watch(), start_print(Reach::LocalOnly)], shop()).await;
