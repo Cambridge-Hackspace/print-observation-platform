@@ -1,0 +1,19 @@
+[package]
+name = "pop-fakes"
+description = "The fake BAM! and printers the end-to-end battery runs POP against (#59)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+axum = "0.8"
+pop-integrations = { path = "../pop-integrations", features = ["fakes"] }
+pop-printers = { path = "../pop-printers", features = ["fakes"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
+
+[lints]
+workspace = true
