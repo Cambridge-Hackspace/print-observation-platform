@@ -1549,6 +1549,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pop-fakes"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "pop-integrations",
+ "pop-printers",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "pop-gcode"
 version = "0.1.0"
 

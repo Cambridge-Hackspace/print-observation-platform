@@ -19,7 +19,11 @@ mkdir -p "$ROOT/web/.e2e"
   "$RUST_IMAGE" \
   sh -c 'set -e
     cargo build --locked --release -p pop-server
-    cp /target/release/pop web/.e2e/pop'
+    cp /target/release/pop web/.e2e/pop
+    # Built on its own: in one build its fakes features would unify into
+    # pop-server, and the pop under test would not be the one that ships.
+    cargo build --locked --release -p pop-fakes
+    cp /target/release/pop-fakes web/.e2e/pop-fakes'
 
 # The script below expands its variables inside the container.
 # shellcheck disable=SC2016
@@ -47,8 +51,40 @@ mkdir -p "$ROOT/web/.e2e"
       sleep 0.2
     done
     if [ "$up" != 1 ]; then echo "pop did not come up:"; cat "$state/server.log"; exit 1; fi
+
+    # A second POP, with printers, for the kiosk (#59): pointed at a fake
+    # BAM! and fake Moonraker printers (crates/pop-fakes). The first keeps no
+    # BAM!, as a new POP has.
+    fleet=$(mktemp -d)
+    cp .e2e/pop "$fleet/pop"
+    cp .e2e/pop-fakes "$fleet/pop-fakes"
+    (cd "$fleet" && POP_FAKES_LISTEN=127.0.0.1:8099 POP_FAKES_PRINTERS=11 ./pop-fakes >"$fleet/fakes.out" 2>"$fleet/fakes.log") &
+    ready=""
+    for _ in $(seq 1 50); do
+      ready=$(grep -m1 "\"ready\":true" "$fleet/fakes.out" 2>/dev/null || true)
+      if [ -n "$ready" ]; then break; fi
+      sleep 0.2
+    done
+    if [ -z "$ready" ]; then echo "the fakes did not come up:"; cat "$fleet/fakes.log"; exit 1; fi
+    field() { printf "%s" "$ready" | sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p"; }
+    (cd "$fleet" && printf "%s\n" "$POP_E2E_ADMIN_PASSWORD" | POP_STORAGE_DATA_DIR="$fleet/data" ./pop user create-admin e2e --name "E2E Admin")
+    (cd "$fleet" && POP_STORAGE_DATA_DIR="$fleet/data" POP_SERVER_LISTEN=127.0.0.1:8081 \
+      POP_BAM_URL="$(field bam)" POP_BAM_TOKEN="$(field token)" POP_BAM_CATEGORY="$(field category)" \
+      ./pop >"$fleet/server.log" 2>&1) &
+    up=0
+    for _ in $(seq 1 50); do
+      if wget -q -O /dev/null http://127.0.0.1:8081/healthz 2>/dev/null; then up=1; break; fi
+      sleep 0.2
+    done
+    if [ "$up" != 1 ]; then echo "the pop with printers did not come up:"; cat "$fleet/server.log"; exit 1; fi
+
     status=0
-    POP_URL=http://127.0.0.1:8080 npx playwright test "$@" || status=$?
-    if [ "$status" -ne 0 ]; then echo "--- server log ---"; tail -50 "$state/server.log"; fi
+    POP_URL=http://127.0.0.1:8080 POP_FLEET_URL=http://127.0.0.1:8081 POP_FAKES_URL=http://127.0.0.1:8099 \
+      npx playwright test "$@" || status=$?
+    if [ "$status" -ne 0 ]; then
+      echo "--- server log ---"; tail -50 "$state/server.log"
+      echo "--- server with printers log ---"; tail -50 "$fleet/server.log"
+      echo "--- fakes log ---"; tail -20 "$fleet/fakes.log"
+    fi
     exit "$status"
   ' sh "$@"
