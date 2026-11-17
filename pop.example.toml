@@ -40,7 +40,9 @@ local_networks = []
 # believed, in CIDR notation. A request carrying those headers from anything
 # else is remote, whatever its address: otherwise a proxy on this machine
 # would make every request it passes on look local. Name your proxy here if
-# you put one in front of POP (docs: remote access).
+# you put one in front of POP (docs: remote access). Have it set ONE of the
+# two headers, replacing whatever the client sent: a request carrying both is
+# remote, since a client could have written either.
 #
 # trusted_proxies = ["127.0.0.1/32"]
 trusted_proxies = []
