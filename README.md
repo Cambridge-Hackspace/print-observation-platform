@@ -5,6 +5,7 @@ home, tap a card at the tower to start them, and watch them from anywhere.
 Printer admins look after the fleet and the filament.
 
 How and why it is built the way it is: [ADR 0001](docs/adr/0001-architecture-and-stack.md).
+What it lets in, from where, and where its secrets live: [the threat model](docs/threat-model.md).
 
 ## Layout
 
