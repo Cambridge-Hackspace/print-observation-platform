@@ -106,8 +106,33 @@ impl Bambu {
 
 /// A certificate that does not match the pin, as the verifier found it.
 #[derive(Debug, Clone)]
-struct Mismatch {
-    seen: String,
+pub(crate) struct Mismatch {
+    pub(crate) seen: String,
+}
+
+/// Where a pinned connection tells of a certificate that was not the pin.
+pub(crate) type Mismatches = Arc<Mutex<Option<Mismatch>>>;
+
+/// TLS that trusts `key`'s certificate on first contact and only it after,
+/// with where a mismatch is told.
+pub(crate) fn pinned_tls(
+    key: &str,
+    pins: Arc<dyn PinStore>,
+) -> Result<(rustls::ClientConfig, Mismatches), rustls::Error> {
+    let provider = Arc::new(rustls::crypto::aws_lc_rs::default_provider());
+    let mismatch = Arc::new(Mutex::new(None));
+    let verifier = Pinning {
+        serial: key.to_owned(),
+        pins,
+        provider: provider.clone(),
+        mismatch: mismatch.clone(),
+    };
+    let tls = rustls::ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()?
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(verifier))
+        .with_no_client_auth();
+    Ok((tls, mismatch))
 }
 
 /// Trusts a printer's certificate on first contact, then only that one.
@@ -309,20 +334,8 @@ impl Driver for Bambu {
 
     fn run(self: Box<Self>, r: Reporter) -> DriverFuture {
         Box::pin(async move {
-            let provider = Arc::new(rustls::crypto::aws_lc_rs::default_provider());
-            let mismatch = Arc::new(Mutex::new(None));
-            let verifier = Pinning {
-                serial: self.serial.clone(),
-                pins: self.pins.clone(),
-                provider: provider.clone(),
-                mismatch: mismatch.clone(),
-            };
-            let tls = rustls::ClientConfig::builder_with_provider(provider)
-                .with_safe_default_protocol_versions()
-                .map_err(|e| fail(e.to_string()))?
-                .dangerous()
-                .with_custom_certificate_verifier(Arc::new(verifier))
-                .with_no_client_auth();
+            let (tls, mismatch) =
+                pinned_tls(&self.serial, self.pins.clone()).map_err(|e| fail(e.to_string()))?;
             let mut opts =
                 MqttOptions::new(format!("pop-{}", self.serial), self.host.clone(), self.port);
             opts.set_credentials("bblp", self.access_code.clone());

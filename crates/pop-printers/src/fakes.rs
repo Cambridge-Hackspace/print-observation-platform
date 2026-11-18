@@ -5,4 +5,5 @@
 //! malformed messages and refused commands.
 
 pub mod bambu;
+pub mod bambu_camera;
 pub mod moonraker;

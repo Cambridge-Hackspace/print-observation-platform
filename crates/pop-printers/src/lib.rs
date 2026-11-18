@@ -10,6 +10,7 @@
 //! then OctoPrint and PrusaLink, then Bambu in LAN mode, then USB serial.
 
 pub mod bambu;
+pub mod bambu_camera;
 pub mod driver;
 pub mod errors;
 #[cfg(feature = "fakes")]
