@@ -26,6 +26,7 @@ ARCH=$(uname -m)        # x86_64 or aarch64
 curl -fLO "https://github.com/Cambridge-Hackspace/print-observation-platform/releases/download/$VERSION/pop-$VERSION-linux-$ARCH"
 curl -fLO "https://github.com/Cambridge-Hackspace/print-observation-platform/releases/download/$VERSION/SHA256SUMS"
 sha256sum --check --ignore-missing SHA256SUMS
+# And check SHA256SUMS's two signatures: docs/releases.md, "Checking a release by hand".
 sudo install -m 0755 "pop-$VERSION-linux-$ARCH" /usr/local/bin/pop
 pop --version
 ```

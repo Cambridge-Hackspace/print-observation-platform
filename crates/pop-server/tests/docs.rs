@@ -91,6 +91,8 @@ fn read_by_code() -> String {
     );
     files(&r.join("tools"), &|_| true, &mut src);
     files(&r.join("web/e2e"), &|_| true, &mut src);
+    // Workflows read variables too: the release keys' secrets (#148).
+    files(&r.join(".github/workflows"), &|_| true, &mut src);
     src.push(r.join("web/playwright.config.ts"));
     // Not this file: it names variables only to test the check.
     let me = r.join("crates/pop-server/tests/docs.rs");
@@ -139,8 +141,9 @@ fn paths(text: &str) -> BTreeSet<String> {
             .any(|p| w.starts_with(p))
             || w == "pop.example.toml"
             || w == "README.md";
-        // A path, not a pattern: no placeholders, globs or line numbers.
-        if named && !w.contains(['*', '{', '<', '#']) && !w.ends_with('/') && w.contains('.') {
+        // A path, not a pattern: no placeholders (`<version>`, a shell's
+        // `$k`), globs or line numbers.
+        if named && !w.contains(['*', '{', '<', '#', '$']) && !w.ends_with('/') && w.contains('.') {
             out.insert(w.split("::").next().unwrap_or(w).to_owned());
         }
     }
