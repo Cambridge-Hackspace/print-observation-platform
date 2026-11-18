@@ -21,22 +21,52 @@ fn keys() -> Keys {
 fn a_release_both_signatures_vouch_for_checks_and_says_its_binaries() {
     let r = check(&keys(), TAG, SUMS, ML_DSA_SIG, ED25519_SIG).unwrap();
     assert_eq!(r.version, Version(9, 8, 7));
-    assert_eq!(r.binaries.keys().collect::<Vec<_>>(), ["aarch64", "x86_64"]);
-    assert_eq!(r.binaries["x86_64"].0, "pop-v9.8.7-linux-x86_64");
-    r.check_binary("x86_64", include_bytes!("vectors/pop-v9.8.7-linux-x86_64"))
-        .unwrap();
-    r.check_binary(
-        "aarch64",
-        include_bytes!("vectors/pop-v9.8.7-linux-aarch64"),
-    )
-    .unwrap();
-    // Another architecture's binary, or a changed one, is not it.
+    let key = |t: &str, a: &str| (t.to_owned(), a.to_owned());
     assert_eq!(
-        r.check_binary("x86_64", include_bytes!("vectors/pop-v9.8.7-linux-aarch64")),
+        r.binaries.keys().cloned().collect::<Vec<_>>(),
+        [
+            key("pop", "aarch64"),
+            key("pop", "x86_64"),
+            key("pop-updater", "aarch64"),
+            key("pop-updater", "x86_64"),
+        ]
+    );
+    assert_eq!(
+        r.binaries[&key("pop", "x86_64")].0,
+        "pop-v9.8.7-linux-x86_64"
+    );
+    for (tool, arch) in r.binaries.keys() {
+        let bytes = std::fs::read(format!(
+            "{}/tests/vectors/{tool}-v9.8.7-linux-{arch}",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+        r.check_binary(tool, arch, &bytes).unwrap();
+    }
+    // Another architecture's binary, another program's, or a changed one,
+    // is not it.
+    assert_eq!(
+        r.check_binary(
+            "pop",
+            "x86_64",
+            include_bytes!("vectors/pop-v9.8.7-linux-aarch64")
+        ),
+        Err(Error::Digest("pop-v9.8.7-linux-x86_64".into()))
+    );
+    assert_eq!(
+        r.check_binary(
+            "pop",
+            "x86_64",
+            include_bytes!("vectors/pop-updater-v9.8.7-linux-x86_64")
+        ),
         Err(Error::Digest("pop-v9.8.7-linux-x86_64".into()))
     );
     assert!(matches!(
-        r.check_binary("riscv64", b"x86"),
+        r.check_binary("pop", "riscv64", b"x86"),
+        Err(Error::Sums(_))
+    ));
+    assert!(matches!(
+        r.check_binary("go2rtc", "x86_64", b"x86"),
         Err(Error::Sums(_))
     ));
 }
@@ -160,7 +190,23 @@ fn a_signed_sums_file_that_is_not_a_releases_fails() {
         include_bytes!("vectors/SHA256SUMS-twice.ml-dsa-65.sig"),
         include_bytes!("vectors/SHA256SUMS-twice.ed25519.sig"),
     );
-    assert_eq!(twice, Err(Error::Sums("aarch64 is named twice".into())));
+    assert_eq!(
+        twice,
+        Err(Error::Sums("pop for aarch64 is named twice".into()))
+    );
+    let stranger = check(
+        &keys(),
+        TAG,
+        include_bytes!("vectors/SHA256SUMS-stranger"),
+        include_bytes!("vectors/SHA256SUMS-stranger.ml-dsa-65.sig"),
+        include_bytes!("vectors/SHA256SUMS-stranger.ed25519.sig"),
+    );
+    assert_eq!(
+        stranger,
+        Err(Error::Sums(
+            "stranger-v9.8.7-linux-x86_64 is not one of POP's programs".into()
+        ))
+    );
     // An empty SHA256SUMS is not here: OpenSSL will not sign nothing, and a
     // release naming no binaries has none for any machine (check_binary).
 }

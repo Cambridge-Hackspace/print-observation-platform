@@ -35,6 +35,14 @@ impl Actor {
             name: Some("the command line".to_owned()),
         }
     }
+
+    /// The updater service (#148).
+    pub fn updater() -> Self {
+        Self {
+            id: None,
+            name: Some("the updater".to_owned()),
+        }
+    }
 }
 
 /// One thing that happened.
@@ -57,6 +65,13 @@ pub fn kind_str(k: AuditKind) -> &'static str {
         AuditKind::AccessCodeSet => "access_code_set",
         AuditKind::CameraLoginSet => "camera_login_set",
         AuditKind::CameraLoginCleared => "camera_login_cleared",
+        AuditKind::UpdateChecked => "update_checked",
+        AuditKind::UpdateWaited => "update_waited",
+        AuditKind::UpdateDownloaded => "update_downloaded",
+        AuditKind::UpdateRefused => "update_refused",
+        AuditKind::UpdateApplied => "update_applied",
+        AuditKind::UpdateRolledBack => "update_rolled_back",
+        AuditKind::UpdateFailed => "update_failed",
         AuditKind::PrinterAdded => "printer_added",
         AuditKind::PrinterDeclined => "printer_declined",
         AuditKind::PrinterRetired => "printer_retired",
@@ -89,6 +104,13 @@ fn kind_from(s: &str) -> AuditKind {
         AuditKind::AccessCodeSet,
         AuditKind::CameraLoginSet,
         AuditKind::CameraLoginCleared,
+        AuditKind::UpdateChecked,
+        AuditKind::UpdateWaited,
+        AuditKind::UpdateDownloaded,
+        AuditKind::UpdateRefused,
+        AuditKind::UpdateApplied,
+        AuditKind::UpdateRolledBack,
+        AuditKind::UpdateFailed,
         AuditKind::PrinterAdded,
         AuditKind::PrinterDeclined,
         AuditKind::PrinterRetired,

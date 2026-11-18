@@ -215,6 +215,9 @@ POP", and points here. Restoring the backup taken before the upgrade is the
 way back. Anything done after the upgrade is in `/var/lib/pop.upgraded`, not
 in the restored database.
 
+Or let the tower upgrade itself, in hours you choose, never mid-print, and
+rolling back a release that does not come up healthy: docs/upgrades.md.
+
 ## The kiosk
 
 The tower's own screen opens `/kiosk` full screen, from boot: docs/kiosk.md

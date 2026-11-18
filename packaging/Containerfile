@@ -24,7 +24,9 @@ WORKDIR /src
 COPY . .
 # The web app is compiled into the binary, so it is in place first.
 COPY --from=web /src/web/dist web/dist
-RUN cargo build --locked --release -p pop-server && cp target/release/pop /pop
+# And the updater (#148), which the release ships beside POP.
+RUN cargo build --locked --release -p pop-server -p pop-updater \
+ && cp target/release/pop /pop && cp target/release/pop-updater /pop-updater
 
 FROM docker.io/library/debian@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3
 RUN apt-get update \
@@ -34,6 +36,7 @@ RUN apt-get update \
  && useradd --system --gid pop --home-dir /var/lib/pop --shell /usr/sbin/nologin pop \
  && install -d -o pop -g pop -m 0700 /var/lib/pop
 COPY --from=build /pop /usr/local/bin/pop
+COPY --from=build /pop-updater /usr/local/bin/pop-updater
 USER pop
 # Everything POP keeps, only POP can read (threat model, gap 9).
 ENV POP_STORAGE_DATA_DIR=/var/lib/pop \

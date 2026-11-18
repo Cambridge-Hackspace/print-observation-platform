@@ -54,6 +54,7 @@ systemd() {
   # The binary, from the image the release ships it from.
   id=$("$CONTAINER" create "$IMAGE")
   "$CONTAINER" cp "$id:/usr/local/bin/pop" /usr/local/bin/pop
+  "$CONTAINER" cp "$id:/usr/local/bin/pop-updater" /usr/local/bin/pop-updater
   "$CONTAINER" rm "$id" >/dev/null
   id -u pop >/dev/null 2>&1 || useradd --system --home-dir /var/lib/pop --shell /usr/sbin/nologin pop
   install -d -m 0755 /etc/pop
@@ -111,6 +112,37 @@ systemd() {
   # go2rtc can write its configuration, as POP's streams need (#66).
   sudo -u go2rtc test -w /var/lib/go2rtc/go2rtc.yaml || fail "go2rtc cannot write its configuration"
   echo "package-test: go2rtc.service runs, asks for its password, and can keep POP's streams"
+
+  # The updater (#148): its units are accepted, and off, a run does nothing.
+  install -m 0644 "$ROOT/packaging/systemd/pop-updater.service" /etc/systemd/system/
+  install -m 0644 "$ROOT/packaging/systemd/pop-updater.timer" /etc/systemd/system/
+  systemd-analyze verify /etc/systemd/system/pop-updater.service /etc/systemd/system/pop-updater.timer
+  systemctl daemon-reload
+  systemctl start pop-updater.service || fail "pop-updater, off, failed"
+  journalctl -u pop-updater --no-pager | grep -q "automatic upgrades are off" ||
+    fail "pop-updater, off, did not say so"
+  [ ! -e /var/lib/pop/updater/events.jsonl ] || fail "pop-updater, off, recorded something"
+  # On, at any hour, against a feed with no release: from inside its
+  # sandbox it reads the running POP's version through the real binary,
+  # asks the feed, and writes its record where POP reads it. (Applying a
+  # release is crates/pop-updater's tests', against fakes.)
+  feed=$(mktemp -d)
+  (cd "$feed" && python3 -m http.server 18099 --bind 127.0.0.1 >/dev/null 2>&1) &
+  feed_pid=$!
+  cat >/etc/pop/updater.toml <<EOF
+enabled = true
+hours = "00:00-23:59"
+api = "http://127.0.0.1:18099"
+repo = "o/r"
+pop = "http://127.0.0.1:18081"
+EOF
+  sleep 1
+  systemctl start pop-updater.service || fail "pop-updater, on, failed"
+  kill "$feed_pid"
+  grep -q '"kind":"checked".*No release yet: v' /var/lib/pop/updater/events.jsonl ||
+    fail "pop-updater did not record its check: $(cat /var/lib/pop/updater/events.jsonl 2>&1)"
+  sudo -u pop test -r /var/lib/pop/updater/events.jsonl || fail "POP cannot read the updater's record"
+  echo "package-test: pop-updater's units are accepted; off it does nothing, on it checks and records"
 }
 
 # The kiosk's packages and unit (#10), in the Debian the box runs: what the

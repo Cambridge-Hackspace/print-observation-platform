@@ -3,7 +3,9 @@
 A release is made by pushing a tag like `v0.2.0` on `main`
 (`.github/workflows/release.yml`). It holds:
 
-- `pop-<version>-linux-x86_64` and `pop-<version>-linux-aarch64`, the binaries;
+- `pop-<version>-linux-x86_64` and `pop-<version>-linux-aarch64`, POP;
+- `pop-updater-<version>-linux-x86_64` and `-aarch64`, its updater
+  (docs/upgrades.md);
 - `SHA256SUMS`, naming each binary with its SHA-256;
 - `SHA256SUMS.ml-dsa-65.sig` and `SHA256SUMS.ed25519.sig`, two signatures of
   `SHA256SUMS` (#148);

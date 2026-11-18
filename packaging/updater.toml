@@ -1,0 +1,29 @@
+# POP's automatic upgrades (#148): /etc/pop/updater.toml. docs/upgrades.md.
+# Every setting here is its default but `enabled`.
+
+# Off unless this is true.
+enabled = true
+
+# Take pre-releases too.
+prereleases = false
+
+# When an upgrade may go in, in this machine's time zone. It also waits
+# while any printer POP watches is busy with a print. May run past
+# midnight: "23:00-02:00".
+hours = "03:00-05:00"
+
+# Where releases come from, and the keys they must be signed with
+# (packaging/release-keys, installed as docs/upgrades.md says).
+repo = "Cambridge-Hackspace/print-observation-platform"
+keys = "/usr/local/share/pop/release-keys"
+
+# POP, as installed by docs/deployment.md.
+binary = "/usr/local/bin/pop"
+pop = "http://127.0.0.1:8080"
+service = "pop.service"
+data_dir = "/var/lib/pop"
+user = "pop"
+pop_config = "/etc/pop/pop.toml"
+
+# How long a new release has to come up healthy before it is rolled back.
+health_wait_secs = 120

@@ -10,13 +10,17 @@
 //!
 //! The file names in `SHA256SUMS` carry the version, `pop-v0.2.0-linux-
 //! x86_64`, so the signature covers it: an old release, still signed,
-//! cannot be offered as a new one.
+//! cannot be offered as a new one. A release holds POP and its updater
+//! (`pop-updater-v0.2.0-linux-x86_64`), for each architecture.
 
 use std::{collections::BTreeMap, fmt};
 
 use ml_dsa::{MlDsa65, VerifyingKey};
 use pkcs8::DecodePublicKey;
 use sha2::{Digest, Sha256};
+
+/// The programs a release holds.
+pub const TOOLS: [&str; 2] = ["pop", "pop-updater"];
 
 /// What is wrong with a release, in words an admin can act on.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -93,18 +97,19 @@ impl fmt::Display for Version {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Release {
     pub version: Version,
-    /// Each binary, by architecture as `uname -m` says it, with its file name
-    /// and SHA-256.
-    pub binaries: BTreeMap<String, (String, [u8; 32])>,
+    /// Each binary, by program (one of [`TOOLS`]) and architecture as
+    /// `uname -m` says it, with its file name and SHA-256.
+    pub binaries: BTreeMap<(String, String), (String, [u8; 32])>,
 }
 
 impl Release {
-    /// Whether `bytes` are the binary for `arch` this release signed.
-    pub fn check_binary(&self, arch: &str, bytes: &[u8]) -> Result<(), Error> {
+    /// Whether `bytes` are `tool`'s binary for `arch` that this release
+    /// signed.
+    pub fn check_binary(&self, tool: &str, arch: &str, bytes: &[u8]) -> Result<(), Error> {
         let (name, want) = self
             .binaries
-            .get(arch)
-            .ok_or_else(|| Error::Sums(format!("it has no binary for {arch}")))?;
+            .get(&(tool.to_owned(), arch.to_owned()))
+            .ok_or_else(|| Error::Sums(format!("it has no {tool} for {arch}")))?;
         let got: [u8; 32] = Sha256::digest(bytes).into();
         if &got == want {
             Ok(())
@@ -140,7 +145,7 @@ pub fn check(
         .filter(|v| v.to_string() == tag)
         .ok_or_else(|| Error::Version(format!("{tag:?} is not a release version like v1.2.3")))?;
     let text = std::str::from_utf8(sums).map_err(|_| Error::Sums("not text".into()))?;
-    let prefix = format!("pop-{version}-linux-");
+    let middle = format!("-{version}-linux-");
     let mut binaries = BTreeMap::new();
     for line in text.lines() {
         let (hex, name) = line
@@ -148,17 +153,23 @@ pub fn check(
             .ok_or_else(|| Error::Sums(format!("{line:?} is not \"<sha256>  <file>\"")))?;
         let digest =
             decode_hex(hex).ok_or_else(|| Error::Sums(format!("{hex:?} is not a SHA-256")))?;
-        let arch = name.strip_prefix(&prefix).ok_or_else(|| {
+        let (tool, arch) = name.split_once(&middle).ok_or_else(|| {
             Error::Version(format!("this release is not {version}: it signed {name}"))
         })?;
+        if !TOOLS.contains(&tool) {
+            return Err(Error::Sums(format!("{name} is not one of POP's programs")));
+        }
         if arch.is_empty() || !arch.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_') {
             return Err(Error::Sums(format!("{name} names no architecture")));
         }
         if binaries
-            .insert(arch.to_owned(), (name.to_owned(), digest))
+            .insert(
+                (tool.to_owned(), arch.to_owned()),
+                (name.to_owned(), digest),
+            )
             .is_some()
         {
-            return Err(Error::Sums(format!("{arch} is named twice")));
+            return Err(Error::Sums(format!("{tool} for {arch} is named twice")));
         }
     }
     Ok(Release { version, binaries })

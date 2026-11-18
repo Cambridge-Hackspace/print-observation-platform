@@ -17,6 +17,7 @@ signatures of `SHA256SUMS` are the release workflow's own script's:
       crates/pop-release/tests/vectors/test-ml-dsa-65.key \
       crates/pop-release/tests/vectors/test-ed25519.key <dir holding the test-*.pub as ml-dsa-65.pub and ed25519.pub>
 
-`SHA256SUMS-twice` (a line named twice) is signed with plain
+`SHA256SUMS-twice` (a line named twice) and `SHA256SUMS-stranger` (a
+program that is not POP's) are signed with plain
 `openssl pkeyutl -sign -rawin`, since the script refuses nothing about
 its content.

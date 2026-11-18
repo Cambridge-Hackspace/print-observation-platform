@@ -1,0 +1,13 @@
+# Starts pop-updater.service every quarter of an hour. It does nothing
+# outside its hours (/etc/pop/updater.toml), or while it is off.
+
+[Unit]
+Description=POP's automatic upgrades, every quarter of an hour
+
+[Timer]
+OnCalendar=*:0/15
+RandomizedDelaySec=60
+Persistent=false
+
+[Install]
+WantedBy=timers.target

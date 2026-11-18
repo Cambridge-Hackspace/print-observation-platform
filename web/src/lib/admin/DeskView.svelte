@@ -9,7 +9,8 @@
   import type { User } from '../generated/User';
   import People from './People.svelte';
   import SecretForm from './SecretForm.svelte';
-  import { connectsBy, fieldsSay, needsAccessCode, needsYou, now, offered, training, whatItNeeds, type Now } from './desk';
+  import type { UpdaterStatus } from '../generated/UpdaterStatus';
+  import { connectsBy, fieldsSay, needsAccessCode, needsYou, now, offered, training, updaterSays, whatItNeeds, type Now } from './desk';
 
   let {
     me,
@@ -24,6 +25,7 @@
     onaccesscode = async () => false,
     oncameralogin = async () => false,
     onclearlogin = () => {},
+    updater = null,
   }: {
     me: User;
     /** Every printer in BAM!'s category; null while loading. */
@@ -45,6 +47,8 @@
     oncameralogin?: (id: string, username: string, password: string) => Promise<boolean>;
     /** Remove the login POP holds for a printer's camera. */
     onclearlogin?: (id: string) => void;
+    /** The running version and what the updater last did (#148). */
+    updater?: UpdaterStatus | null;
   } = $props();
 
   /** The secret being entered, and for which printer. */
@@ -82,6 +86,11 @@
       <Button size="sm" onclick={onsignout}>Sign out</Button>
     </div>
   </header>
+
+  {#if updater}
+    {@const u = updaterSays(updater)}
+    <p class="version" class:alarm={u.alarm} data-testid="updater">{u.text}</p>
+  {/if}
 
   {#if problem}
     <p class="problem" role="alert">{problem}</p>
@@ -329,6 +338,17 @@
   }
   .kept {
     font-size: 14px;
+  }
+  .version {
+    margin: 0;
+    font-size: 14px;
+    color: var(--pop-muted);
+  }
+  .version.alarm {
+    padding: 8px 12px;
+    background: var(--pop-butter);
+    color: var(--pop-ink);
+    border-radius: 4px;
   }
   .kept > span {
     display: block;

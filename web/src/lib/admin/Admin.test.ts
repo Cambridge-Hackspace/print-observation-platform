@@ -85,6 +85,7 @@ function pop(start: { me: User | null; printers: AdminPrinter[]; refuse?: string
       if (me?.role !== 'admin') return json({ error: 'admins only' }, 403);
       if (url === '/api/admin/printers') return json(printers);
       if (url === '/api/admin/users' && method === 'GET') return json([]);
+      if (url === '/api/admin/updater') return json({ running: '0.2.0', last: { at: 1, kind: 'rolled_back', version: 'v0.3.0', summary: 'v0.3.0 failed its health check: back to v0.2.0' } });
       const kept = /^\/api\/admin\/printers\/([^/]+)\/(access-code|camera-login)$/.exec(url);
       if (kept) {
         if (start.refuse) return json({ error: start.refuse }, 403);
@@ -324,5 +325,13 @@ describe('the admin desk', () => {
     await new Promise((done) => setTimeout(done, 50));
     await tick();
     expect(r.getByTestId('secret-form')).toBeTruthy();
+  });
+
+  it('shows admins the running version and what the updater last did', async () => {
+    pop({ me: ASH, printers: [] });
+    const r = render(Admin);
+    const line = await waitFor(() => r.getByTestId('updater'));
+    expect(line.textContent).toBe('POP 0.2.0 · v0.3.0 failed its health check: back to v0.2.0');
+    expect(line.classList.contains('alarm')).toBe(true);
   });
 });

@@ -192,6 +192,28 @@ notices go.
   with no camera address, and when it cannot be a login.
   `crates/pop-server/tests/printers.rs::a_camera_login_is_refused_when_it_cannot_be_kept_rightly`.
 
+**Automatic upgrades (#148, docs/upgrades.md).** Off unless turned on. The
+updater runs as root, since it replaces POP's binary and restarts it, so
+what it installs is only what both release keys signed (docs/releases.md).
+- A release is used only when its ML-DSA-65 and Ed25519 signatures both
+  check, the binary is the one its SHA256SUMS names, and it is newer than
+  what runs; an older signed release cannot be passed off as a newer one.
+  `crates/pop-release/tests/check.rs::either_signature_wrong_fails_the_release`,
+  `crates/pop-release/tests/check.rs::a_release_is_only_the_version_it_signed`,
+  `crates/pop-updater/tests/updater.rs::a_tampered_release_is_refused_and_not_tried_again`,
+  `crates/pop-updater/tests/updater.rs::an_older_or_the_same_release_is_never_applied`.
+- A release that does not come up healthy is rolled back, with the database
+  as it was before it.
+  `crates/pop-updater/tests/updater.rs::a_failing_release_that_migrated_gets_the_database_back`.
+- The release workflow publishes nothing its committed public keys do not
+  check. `tools/sign-release-check.sh` (CI's package job).
+- Whether the tower is busy, and with which printers, is told to this
+  machine only.
+  `crates/pop-server/tests/updater.rs::the_updater_is_told_the_version_and_whether_it_is_quiet_from_this_machine_only`.
+- Not covered: whoever holds the release keys' secrets, or can push a tag
+  that runs the release workflow, can ship a release every updater takes.
+  That is the repository's admins.
+
 **The Discord webhook.**
 - Sealed the same way, and shown again only masked.
   `crates/pop-server/tests/notify.rs::a_saved_webhook_is_sealed_and_never_shown_in_full`,

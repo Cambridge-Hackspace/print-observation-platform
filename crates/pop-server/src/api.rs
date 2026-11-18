@@ -291,6 +291,21 @@ pub enum AuditKind {
     CameraLoginSet,
     /// A camera's login was removed from POP.
     CameraLoginCleared,
+    /// The updater looked for a release (#148).
+    UpdateChecked,
+    /// The updater found one, and waited: a print, or outside its hours.
+    UpdateWaited,
+    /// The updater downloaded a release and its signatures checked.
+    UpdateDownloaded,
+    /// The updater refused a release: its signatures or sums did not check.
+    UpdateRefused,
+    /// The updater put a new release in, and it passed its health check.
+    UpdateApplied,
+    /// A new release failed its health check, and the updater put the one
+    /// before it back.
+    UpdateRolledBack,
+    /// The updater could not do what it set out to.
+    UpdateFailed,
     /// A printer from BAM! was added to the tower.
     PrinterAdded,
     /// An admin said a printer in BAM! is not one for the tower.
@@ -440,6 +455,40 @@ pub struct CameraLoginBody {
     /// Empty for a camera that asks for a password only.
     pub username: String,
     pub password: String,
+}
+
+/// `GET /api/updater/quiet` (#148): for the updater, from this machine.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct UpdaterQuiet {
+    /// The running version, `0.1.0`.
+    pub version: String,
+    /// No printer is busy with a print: an upgrade may go in.
+    pub quiet: bool,
+    /// The printers busy with a print, by name.
+    pub busy: Vec<String>,
+}
+
+/// `GET /api/admin/updater` (#148).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct UpdaterStatus {
+    /// The running version, `0.1.0`.
+    pub running: String,
+    /// The last thing the updater did, if it has done anything.
+    pub last: Option<UpdaterEvent>,
+}
+
+/// One thing the updater did.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct UpdaterEvent {
+    /// Unix seconds.
+    #[ts(type = "number")]
+    pub at: i64,
+    /// `checked`, `waiting`, `downloaded`, `refused`, `applied`,
+    /// `rolled_back` or `failed`.
+    pub kind: String,
+    /// The release it concerned, `v0.2.0`.
+    pub version: Option<String>,
+    pub summary: String,
 }
 
 /// The body of every API error.

@@ -8,6 +8,7 @@
   import { follow } from '../live';
   import { empty, reduce } from '../screen';
   import type { AdminPrinter } from '../generated/AdminPrinter';
+  import type { UpdaterStatus } from '../generated/UpdaterStatus';
   import type { User } from '../generated/User';
   import DeskView from './DeskView.svelte';
   import SignIn from './SignIn.svelte';
@@ -18,6 +19,7 @@
   let problem: string | null = $state(null);
   let busy: string | null = $state(null);
   let screen = $state(empty());
+  let updater: UpdaterStatus | null = $state(null);
 
   async function load() {
     const a = await call<AdminPrinter[]>('GET', '/api/admin/printers');
@@ -31,7 +33,11 @@
 
   async function signedIn(u: User) {
     me = u;
-    if (u.role === 'admin') await load();
+    if (u.role === 'admin') {
+      await load();
+      const s = await call<UpdaterStatus>('GET', '/api/admin/updater');
+      updater = s.ok ? s.data : null;
+    }
   }
 
   async function act(id: string, what: 'add' | 'decline') {
@@ -89,6 +95,7 @@
     onaccesscode={(id, code) => secret('PUT', id, 'access-code', { access_code: code })}
     oncameralogin={(id, username, password) => secret('PUT', id, 'camera-login', { username, password })}
     onclearlogin={(id) => secret('DELETE', id, 'camera-login')}
+    {updater}
     onsignout={signOut}
   />
 {/if}
