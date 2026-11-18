@@ -13,9 +13,9 @@ use pop_server::api::{
     AccessCode, Account, AdminCamera, AdminPrinter, ApiError, AuditEntry, AuditKind, CameraHealth,
     Device, DiscordWebhook, ErrorGuide, FeedbackKind, FeedbackSettings, FeedbackState,
     FeedbackStatus, Guide, GuideImage, GuideProblems, GuideSummary, Health, LinkGuide, NewActive,
-    NewFeedback, NewGuideImage, NewName, NewPassword, NewRole, NewTraining, NewUser,
-    NotifySettings, PublicGuide, PublicGuideList, Role, ServerEvent, SignIn, Snapshot, Status,
-    TowerPrinter, TowerState, User,
+    NewFeedback, NewGuideImage, NewName, NewPassword, NewReport, NewRole, NewTraining, NewUser,
+    NotifySettings, PublicGuide, PublicGuideList, ReportTaken, Role, ServerEvent, SignIn, Snapshot,
+    Status, TowerPrinter, TowerState, User,
 };
 use ts_rs::TS;
 
@@ -35,6 +35,9 @@ fn export(dir: &Path) {
     AuditKind::export_all_to(dir).unwrap();
     AuditEntry::export_all_to(dir).unwrap();
     AdminPrinter::export_all_to(dir).unwrap();
+    // "Something looks wrong" (#63).
+    NewReport::export_all_to(dir).unwrap();
+    ReportTaken::export_all_to(dir).unwrap();
     // Feedback (#96).
     NewFeedback::export_all_to(dir).unwrap();
     FeedbackStatus::export_all_to(dir).unwrap();

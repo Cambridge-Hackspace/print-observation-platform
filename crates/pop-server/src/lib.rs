@@ -18,6 +18,7 @@ pub mod notices;
 pub mod notify;
 pub mod pins;
 pub mod printers;
+pub mod report;
 pub mod run;
 pub mod secrets;
 pub mod tower;
@@ -379,6 +380,15 @@ pub fn routes() -> Vec<Route> {
             reach: Reach::Anywhere,
             who: Who::Member,
             handler: get(feedback::status),
+        },
+        // ---- "something looks wrong" (#63): told to the group, never the printer ----
+        Route {
+            method: Method::POST,
+            path: "/api/printers/{bam_id}/report",
+            effect: Effect::Report,
+            reach: Reach::Anywhere,
+            who: Who::Member,
+            handler: post(report::report),
         },
         // ---- watching a camera (#67): members, from anywhere, read-only ----
         Route {

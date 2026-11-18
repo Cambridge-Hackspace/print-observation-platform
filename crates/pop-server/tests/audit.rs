@@ -27,6 +27,11 @@ use tower::ServiceExt;
 const WRITE_ROUTES: &[(&str, &str, &str)] = &[
     (
         "POST",
+        "/api/printers/{bam_id}/report",
+        "tests/report.rs: a_report_tells_the_group_and_is_recorded",
+    ),
+    (
+        "POST",
         "/api/feedback",
         "tests/feedback.rs: a_report_becomes_an_issue_that_shows_its_screenshot",
     ),
