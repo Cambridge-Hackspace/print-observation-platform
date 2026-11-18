@@ -62,7 +62,7 @@ struct Shared {
     /// Recorded frames, by event kind, to make new ones from; and hello.
     templates: BTreeMap<String, Value>,
     hello: Value,
-    garbage: Mutex<bool>,
+    garbage: Mutex<Option<String>>,
     refuse_live: Mutex<bool>,
     requests: Mutex<Vec<String>>,
     category_reads: AtomicU32,
@@ -180,7 +180,7 @@ impl FakeBam {
             assets: Mutex::new(assets),
             templates,
             hello,
-            garbage: Mutex::new(false),
+            garbage: Mutex::new(None),
             refuse_live: Mutex::new(false),
             requests: Mutex::new(Vec::new()),
             category_reads: AtomicU32::new(0),
@@ -216,7 +216,13 @@ impl FakeBam {
 
     /// Answer every request from now on with a body that is not JSON.
     pub fn send_garbage(&self, on: bool) {
-        *self.shared.garbage.lock().unwrap() = on;
+        *self.shared.garbage.lock().unwrap() =
+            on.then(|| "<html>a proxy's error page</html>".into());
+    }
+
+    /// Answer every request from now on with `body`, as JSON.
+    pub fn send_body(&self, body: &str) {
+        *self.shared.garbage.lock().unwrap() = Some(body.into());
     }
 
     /// Every request it has answered, as "METHOD path?query".
@@ -359,11 +365,11 @@ async fn answer(State(s): State<Arc<Shared>>, req: Request) -> Response {
     if let Some(r) = refused(&s, auth) {
         return r;
     }
-    if *s.garbage.lock().unwrap() {
+    if let Some(body) = s.garbage.lock().unwrap().clone() {
         return Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "application/json")
-            .body(Body::from("<html>a proxy's error page</html>"))
+            .body(Body::from(body))
             .expect("a response");
     }
     // The category's assets, from state, as BAM! orders them: newest first.
@@ -383,6 +389,14 @@ async fn answer(State(s): State<Arc<Shared>>, req: Request) -> Response {
                 .as_str()
                 .cmp(&a["asset"]["created_at"].as_str())
         });
+        // Nothing to list is `null`, not `[]`, as BAM! v0.20.0 sends it: its
+        // list is a Go slice left nil (internal/api/assets.go). Seen live on
+        // a new, empty printer category, which POP took for an error.
+        let list = if list.is_empty() {
+            Value::Null
+        } else {
+            Value::from(list)
+        };
         json_response(200, &json!({ "assets": list }))
     };
     if k == format!("GET /api/v1/assets?{category}") {
