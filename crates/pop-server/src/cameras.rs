@@ -551,13 +551,24 @@ impl HealthCheck for Go2rtcHealth {
 
     fn check(&self) -> CheckFuture<'_> {
         Box::pin(async move {
-            self.0.version().await.map(|_| ()).map_err(|e| {
+            self.0.version().await.map_err(|e| {
                 tracing::error!("health: {e}");
                 match e {
                     Go2rtcError::Auth => "go2rtc refuses POP's user name and password".to_owned(),
                     _ => "go2rtc does not answer".to_owned(),
                 }
-            })
+            })?;
+            // A password go2rtc does not ask for protects nothing (#149).
+            if self.0.has_password() && self.0.answers_without_password().await.unwrap_or(false) {
+                tracing::warn!(
+                    "go2rtc answers requests with no password: turn on local_auth in its api section (docs/integrations/go2rtc.md)"
+                );
+                return Err(
+                    "go2rtc answers without its password: turn on local_auth in its configuration"
+                        .to_owned(),
+                );
+            }
+            Ok(())
         })
     }
 }

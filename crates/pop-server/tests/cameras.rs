@@ -402,6 +402,23 @@ async fn health_says_whether_go2rtc_answers_and_lets_pop_in() {
     assert_eq!(body["checks"]["go2rtc"]["error"], "go2rtc does not answer");
 }
 
+/// A password go2rtc does not ask for protects nothing (#149): health says
+/// so, by name, and is fine again once local_auth is on.
+#[tokio::test]
+async fn health_says_when_go2rtc_asks_for_no_password() {
+    let pop = pop().await;
+    pop.go2rtc.local_auth(false);
+    let (code, body, ..) = pop.send(Method::GET, "/healthz", None, None).await;
+    assert_eq!(code, StatusCode::SERVICE_UNAVAILABLE, "{body}");
+    assert_eq!(
+        body["checks"]["go2rtc"]["error"],
+        "go2rtc answers without its password: turn on local_auth in its configuration"
+    );
+    pop.go2rtc.local_auth(true);
+    let (code, body, ..) = pop.send(Method::GET, "/healthz", None, None).await;
+    assert_eq!(code, StatusCode::OK, "{body}");
+}
+
 #[tokio::test]
 async fn a_wrong_go2rtc_password_is_said_and_cameras_read_unknown() {
     let dir = tempfile::tempdir().unwrap();

@@ -21,7 +21,9 @@ never reach go2rtc directly; they watch through POP (#67).
 
    **`local_auth` matters.** Without it, go2rtc asks nothing of requests from
    its own machine, whatever the password, so any program on the box can
-   change its streams.
+   change its streams. POP checks: it asks go2rtc once with no password, and if go2rtc
+   answers, it says so in the log, and `/healthz` fails its `go2rtc` check
+   with "go2rtc answers without its password".
 3. Let go2rtc write its configuration file, and nobody else read it (mode
    `0600`, owned by go2rtc's user). go2rtc writes the streams POP adds into
    that file, and a camera's address can hold the camera's password.

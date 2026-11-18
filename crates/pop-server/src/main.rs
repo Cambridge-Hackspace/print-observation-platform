@@ -254,6 +254,17 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
             }
             let client = pop_integrations::go2rtc::Go2rtc::new(&g.url, auth)
                 .map_err(|e| format!("go2rtc: {e}"))?;
+            // A password go2rtc does not ask for protects nothing (#149).
+            let probe = client.clone();
+            tokio::spawn(async move {
+                if probe.has_password()
+                    && matches!(probe.answers_without_password().await, Ok(true))
+                {
+                    tracing::warn!(
+                        "go2rtc answers requests with no password: turn on local_auth in its api section (docs/integrations/go2rtc.md)"
+                    );
+                }
+            });
             // go2rtc serves the tower printers' cameras, kept as BAM! has
             // them (#66).
             let (kept, _keeper) = pop_server::cameras::spawn(
