@@ -15,7 +15,7 @@ const printer = (name: string, s: Partial<TowerPrinter['state']>): TowerPrinter 
   state: { status: 'idle', progress: null, layer: null, seconds_left: null, job: null, error: null, held: false, ...s },
   watched: true,
   materials: [],
-  training: null,
+  training: null, camera: false,
 });
 
 function pop(start: { me: User | null; printers?: TowerPrinter[] }) {
@@ -89,6 +89,26 @@ describe('the phone app', () => {
     expect(items[1]!.textContent).toContain('Dev’s gear');
     expect(within(items[1]!).getByRole('progressbar')).toBeTruthy();
     expect(r.getByRole('button', { name: 'Sign in' })).toBeTruthy();
+  });
+
+  it('opens a printer to watch it, live, and goes back to the list', async () => {
+    pop({
+      me: null,
+      printers: [printer('Mk4', { status: 'printing', progress: 0.5, seconds_left: 600, job: { name: 'gear.gcode', owner: 'Dev Patel' } })],
+    });
+    const r = render(Phone);
+    await waitFor(() => expect(r.getByRole('link', { name: 'Mk4' })).toBeTruthy());
+    const link = r.getByRole('link', { name: 'Mk4' });
+    expect(link.getAttribute('href')).toBe('#watch/id-Mk4');
+    history.replaceState(null, '', '/#watch/id-Mk4');
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    await waitFor(() => expect(r.getByTestId('watch')).toBeTruthy());
+    expect(r.getByRole('heading', { level: 1 }).textContent).toBe('Mk4');
+    expect(r.getByTestId('watch-left').textContent).toContain('10 min left');
+    history.replaceState(null, '', '/#printers');
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    await waitFor(() => expect(r.queryByTestId('watch')).toBeNull());
+    expect(r.getByRole('heading', { level: 1 }).textContent).toBe('Printers');
   });
 
   it('signs in, says who you are, and signs out', async () => {

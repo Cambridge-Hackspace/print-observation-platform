@@ -23,7 +23,7 @@ const live = (s: Partial<PrinterState>): TowerPrinter => ({
   state: { status: 'idle', progress: null, layer: null, seconds_left: null, job: null, error: null, held: false, ...s },
   watched: true,
   materials: [],
-  training: 'advanced',
+  training: 'advanced', camera: false,
 });
 
 describe('the printers table', () => {

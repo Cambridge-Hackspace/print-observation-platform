@@ -303,6 +303,7 @@ mod tests {
             watched: true,
             materials: vec![],
             training: None,
+            camera: false,
         }
     }
 

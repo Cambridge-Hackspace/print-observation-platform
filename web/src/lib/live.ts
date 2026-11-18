@@ -105,7 +105,11 @@ function printer(v: unknown): TowerPrinter | null {
   const training = nullable(o.training, (t) => (str(t) ? t : null));
   const state = printerState(o.state);
   if (training === undefined || !state) return null;
-  return { id: o.id, name: o.name, state, watched: o.watched, materials: [...o.materials], training };
+  // Whether it has a camera to watch (#61); absent from a server older than
+  // it, which had none.
+  if (o.camera !== undefined && typeof o.camera !== 'boolean') return null;
+  const camera = o.camera ?? false;
+  return { id: o.id, name: o.name, state, watched: o.watched, materials: [...o.materials], training, camera };
 }
 
 /** Every printer, or null if any is not one. */

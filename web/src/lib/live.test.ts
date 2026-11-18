@@ -85,6 +85,18 @@ describe('parse', () => {
     const e = parse(raw);
     expect(e?.type === 'printers' && e.data[0]?.state.held).toBe(false);
   });
+  it('reads whether a printer has a camera, and none from a server that never said', () => {
+    const with_ = (camera: string) =>
+      `{"type":"printers","data":[{"id":"a","name":"A","watched":true,"materials":[],"training":null,${camera}"state":{"status":"idle","progress":null,"layer":null,"seconds_left":null,"job":null,"error":null,"held":false}}]}`;
+    const camera = (raw: string) => {
+      const e = parse(raw);
+      return e?.type === 'printers' ? e.data[0]?.camera : 'not read';
+    };
+    expect(camera(with_('"camera":true,'))).toBe(true);
+    expect(camera(with_('"camera":false,'))).toBe(false);
+    expect(camera(with_(''))).toBe(false);
+    expect(parse(with_('"camera":"yes",'))).toBeNull();
+  });
   it('reads the printers, as the server sends them', () => {
     // A frame as pop-server serializes it (tests/run.rs sees the same shape).
     const voron = {
@@ -101,7 +113,7 @@ describe('parse', () => {
       },
       watched: true,
       materials: ['PLA', 'PETG'],
-      training: 'advanced',
+      training: 'advanced', camera: false,
     };
     expect(parse(JSON.stringify({ type: 'printers', data: [voron] }))).toEqual({ type: 'printers', data: [voron] });
   });

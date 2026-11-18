@@ -90,7 +90,7 @@ async fn pop(added: &[&str]) -> Pop {
             max: Duration::from_millis(200),
             healthy_after: Duration::from_secs(60),
         },
-        cameras: tokio::sync::watch::channel(Default::default()).0,
+        cameras: None,
     });
     let state = state.with_tower(tower.clone());
     Pop {
@@ -315,4 +315,24 @@ async fn a_bambu_pin_outlives_a_restart() {
         );
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
+}
+
+/// Without a go2rtc, no printer reads as having a camera to watch (#61),
+/// whatever BAM! says: there is nothing to show it.
+#[tokio::test]
+async fn without_go2rtc_no_printer_has_a_camera() {
+    let pop = pop(&["voron"]).await;
+    until(&pop.tower, "the Voron runs", |ps| {
+        named(ps, "Voron 2.4").is_some()
+    })
+    .await;
+    let voron = pop.fake.id("voron").to_owned();
+    pop.fake.edit(&voron, "camera", "rtsp://10.0.0.40/stream");
+    // A change the tower shows, made after the camera, so the camera's is in.
+    pop.fake.edit(&voron, "training", "expert");
+    let ps = until(&pop.tower, "the new training shows", |ps| {
+        named(ps, "Voron 2.4").is_some_and(|p| p.training.as_deref() == Some("expert"))
+    })
+    .await;
+    assert!(!named(&ps, "Voron 2.4").unwrap().camera);
 }

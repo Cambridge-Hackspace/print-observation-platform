@@ -12,7 +12,8 @@
   import { byNeed, card, need, type Need } from '../tower/need';
   import type { User } from '../generated/User';
   import SignIn from '../admin/SignIn.svelte';
-  import { tabFrom, type Tab } from './tabs';
+  import { tabFrom, watchHash, watching, type Tab } from './tabs';
+  import Watch from './Watch.svelte';
 
   let connection: Connection = $state('connecting');
   let screen = $state(empty());
@@ -20,6 +21,7 @@
   let me: User | null = $state(null);
   let signingIn = $state(false);
   let tab: Tab = $state(tabFrom(location.hash));
+  let watched: string | null = $state(watching(location.hash));
 
   const printers = $derived(byNeed(screen.printers));
   const COLOR: Record<Need, string> = {
@@ -36,7 +38,10 @@
     event: (e) => (screen = reduce(screen, e)),
   });
   const tick = setInterval(() => (now = new Date()), 30_000);
-  const onHash = () => (tab = tabFrom(location.hash));
+  const onHash = () => {
+    tab = tabFrom(location.hash);
+    watched = watching(location.hash);
+  };
   onMount(async () => {
     window.addEventListener('hashchange', onHash);
     const a = await call<User>('GET', '/api/me');
@@ -79,7 +84,14 @@
     {/if}
 
     <main>
-      {#if tab === 'printers'}
+      {#if watched !== null}
+        <Watch
+          printer={screen.printers.find((p) => p.id === watched) ?? null}
+          {now}
+          signedIn={me !== null}
+          onsignin={() => (signingIn = true)}
+        />
+      {:else if tab === 'printers'}
         <h1>Printers</h1>
         <ul class="list" data-testid="phone-printers">
           {#each printers as p (p.id)}
@@ -87,7 +99,7 @@
             {@const w = card(p, now)}
             <li class="printer" data-need={n}>
               <div class="row">
-                <span class="pname">{p.name}</span>
+                <a class="pname" href={watchHash(p.id)}>{p.name}</a>
                 <span style:color={COLOR[n]}><StatusSquare color={COLOR[n]} label={w.state} /></span>
               </div>
               {#if w.job}<span class="job" use:sensitive={'file'}>{w.job}</span>{/if}
@@ -141,6 +153,10 @@
 {/if}
 
 <style>
+  a.pname {
+    color: inherit;
+    text-decoration: none;
+  }
   .phone {
     box-sizing: border-box;
     min-height: 100vh;

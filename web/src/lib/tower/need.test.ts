@@ -18,7 +18,7 @@ const printer = (name: string, s: PrinterState, more: Partial<TowerPrinter> = {}
   state: s,
   watched: true,
   materials: [],
-  training: null,
+  training: null, camera: false,
   ...more,
 });
 

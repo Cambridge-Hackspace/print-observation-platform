@@ -43,8 +43,9 @@ pub struct Runner {
     pub decided: Arc<Notify>,
     pub pins: Arc<dyn PinStore>,
     pub backoff: Backoff,
-    /// Told the cameras of the printers that run (#66).
-    pub cameras: watch::Sender<crate::cameras::Wanted>,
+    /// Told the cameras of the printers that run (#66); none when POP has
+    /// no go2rtc, and then no printer reads as having a camera.
+    pub cameras: Option<watch::Sender<crate::cameras::Wanted>>,
 }
 
 /// A printer as it runs: its settings, and the access code it was given.
@@ -109,8 +110,10 @@ async fn run(mut r: Runner, tx: watch::Sender<Vec<TowerPrinter>>) {
                 Err(RecvError::Closed) => return,
             },
         }
-        publish(&r.events, &tx, &fleet, &running);
-        cameras(&r.cameras, &running);
+        publish(&r.events, &tx, &fleet, &running, r.cameras.is_some());
+        if let Some(tx) = &r.cameras {
+            cameras(tx, &running);
+        }
     }
 }
 
@@ -215,6 +218,7 @@ fn publish(
     tx: &watch::Sender<Vec<TowerPrinter>>,
     fleet: &Fleet,
     running: &BTreeMap<String, Running>,
+    cameras: bool,
 ) {
     let mut printers: Vec<TowerPrinter> = running
         .iter()
@@ -225,6 +229,8 @@ fn publish(
             watched: r.watched,
             materials: r.config.materials.clone(),
             training: r.config.training.clone(),
+            camera: cameras
+                && crate::cameras::source_of(&r.config, r.access_code.as_deref()).is_some(),
         })
         .collect();
     printers.sort_by_key(|a| a.name.to_lowercase());

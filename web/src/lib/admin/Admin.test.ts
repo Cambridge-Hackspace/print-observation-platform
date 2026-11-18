@@ -156,7 +156,7 @@ describe('the admin desk', () => {
       },
       watched: true,
       materials: [],
-      training: null,
+      training: null, camera: false,
     };
     pop({ me: ASH, printers: [printer('Voron 2.4')], live: [voron] });
     const r = render(Admin);
@@ -170,7 +170,7 @@ describe('the admin desk', () => {
       state: { status: 'needs_hand', progress: 0.4, layer: null, seconds_left: null, job: null, error: null, held: false },
       watched: true,
       materials: [],
-      training: null,
+      training: null, camera: false,
     };
     pop({ me: ASH, printers: [printer('Ender 3')], live: [stuck] });
     const r = render(Admin);
