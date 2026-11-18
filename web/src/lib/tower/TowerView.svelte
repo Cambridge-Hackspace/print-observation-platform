@@ -1,6 +1,7 @@
 <script lang="ts">
   // The tower's home screen (#49), as given: Tower.svelte connects it to the
   // live stream. One card per printer, most needed first.
+  import { sensitive } from '../feedback/sensitive';
   import { onDestroy, onMount } from 'svelte';
   import { prefersReducedMotion } from 'svelte/motion';
   import type { Connection } from '../live';
@@ -124,7 +125,7 @@
           <span style:color={COLOR[n]}><StatusSquare color={COLOR[n]} label={w.state} /></span>
         </div>
         <div class="what">
-          <span class="job">{w.job}</span>
+          <span class="job" use:sensitive={'file'}>{w.job}</span>
           {#if n === 'free' || n === 'offline' || p.state.progress === null}
             <div class="empty" aria-hidden="true"></div>
           {:else}

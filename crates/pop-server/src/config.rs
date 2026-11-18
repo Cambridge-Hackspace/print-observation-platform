@@ -343,6 +343,7 @@ impl Config {
             &mut self.feedback.private_key_file,
         );
         set("POP_FEEDBACK_REPO", &mut self.feedback.repo);
+        set("POP_FEEDBACK_API", &mut self.feedback.api);
         set("POP_GO2RTC_URL", &mut self.go2rtc.url);
         set("POP_GO2RTC_USERNAME", &mut self.go2rtc.username);
         set("POP_GO2RTC_PASSWORD", &mut self.go2rtc.password);

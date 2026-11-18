@@ -300,8 +300,22 @@ docs/integrations/github-feedback.md), so what a report carries is public.
 - The GitHub App's private key stays on the server; the browser never sees
   it. A report names who filed it, by name, as the issue says it will.
 
-What the server cannot do is redact the screenshot: that happens on the
-screen, before the picture is taken (#96's second half).
+- The screenshot is redacted before it becomes an image, on a clone of the
+  page: what screens mark with `use:sensitive` (members' names, usernames,
+  job file names, notices naming owners) becomes a labelled block; form
+  fields are emptied; camera pictures become grey boxes; and a backstop
+  takes emails, long numbers, UUIDs and tokens out of every text left, each
+  kind caught on its own. The page on screen is untouched.
+  `web/src/lib/feedback/redact.test.ts › "leaves nothing marked in the clone, and the page as it was"`,
+  `web/src/lib/feedback/redact.test.ts › "catches what was not marked: an email, a card number, a token"`,
+  `web/src/lib/feedback/redact.test.ts › "catches each kind of secret by itself"`.
+- No screen renders a member's details outside `use:sensitive`, so a new
+  one cannot forget to; the check is fed a screen that forgot.
+  `web/src/lib/feedback/structure.test.ts › "are always inside use:sensitive"`,
+  `web/src/lib/feedback/structure.test.ts › "fails a screen that renders a name unmarked"`.
+  It sees member details by how templates reach them; one reached through
+  a variable named for something else is not seen, and the backstop and the
+  person looking at the picture before sending stand behind that.
 
 ## Gaps
 

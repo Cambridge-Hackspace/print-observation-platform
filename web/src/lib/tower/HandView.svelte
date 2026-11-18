@@ -2,6 +2,7 @@
   // "A printer needs a hand" (#55), at the kiosk: the cause in plain words,
   // numbered steps, a link to the guide, and what the group chat saw. The
   // kiosk never resumes a printer; the last step says to, at the printer.
+  import { sensitive } from '../feedback/sensitive';
   import { onDestroy, onMount } from 'svelte';
   import { Button, Icon, Logo, PrinterDrawing } from '../design';
   import type { GroupNotice } from '../generated/GroupNotice';
@@ -133,7 +134,7 @@
           <span class="muted">What the group chat saw</span>
           <div class="notice" data-testid="told">
             <div class="from"><Logo size={30} /><span class="pop">POP</span><span class="muted">{clock(new Date(told.at * 1000))}</span></div>
-            <p>{told.text}</p>
+            <p use:sensitive={'name'}>{told.text}</p>
           </div>
         {:else}
           <p class="muted" data-testid="not-told">POP hasn’t posted this one to the group chat.</p>
