@@ -1619,6 +1619,7 @@ dependencies = [
  "pop-integrations",
  "pop-printers",
  "rand 0.8.8",
+ "regex-automata",
  "reqwest",
  "rpassword",
  "rust-embed",
