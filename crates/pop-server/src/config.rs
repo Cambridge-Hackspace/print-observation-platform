@@ -29,6 +29,18 @@ pub struct Config {
     pub go2rtc: Go2rtc,
     pub secrets: Secrets,
     pub guides: Guides,
+    pub public: Public,
+}
+
+/// What the public live stream (`/api/events`) carries to anyone who is
+/// neither signed in nor at the space (#134).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Default)]
+#[serde(deny_unknown_fields, default)]
+pub struct Public {
+    /// Whether owners' first names go out on it. Off: nobody is named, in a
+    /// printer's job or a notice. Signed-in screens and the space's own
+    /// network always see names.
+    pub owner_names: bool,
 }
 
 /// The go2rtc that serves the printers' cameras (#66), as its own service.
@@ -287,6 +299,18 @@ impl Config {
         set("POP_GO2RTC_PASSWORD", &mut self.go2rtc.password);
         set("POP_SECRETS_KEY", &mut self.secrets.key);
         set("POP_GUIDES_LICENSE", &mut self.guides.license);
+        if let Some(v) = env("POP_PUBLIC_OWNER_NAMES") {
+            self.public.owner_names = match v.as_str() {
+                "true" => true,
+                "false" => false,
+                _ => {
+                    return Err(err(
+                        "POP_PUBLIC_OWNER_NAMES",
+                        format!("{v:?}: expected true or false"),
+                    ));
+                }
+            };
+        }
         if let Some(v) = env("POP_GUIDES_INDEXABLE") {
             self.guides.indexable = match v.as_str() {
                 "true" => true,
@@ -721,6 +745,24 @@ mod tests {
         })
         .unwrap();
         assert_eq!(c.server.public_url, "http://10.0.0.5:8080");
+    }
+
+    #[test]
+    fn owner_names_on_the_public_stream_are_off_unless_said() {
+        assert!(!Config::default().public.owner_names, "private by default");
+        assert!(
+            Config::parse("[public]\nowner_names = true\n")
+                .unwrap()
+                .public
+                .owner_names
+        );
+        let c = Config::load(None, |k| {
+            (k == "POP_PUBLIC_OWNER_NAMES").then(|| "true".to_owned())
+        })
+        .unwrap();
+        assert!(c.public.owner_names);
+        let e = env_err(&[("POP_PUBLIC_OWNER_NAMES", "yes")]);
+        assert_eq!(e.key, "POP_PUBLIC_OWNER_NAMES");
     }
 
     #[test]

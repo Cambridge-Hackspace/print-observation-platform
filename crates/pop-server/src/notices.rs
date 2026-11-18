@@ -48,8 +48,17 @@ fn mid_sentence(words: &str) -> String {
     }
 }
 
+/// The printer as it would be with no one's print on it.
+fn without_owner(p: &TowerPrinter) -> TowerPrinter {
+    let mut p = p.clone();
+    if let Some(j) = p.state.job.as_mut() {
+        j.owner = None;
+    }
+    p
+}
+
 /// "Sam" from "Sam Lee".
-fn first_name(owner: &str) -> Option<&str> {
+pub fn first_name(owner: &str) -> Option<&str> {
     owner.split_whitespace().next()
 }
 
@@ -85,8 +94,17 @@ pub fn fixed(p: &TowerPrinter) -> String {
 /// A notice for the group, about one printer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Notice {
-    NeedsHand { printer: String, text: String },
-    Fixed { printer: String, text: String },
+    /// `without_owner` is the same notice with no one named in it, for the
+    /// public stream when owners' names are not to go out on it (#134).
+    NeedsHand {
+        printer: String,
+        text: String,
+        without_owner: String,
+    },
+    Fixed {
+        printer: String,
+        text: String,
+    },
 }
 
 impl Notice {
@@ -124,6 +142,7 @@ impl Watcher {
                 Some(false) if now => out.push(Notice::NeedsHand {
                     printer: p.id.clone(),
                     text: needs_a_hand(p),
+                    without_owner: needs_a_hand(&without_owner(p)),
                 }),
                 Some(true) if !now => out.push(Notice::Fixed {
                     printer: p.id.clone(),
@@ -205,7 +224,11 @@ pub fn spawn(
             let printers = tower.borrow_and_update().clone();
             for notice in watcher.see(&printers) {
                 match notice {
-                    Notice::NeedsHand { printer, text } => {
+                    Notice::NeedsHand {
+                        printer,
+                        text,
+                        without_owner,
+                    } => {
                         let n = told.begin(&printer);
                         let (sent, taken) = oneshot::channel();
                         notifier.post_then(text.clone(), sent);
@@ -213,7 +236,15 @@ pub fn spawn(
                         tokio::spawn(async move {
                             if taken.await.is_ok() {
                                 let at = unix_now();
-                                let _ = back.send((n, GroupNotice { printer, text, at }));
+                                let _ = back.send((
+                                    n,
+                                    GroupNotice {
+                                        printer,
+                                        text,
+                                        at,
+                                        without_owner,
+                                    },
+                                ));
                             }
                         });
                     }
@@ -416,7 +447,7 @@ mod tests {
         ]);
         let n = w.see(&[stuck("A"), printer("B", PrinterStatus::Done)]);
         assert_eq!(n.len(), 1);
-        assert!(matches!(&n[0], Notice::NeedsHand { printer, text }
+        assert!(matches!(&n[0], Notice::NeedsHand { printer, text, .. }
             if printer == "id-A" && text.starts_with("A needs a hand")));
     }
 
@@ -425,6 +456,7 @@ mod tests {
             printer: printer.into(),
             text: text.into(),
             at: 1,
+            without_owner: text.into(),
         }
     }
 

@@ -77,7 +77,22 @@ believed only from `access.trusted_proxies`.
   does, the enumeration above covers it from its first commit.
 
 **What anyone can reach, from anywhere.** Health, status, the live stream
-(`/api/events`), signing in, and the published guides. Nothing public changes
+(`/api/events`), signing in, and the published guides.
+
+The live stream carries printer names, job file names, error text and group
+notices, and every field it carries is pinned: a new one fails the test until
+someone has decided it may go out.
+`crates/pop-server/tests/public_stream.rs::the_public_stream_carries_only_reviewed_fields`.
+Whose print is whose goes out to the public only as `[public] owner_names`
+says: off (the default), nobody is named, in a printer's job or a notice; on,
+first names only. A screen signed in, or on the space's own network (the
+kiosk), sees names either way; a session cookie that is not a session counts
+for nothing.
+`crates/pop-server/tests/public_stream.rs::with_owner_names_off_the_public_sees_nobody_named`,
+`crates/pop-server/tests/public_stream.rs::with_owner_names_on_the_public_sees_first_names_only`,
+`crates/pop-server/tests/public_stream.rs::signed_in_or_at_the_space_names_are_seen_either_way`,
+`crates/pop-server/tests/public_stream.rs::a_session_that_is_not_one_is_the_public`,
+`crates/pop-server/tests/public_stream.rs::what_a_reconnecting_screen_missed_is_named_as_it_may_see`. Nothing public changes
 anything except signing in, and that check is self-tested too.
 `crates/pop-server/tests/access.rs::no_public_route_changes_anything_but_signing_in`,
 `crates/pop-server/tests/access.rs::the_check_fails_a_public_route_that_writes`.
@@ -284,10 +299,8 @@ Each of these is true of POP today, or untested, and none is claimed above.
    as reachable from anywhere:** reading the notification settings, clearing
    the webhook, and testing it. The enumeration test covers only routes that
    control printers. Tracked in #133.
-4. **The live stream is public and its fields are untested.** It carries
-   printer names, job file names, error text and group notices. Once POP
-   knows whose print is whose, it will carry owners' first names. No test
-   pins what it may carry. Tracked in #134.
+4. **Closed (#134).** The live stream's fields are pinned, and owners'
+   names on it follow `[public] owner_names`; see "What anyone can reach".
 
 **Signing in.**
 5. **There is no rate limit or lockout on signing in.** Every failed try

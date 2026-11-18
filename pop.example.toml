@@ -91,3 +91,11 @@ key = ""
 license = ""
 # Whether search engines may index the public guides at /guides.
 indexable = false
+
+[public]
+# What the live stream (/api/events) carries to anyone who is neither signed
+# in nor on the space's network: the public, watching from outside. Whether
+# owners' first names go out on it. Off: nobody is named, in a printer's job
+# or a notice. Signed-in screens, and the space's own network (the kiosk),
+# always see names.
+owner_names = false
