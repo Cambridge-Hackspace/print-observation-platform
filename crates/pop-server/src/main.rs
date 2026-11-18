@@ -211,6 +211,12 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
             "built without the web app: run tools/web/build.sh, then build the server again"
         );
     }
+    // What the updater did, into the audit log (#148).
+    pop_server::updater::spawn(
+        pool.clone(),
+        data_dir.clone(),
+        std::time::Duration::from_secs(30),
+    );
     let mut state = AppState::new(pool, Arc::new(Embedded))
         .with_access(config.access.clone())
         .with_secrets(pop_server::secrets::Secrets::new(&config.secrets.key))

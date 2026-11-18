@@ -3,4 +3,4 @@
 /**
  * What an audit entry records.
  */
-export type AuditKind = "signed_in" | "sign_in_failed" | "signed_out" | "user_created" | "password_reset" | "role_changed" | "access_code_set" | "camera_login_set" | "camera_login_cleared" | "printer_added" | "printer_declined" | "printer_retired" | "webhook_set" | "webhook_cleared" | "webhook_tested" | "guide_created" | "guide_edited" | "error_guide_linked" | "name_changed" | "account_deactivated" | "account_reactivated" | "training_changed" | "feedback_filed" | "problem_reported" | "other";
+export type AuditKind = "signed_in" | "sign_in_failed" | "signed_out" | "user_created" | "password_reset" | "role_changed" | "access_code_set" | "camera_login_set" | "camera_login_cleared" | "update_checked" | "update_waited" | "update_downloaded" | "update_refused" | "update_applied" | "update_rolled_back" | "update_failed" | "printer_added" | "printer_declined" | "printer_retired" | "webhook_set" | "webhook_cleared" | "webhook_tested" | "guide_created" | "guide_edited" | "error_guide_linked" | "name_changed" | "account_deactivated" | "account_reactivated" | "training_changed" | "feedback_filed" | "problem_reported" | "other";

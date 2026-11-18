@@ -1,0 +1,23 @@
+# One run of POP's automatic upgrades (#148, docs/upgrades.md), started by
+# pop-updater.timer. Off until /etc/pop/updater.toml says `enabled = true`.
+#
+# Runs as root: it replaces /usr/local/bin/pop, restarts pop.service, and
+# on a rollback restores POP's data directory and gives it back to the pop
+# account. Everything else is read-only to it.
+
+[Unit]
+Description=POP's automatic upgrades: one check
+Documentation=https://github.com/Cambridge-Hackspace/print-observation-platform/blob/main/docs/upgrades.md
+After=network-online.target pop.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/pop-updater --config /etc/pop/updater.toml
+UMask=0022
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/usr/local/bin /var/lib
+ProtectHome=yes
+PrivateTmp=yes

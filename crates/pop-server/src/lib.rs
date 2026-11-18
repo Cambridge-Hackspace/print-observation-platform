@@ -22,6 +22,7 @@ pub mod report;
 pub mod run;
 pub mod secrets;
 pub mod tower;
+pub mod updater;
 pub mod users;
 
 use std::sync::Arc;
@@ -593,6 +594,25 @@ pub fn routes() -> Vec<Route> {
             reach: Reach::LocalOnly,
             who: Who::Admin,
             handler: delete(printers::clear_camera_login),
+        },
+        // ---- automatic upgrades (#148) ----
+        Route {
+            method: Method::GET,
+            path: "/api/updater/quiet",
+            effect: Effect::Read,
+            // For the updater, on this machine: it says which printers are
+            // printing, and nothing more.
+            reach: Reach::LocalOnly,
+            who: Who::Anyone,
+            handler: get(updater::quiet),
+        },
+        Route {
+            method: Method::GET,
+            path: "/api/admin/updater",
+            effect: Effect::Read,
+            reach: Reach::Anywhere,
+            who: Who::Admin,
+            handler: get(updater::status),
         },
         // ---- the audit log (#8) ----
         Route {

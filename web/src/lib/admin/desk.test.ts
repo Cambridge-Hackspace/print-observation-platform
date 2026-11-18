@@ -1,6 +1,6 @@
 // The printers table's words (#86).
 import { describe, expect, it } from 'vitest';
-import { connectsBy, fieldsSay, midSentence, needsYou, now, offered, training, whatItNeeds } from './desk';
+import { connectsBy, fieldsSay, midSentence, needsYou, now, offered, training, updaterSays, whatItNeeds } from './desk';
 import type { AdminPrinter } from '../generated/AdminPrinter';
 import type { PrinterState } from '../generated/PrinterState';
 import type { TowerPrinter } from '../generated/TowerPrinter';
@@ -172,5 +172,23 @@ describe('what needs you', () => {
     });
     expect(whatItNeeds(both)).toBe('Fix it in BAM! before it can be added: Serial (serial): missing. Then enter its LAN access code here.');
     expect(needsYou([both], [], [])[0]).toMatchObject({ title: 'Voron 2.4 can’t run: fix it in BAM!', detail: 'Serial (serial): missing' });
+  });
+});
+
+describe('the updater on the desk (#148)', () => {
+  const at = { at: 1, version: 'v0.2.0' };
+  it('says the running version, and what it last did', () => {
+    expect(updaterSays({ running: '0.1.0', last: null })).toEqual({ text: 'POP 0.1.0', alarm: false });
+    expect(
+      updaterSays({ running: '0.2.0', last: { ...at, kind: 'applied', summary: 'Upgraded from v0.1.0 to v0.2.0' } }),
+    ).toEqual({ text: 'POP 0.2.0 · Upgraded from v0.1.0 to v0.2.0', alarm: false });
+  });
+  it('raises what needs a person, and only that', () => {
+    for (const kind of ['refused', 'rolled_back', 'failed']) {
+      expect(updaterSays({ running: '0.1.0', last: { ...at, kind, summary: 's' } }).alarm).toBe(true);
+    }
+    for (const kind of ['checked', 'waiting', 'downloaded', 'applied']) {
+      expect(updaterSays({ running: '0.1.0', last: { ...at, kind, summary: 's' } }).alarm).toBe(false);
+    }
   });
 });

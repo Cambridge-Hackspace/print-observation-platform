@@ -1,0 +1,30 @@
+[package]
+name = "pop-updater"
+description = "Optional automatic upgrades for POP: checks, verifies, applies in a quiet window, rolls back (#148)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+pop-release = { path = "../pop-release" }
+# The hours window is in the machine's own time zone, as people there read
+# a clock.
+jiff = { version = "=0.2.39", features = ["tz-system"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt", "macros", "time", "process", "fs"] }
+toml = "0.8"
+
+[dev-dependencies]
+axum = "0.8"
+ed25519-dalek = { version = "=3.0.0", default-features = false, features = ["fast", "pkcs8", "pem"] }
+ml-dsa = { version = "=0.1.2", default-features = false, features = ["alloc", "pkcs8"] }
+pkcs8 = { version = "0.11", features = ["pem"] }
+pop-server = { path = "../pop-server" }
+sha2 = "0.10"
+tempfile = "3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }

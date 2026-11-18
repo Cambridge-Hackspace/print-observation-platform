@@ -5,6 +5,7 @@
 import type { AdminPrinter } from '../generated/AdminPrinter';
 import type { GroupNotice } from '../generated/GroupNotice';
 import type { TowerPrinter } from '../generated/TowerPrinter';
+import type { UpdaterStatus } from '../generated/UpdaterStatus';
 import { card, clock, firstName, need, type Need } from '../tower/need';
 
 /** How a printer connects, as people say it. */
@@ -74,6 +75,19 @@ export function whatItNeeds(p: AdminPrinter): string {
   if (bam.length) parts.push(`Fix it in BAM! before it can be added: ${bam.map((x) => `${x.field}: ${x.problem}`).join('; ')}.`);
   if (pop.length) parts.push(`${bam.length ? 'Then enter' : 'Enter'} its LAN access code here.`);
   return parts.join(' ');
+}
+
+/**
+ * The running version and what the updater last did (#148): "POP 0.2.0 ·
+ * Upgraded from v0.1.0 to v0.2.0". `alarm` when it needs a person: a
+ * release refused, rolled back, or a run that failed.
+ */
+export function updaterSays(u: UpdaterStatus): { text: string; alarm: boolean } {
+  const last = u.last;
+  return {
+    text: last ? `POP ${u.running} · ${last.summary}` : `POP ${u.running}`,
+    alarm: last !== null && ['refused', 'rolled_back', 'failed'].includes(last.kind),
+  };
 }
 
 /** The printers waiting for an admin to say, for the "New in BAM!" banners. */

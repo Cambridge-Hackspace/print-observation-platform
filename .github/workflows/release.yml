@@ -46,16 +46,19 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           docker push "$IMAGE:$GITHUB_REF_NAME-${{ matrix.arch }}"
 
-      - name: Take the binary out
+      - name: Take the binaries out
         run: |
           id=$(docker create "$IMAGE:$GITHUB_REF_NAME-${{ matrix.arch }}")
           docker cp "$id:/usr/local/bin/pop" "pop-$GITHUB_REF_NAME-linux-${{ matrix.arch }}"
+          docker cp "$id:/usr/local/bin/pop-updater" "pop-updater-$GITHUB_REF_NAME-linux-${{ matrix.arch }}"
           docker rm "$id"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pop-linux-${{ matrix.arch }}
-          path: pop-${{ github.ref_name }}-linux-${{ matrix.arch }}
+          path: |
+            pop-${{ github.ref_name }}-linux-${{ matrix.arch }}
+            pop-updater-${{ github.ref_name }}-linux-${{ matrix.arch }}
           if-no-files-found: error
 
   publish:
@@ -118,5 +121,5 @@ jobs:
           cd dist
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
             --title "POP $GITHUB_REF_NAME" --verify-tag \
-            --notes "Binaries for Linux on x86-64 and ARM64, their SHA256SUMS signed with ML-DSA-65 and Ed25519, and the image $IMAGE:$GITHUB_REF_NAME. Installing and upgrading: docs/deployment.md." \
+            --notes "POP and its updater for Linux on x86-64 and ARM64, their SHA256SUMS signed with ML-DSA-65 and Ed25519, and the image $IMAGE:$GITHUB_REF_NAME. Installing and upgrading: docs/deployment.md." \
             pop-* SHA256SUMS SHA256SUMS.ml-dsa-65.sig SHA256SUMS.ed25519.sig

@@ -15,7 +15,7 @@ use pop_server::api::{
     FeedbackStatus, Guide, GuideImage, GuideProblems, GuideSummary, Health, LinkGuide, NewActive,
     NewFeedback, NewGuideImage, NewName, NewPassword, NewReport, NewRole, NewTraining, NewUser,
     NotifySettings, PublicGuide, PublicGuideList, ReportTaken, Role, ServerEvent, SignIn, Snapshot,
-    Status, TowerPrinter, TowerState, User,
+    Status, TowerPrinter, TowerState, UpdaterStatus, User,
 };
 use ts_rs::TS;
 
@@ -75,6 +75,8 @@ fn export(dir: &Path) {
     NewName::export_all_to(dir).unwrap();
     NewActive::export_all_to(dir).unwrap();
     NewTraining::export_all_to(dir).unwrap();
+    // Automatic upgrades (#148).
+    UpdaterStatus::export_all_to(dir).unwrap();
 }
 
 fn read_dir(dir: &Path) -> BTreeMap<String, String> {
