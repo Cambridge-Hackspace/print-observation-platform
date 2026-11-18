@@ -99,9 +99,9 @@ fn every_test_the_threat_model_names_exists() {
 
 #[test]
 fn the_check_finds_a_reference_that_points_at_nothing() {
-    let doc = "Real: `crates/pop-server/tests/access.rs::no_route_that_controls_a_printer_is_reachable_from_outside`. \
+    let doc = "Real: `crates/pop-server/tests/access.rs::no_route_needs_less_than_what_it_does`. \
                Renamed: `crates/pop-server/tests/access.rs::no_route_controls_anything`. \
-               Unit: `crates/pop-server/src/access.rs::tests::this_machine_is_local`. \
+               Unit: `crates/pop-server/src/access.rs::tests::this_machine_is_not_the_space_by_itself`. \
                Gone: `crates/pop-server/tests/nowhere.rs::anything`. \
                Web: `web/src/lib/tower/HandView.test.ts › \"never offers to resume a print that stopped\"`. \
                Web, renamed: `web/src/lib/tower/HandView.test.ts › \"offers to resume\"`. \

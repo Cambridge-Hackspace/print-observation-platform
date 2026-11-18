@@ -563,8 +563,11 @@ async fn the_test_button_posts_now_and_says_how_it_went() {
     );
 }
 
+/// Where notices go is admin-class, which an admin holds from anywhere
+/// (cal, #12): from outside the space it is set, and signed out it is not. A
+/// member is refused on every admin route (tests/users.rs, tests/access.rs).
 #[tokio::test]
-async fn where_notices_go_is_set_only_at_the_space_and_only_by_an_admin() {
+async fn where_notices_go_is_set_by_an_admin_from_anywhere_and_nobody_else() {
     let pop = pop().await;
     let res = pop
         .send(
@@ -574,7 +577,7 @@ async fn where_notices_go_is_set_only_at_the_space_and_only_by_an_admin() {
             "203.0.113.9:4000",
         )
         .await;
-    assert_eq!(res.status(), StatusCode::FORBIDDEN);
+    assert!(res.status().is_success(), "{}", res.status());
     let anon = Pop {
         cookie: String::new(),
         ..pop

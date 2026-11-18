@@ -294,12 +294,14 @@ async fn the_code_is_kept_sealed_and_opens_with_its_key_only() {
     );
 }
 
+/// An access code is admin-class, which an admin holds from anywhere (cal,
+/// #12): entered from outside the space, it is kept.
 #[tokio::test]
-async fn a_code_is_entered_only_from_inside_the_space() {
+async fn an_admin_enters_a_code_from_anywhere() {
     let pop = pop().await;
-    let (code, _) = pop.enter_code(pop.fake.id("x1"), "12345678", REMOTE).await;
-    assert_eq!(code, StatusCode::FORBIDDEN);
-    assert_eq!(named(&pop.printers().await, "X1 Carbon")["ready"], false);
+    let (code, body) = pop.enter_code(pop.fake.id("x1"), "12345678", REMOTE).await;
+    assert_eq!(code, StatusCode::NO_CONTENT, "{body}");
+    assert_eq!(named(&pop.printers().await, "X1 Carbon")["ready"], true);
 }
 
 #[tokio::test]
@@ -629,9 +631,17 @@ async fn a_camera_login_is_refused_when_it_cannot_be_kept_rightly() {
     let voron = pop.fake.id("voron").to_owned();
     pop.fake.edit_without_event(&voron, "camera", CAMERA);
     let good = json!({"username": "viewer", "password": "hunter2"});
-    // From outside the space.
-    let (code, _) = pop.enter_login(&voron, good.clone(), REMOTE).await;
-    assert_eq!(code, StatusCode::FORBIDDEN);
+    // Signed out (an admin from outside the space may: cal, #12).
+    let (code, _, _) = pop
+        .send(
+            Method::PUT,
+            &format!("/api/admin/printers/{voron}/camera-login"),
+            None,
+            Some(good.clone()),
+            REMOTE,
+        )
+        .await;
+    assert_eq!(code, StatusCode::UNAUTHORIZED);
     // What cannot be a login.
     for bad in [
         json!({"username": "viewer", "password": ""}),

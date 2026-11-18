@@ -8,6 +8,7 @@
   import type { TowerPrinter } from '../generated/TowerPrinter';
   import type { User } from '../generated/User';
   import People from './People.svelte';
+  import Kiosks from './Kiosks.svelte';
   import SecretForm from './SecretForm.svelte';
   import type { UpdaterStatus } from '../generated/UpdaterStatus';
   import { connectsBy, fieldsSay, needsAccessCode, needsYou, now, offered, training, updaterSays, whatItNeeds, type Now } from './desk';
@@ -192,6 +193,8 @@
   </div>
 
   <People printers={printers ?? []} {me} />
+
+  <Kiosks />
 </div>
 
 <style>

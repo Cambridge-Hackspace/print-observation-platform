@@ -17,6 +17,7 @@ use pop_server::api::{
     NotifySettings, PublicGuide, PublicGuideList, ReportTaken, Role, ServerEvent, SignIn, Snapshot,
     Status, TowerPrinter, TowerState, UpdaterStatus, User,
 };
+use pop_server::api::{Kiosk, NewKiosk};
 use ts_rs::TS;
 
 fn generated_dir() -> PathBuf {
@@ -77,6 +78,9 @@ fn export(dir: &Path) {
     NewTraining::export_all_to(dir).unwrap();
     // Automatic upgrades (#148).
     UpdaterStatus::export_all_to(dir).unwrap();
+    // Kiosks (#12).
+    Kiosk::export_all_to(dir).unwrap();
+    NewKiosk::export_all_to(dir).unwrap();
 }
 
 fn read_dir(dir: &Path) -> BTreeMap<String, String> {

@@ -232,14 +232,14 @@ async fn adding_and_declining_are_recorded() {
     );
 }
 
+/// Which printers the tower runs is admin-class, which an admin holds from
+/// anywhere (cal, #12).
 #[tokio::test]
-async fn which_printers_the_tower_runs_is_decided_only_at_the_space() {
+async fn which_printers_the_tower_runs_is_decided_by_an_admin_from_anywhere() {
     let pop = pop().await;
-    for what in ["add", "decline"] {
-        let (c, _) = pop.decide(pop.fake.id("voron"), what, REMOTE).await;
-        assert_eq!(c, StatusCode::FORBIDDEN, "{what}");
-    }
-    assert_eq!(state_of(&pop.tower().await, "Voron 2.4"), "offered");
+    let (c, b) = pop.decide(pop.fake.id("voron"), "add", REMOTE).await;
+    assert!(c.is_success(), "{c} {b}");
+    assert_eq!(state_of(&pop.tower().await, "Voron 2.4"), "added");
 }
 
 #[tokio::test]

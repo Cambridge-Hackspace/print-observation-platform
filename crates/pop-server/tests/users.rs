@@ -10,7 +10,7 @@ use axum::{
 use http_body_util::BodyExt;
 use pop_server::{
     AppState,
-    access::Who,
+    access::{Class, Need},
     api::Role,
     assets::Embedded,
     audit::Actor,
@@ -130,10 +130,12 @@ impl Pop {
 
 // ---- the issue's "done when": role checks on every route group --------------------
 
-/// Every route that names who may use it refuses everyone else: no one
-/// signed in gets 401 on any route for members or admins, and a member gets
-/// 403 on every admin route, which an admin can reach. Walks the real route
-/// table, so a route added later is covered as it lands.
+/// Every route refuses whoever its need does not cover, ONLINE (these
+/// requests come from 127.0.0.1 and no space network is configured, #12): no
+/// one signed in gets 401 on any route that needs an account or a class, a
+/// member gets 403 on every printer and admin route, and an admin reaches
+/// every admin route. Walks the real route table, so a route added later is
+/// covered as it lands. tests/access.rs asks the same routes locally.
 #[tokio::test]
 async fn every_route_refuses_whoever_it_does_not_name() {
     let pop = pop().await;
@@ -141,7 +143,7 @@ async fn every_route_refuses_whoever_it_does_not_name() {
     let admin = pop.sign_in("ada", ADMIN_PW).await;
     let table = routes();
     assert!(
-        table.iter().any(|r| r.who == Who::Admin),
+        table.iter().any(|r| r.need == Need::Class(Class::Admin)),
         "no admin routes to check"
     );
     for r in &table {
@@ -149,16 +151,21 @@ async fn every_route_refuses_whoever_it_does_not_name() {
         let body =
             matches!(r.method, Method::POST | Method::PUT | Method::PATCH).then(|| json!({}));
         let what = format!("{} {}", r.method, r.path);
-        match r.who {
-            Who::Anyone => {}
-            // This test's requests come from 127.0.0.1, which is at the
-            // space; tests/cameras.rs asks from outside, signed out, too.
-            Who::MemberOrLocal => {}
-            Who::Member => {
+        match r.need {
+            Need::Anyone => {}
+            Need::Account | Need::Class(Class::Visibility) => {
                 let anon = pop.send(r.method.clone(), &uri, None, body.clone()).await;
                 assert_eq!(anon.code, StatusCode::UNAUTHORIZED, "{what}, signed out");
             }
-            Who::Admin => {
+            Need::Class(Class::Printer) => {
+                let anon = pop.send(r.method.clone(), &uri, None, body.clone()).await;
+                assert_eq!(anon.code, StatusCode::UNAUTHORIZED, "{what}, signed out");
+                let m = pop
+                    .send(r.method.clone(), &uri, Some(&member), body.clone())
+                    .await;
+                assert_eq!(m.code, StatusCode::FORBIDDEN, "{what}, a member online");
+            }
+            Need::Class(Class::Admin) => {
                 let anon = pop.send(r.method.clone(), &uri, None, body.clone()).await;
                 assert_eq!(anon.code, StatusCode::UNAUTHORIZED, "{what}, signed out");
                 let m = pop
@@ -185,7 +192,7 @@ async fn every_admin_route_is_under_api_admin_and_nothing_else_is() {
     for r in routes() {
         assert_eq!(
             r.path.starts_with("/api/admin/"),
-            r.who == Who::Admin,
+            r.need == Need::Class(Class::Admin),
             "{} {}",
             r.method,
             r.path

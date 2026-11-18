@@ -291,6 +291,10 @@ pub enum AuditKind {
     CameraLoginSet,
     /// A camera's login was removed from POP.
     CameraLoginCleared,
+    /// An admin enrolled a kiosk (#12).
+    KioskEnrolled,
+    /// An admin revoked a kiosk.
+    KioskRevoked,
     /// The updater looked for a release (#148).
     UpdateChecked,
     /// The updater found one, and waited: a print, or outside its hours.
@@ -489,6 +493,29 @@ pub struct UpdaterEvent {
     /// The release it concerned, `v0.2.0`.
     pub version: Option<String>,
     pub summary: String,
+}
+
+/// `POST /api/admin/kiosks` (#12): make this browser a kiosk.
+#[derive(Debug, Clone, Deserialize, TS)]
+pub struct NewKiosk {
+    /// What to call it on the desk: "The tower".
+    pub name: String,
+}
+
+/// An enrolled kiosk, as the desk lists it (#12).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct Kiosk {
+    #[ts(type = "number")]
+    pub id: i64,
+    pub name: String,
+    /// Unix seconds.
+    #[ts(type = "number")]
+    pub enrolled_at: i64,
+    pub revoked: bool,
+    /// Its last check-in, in Unix seconds, and the address it came from.
+    #[ts(type = "number | null")]
+    pub last_seen_at: Option<i64>,
+    pub last_address: Option<String>,
 }
 
 /// The body of every API error.

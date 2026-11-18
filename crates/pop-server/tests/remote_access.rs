@@ -115,9 +115,9 @@ fn problems(conf: &str) -> Vec<String> {
                     r.method, r.path
                 ));
             }
-            (Reach::LocalOnly, true) => {
+            (Reach::ThisMachine, true) => {
                 out.push(format!(
-                    "{} {} is the space's only, but forwarded",
+                    "{} {} is for POP's own machine only, but forwarded",
                     r.method, r.path
                 ));
             }

@@ -14,6 +14,7 @@ pub mod events;
 pub mod feedback;
 pub mod guides;
 pub mod health;
+pub mod kiosks;
 pub mod notices;
 pub mod notify;
 pub mod pins;
@@ -38,7 +39,7 @@ use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::Level;
 
 use crate::{
-    access::{Effect, Reach, Route, Who},
+    access::{Class, Effect, Need, Reach, Route},
     api::Status,
     assets::Assets,
     events::Events,
@@ -55,6 +56,9 @@ pub struct AppState {
     pub checks: Arc<Vec<Arc<dyn HealthCheck>>>,
     /// Which requests are local (#7).
     pub access: config::Access,
+    /// Where each enrolled kiosk last checked in from (#12): what makes a
+    /// network the space's.
+    pub kiosks: kiosks::Sightings,
     /// Where the printers come from (#20, #21), when BAM! is configured.
     pub bam: Option<Arc<printers::BamSource>>,
     /// Seals the secrets POP keeps for printers (#21).
@@ -105,6 +109,7 @@ impl AppState {
             tower: tokio::sync::watch::channel(Vec::new()).1,
             told: tokio::sync::watch::channel(Vec::new()).1,
             decided: Arc::new(tokio::sync::Notify::new()),
+            kiosks: kiosks::Sightings::default(),
             public_url: None,
             notifier: None,
             http: reqwest::Client::new(),
@@ -243,24 +248,24 @@ pub fn routes() -> Vec<Route> {
             method: Method::GET,
             path: "/healthz",
             effect: Effect::Read,
+            need: Need::Anyone,
             reach: Reach::Anywhere,
-            who: Who::Anyone,
             handler: get(health::healthz),
         },
         Route {
             method: Method::GET,
             path: "/api/status",
             effect: Effect::Read,
+            need: Need::Anyone,
             reach: Reach::Anywhere,
-            who: Who::Anyone,
             handler: get(status),
         },
         Route {
             method: Method::GET,
             path: "/api/events",
             effect: Effect::Read,
+            need: Need::Anyone,
             reach: Reach::Anywhere,
-            who: Who::Anyone,
             handler: get(events::stream),
         },
         // ---- signing in and out (#11) ----
@@ -268,24 +273,24 @@ pub fn routes() -> Vec<Route> {
             method: Method::POST,
             path: "/api/session",
             effect: Effect::Account,
+            need: Need::Anyone,
             reach: Reach::Anywhere,
-            who: Who::Anyone,
             handler: post(auth::sign_in),
         },
         Route {
             method: Method::DELETE,
             path: "/api/session",
             effect: Effect::Account,
+            need: Need::Account,
             reach: Reach::Anywhere,
-            who: Who::Member,
             handler: delete(auth::sign_out),
         },
         Route {
             method: Method::GET,
             path: "/api/me",
             effect: Effect::Read,
+            need: Need::Account,
             reach: Reach::Anywhere,
-            who: Who::Member,
             handler: get(auth::me),
         },
         // ---- managing accounts (#11) ----
@@ -293,32 +298,32 @@ pub fn routes() -> Vec<Route> {
             method: Method::GET,
             path: "/api/admin/users",
             effect: Effect::Read,
+            need: Need::Class(Class::Admin),
             reach: Reach::Anywhere,
-            who: Who::Admin,
             handler: get(auth::list),
         },
         Route {
             method: Method::POST,
             path: "/api/admin/users",
             effect: Effect::Account,
+            need: Need::Class(Class::Admin),
             reach: Reach::Anywhere,
-            who: Who::Admin,
             handler: post(auth::create),
         },
         Route {
             method: Method::PUT,
             path: "/api/admin/users/{id}/password",
             effect: Effect::Account,
+            need: Need::Class(Class::Admin),
             reach: Reach::Anywhere,
-            who: Who::Admin,
             handler: put(auth::reset_password),
         },
         Route {
             method: Method::PUT,
             path: "/api/admin/users/{id}/role",
             effect: Effect::Account,
+            need: Need::Class(Class::Admin),
             reach: Reach::Anywhere,
-            who: Who::Admin,
             handler: put(auth::set_role),
         },
         // ---- managing local users (#90) ----
@@ -326,24 +331,24 @@ pub fn routes() -> Vec<Route> {
             method: Method::PUT,
             path: "/api/admin/users/{id}/name",
             effect: Effect::Account,
+            need: Need::Class(Class::Admin),
             reach: Reach::Anywhere,
-            who: Who::Admin,
             handler: put(auth::set_name),
         },
         Route {
             method: Method::PUT,
             path: "/api/admin/users/{id}/active",
             effect: Effect::Account,
+            need: Need::Class(Class::Admin),
             reach: Reach::Anywhere,
-            who: Who::Admin,
             handler: put(auth::set_active),
         },
         Route {
             method: Method::PUT,
             path: "/api/admin/users/{id}/training",
             effect: Effect::Account,
+            need: Need::Class(Class::Admin),
             reach: Reach::Anywhere,
-            who: Who::Admin,
             handler: put(auth::set_training),
         },
         // ---- printers from BAM! (#21) ----
@@ -351,8 +356,8 @@ pub fn routes() -> Vec<Route> {
             method: Method::GET,
             path: "/api/admin/printers",
             effect: Effect::Read,
+            need: Need::Class(Class::Admin),
             reach: Reach::Anywhere,
-            who: Who::Admin,
             handler: get(printers::list),
         },
         // ---- feedback from any screen (#96) ----
@@ -360,8 +365,8 @@ pub fn routes() -> Vec<Route> {
             method: Method::GET,
             path: "/api/feedback",
             effect: Effect::Read,
+            need: Need::Account,
             reach: Reach::Anywhere,
-            who: Who::Member,
             handler: get(feedback::settings),
         },
         Route {
@@ -370,16 +375,16 @@ pub fn routes() -> Vec<Route> {
             // A report: it reaches GitHub, never a printer. The role check,
             // feedback.file, is the handler's, from [feedback] roles.
             effect: Effect::Report,
+            need: Need::Account,
             reach: Reach::Anywhere,
-            who: Who::Member,
             handler: post(feedback::file).layer(axum::extract::DefaultBodyLimit::max(8 << 20)),
         },
         Route {
             method: Method::GET,
             path: "/api/feedback/{id}",
             effect: Effect::Read,
+            need: Need::Account,
             reach: Reach::Anywhere,
-            who: Who::Member,
             handler: get(feedback::status),
         },
         // ---- "something looks wrong" (#63): told to the group, never the printer ----
@@ -387,52 +392,52 @@ pub fn routes() -> Vec<Route> {
             method: Method::POST,
             path: "/api/printers/{bam_id}/report",
             effect: Effect::Report,
+            need: Need::Account,
             reach: Reach::Anywhere,
-            who: Who::Member,
             handler: post(report::report),
         },
-        // ---- watching a camera (#67, #58): members, and anyone at the space ----
+        // ---- watching a camera (#67, #58): visibility-class ----
         Route {
             method: Method::GET,
             path: "/api/printers/{bam_id}/camera/mse",
             effect: Effect::Read,
+            need: Need::Class(Class::Visibility),
+            // Visibility-class: anyone at the space, any member online (#12).
             reach: Reach::Anywhere,
-            // Members from anywhere; and at the space, the kiosk (#58).
-            who: Who::MemberOrLocal,
             handler: get(cameras::watch_mse),
         },
         Route {
             method: Method::GET,
             path: "/api/printers/{bam_id}/camera/mjpeg",
             effect: Effect::Read,
+            need: Need::Class(Class::Visibility),
+            // Visibility-class: anyone at the space, any member online (#12).
             reach: Reach::Anywhere,
-            // Members from anywhere; and at the space, the kiosk (#58).
-            who: Who::MemberOrLocal,
             handler: get(cameras::watch_mjpeg),
         },
         Route {
             method: Method::GET,
             path: "/api/admin/cameras",
             effect: Effect::Read,
+            need: Need::Class(Class::Admin),
             reach: Reach::Anywhere,
-            who: Who::Admin,
             handler: get(cameras::list),
         },
         Route {
             method: Method::POST,
             path: "/api/admin/printers/{bam_id}/add",
-            // Which printers the tower runs: from inside the space only.
+            // Which printers the tower runs: admin-class, from anywhere (#12).
             effect: Effect::ControlsPrinter,
-            reach: Reach::LocalOnly,
-            who: Who::Admin,
+            need: Need::Class(Class::Admin),
+            reach: Reach::Anywhere,
             handler: post(printers::add),
         },
         Route {
             method: Method::POST,
             path: "/api/admin/printers/{bam_id}/decline",
             effect: Effect::ControlsPrinter,
-            reach: Reach::LocalOnly,
-            who: Who::Admin,
+            need: Need::Class(Class::Admin),
+            reach: Reach::Anywhere,
             handler: post(printers::decline),
         },
         // Published guides, for anyone, from anywhere (#94): read-only, like
@@ -441,48 +446,48 @@ pub fn routes() -> Vec<Route> {
             method: Method::GET,
             path: "/api/public/guides",
             effect: Effect::Read,
+            need: Need::Anyone,
             reach: Reach::Anywhere,
-            who: Who::Anyone,
             handler: get(guides::public_list),
         },
         Route {
             method: Method::GET,
             path: "/api/public/guides/{slug}",
             effect: Effect::Read,
+            need: Need::Anyone,
             reach: Reach::Anywhere,
-            who: Who::Anyone,
             handler: get(guides::public_get),
         },
         Route {
             method: Method::GET,
             path: "/api/public/guides/{slug}/images/{id}",
             effect: Effect::Read,
+            need: Need::Anyone,
             reach: Reach::Anywhere,
-            who: Who::Anyone,
             handler: get(guides::public_image),
         },
         Route {
             method: Method::GET,
             path: "/api/public/error-guides",
             effect: Effect::Read,
+            need: Need::Anyone,
             reach: Reach::Anywhere,
-            who: Who::Anyone,
             handler: get(guides::public_error_guides),
         },
         Route {
             method: Method::GET,
             path: "/api/admin/error-guides",
             effect: Effect::Read,
+            need: Need::Class(Class::Admin),
             reach: Reach::Anywhere,
-            who: Who::Admin,
             handler: get(guides::admin_error_guides),
         },
         Route {
             method: Method::PUT,
             path: "/api/admin/error-guides/{key}",
             effect: Effect::Content,
+            need: Need::Class(Class::Admin),
             reach: Reach::Anywhere,
-            who: Who::Admin,
             handler: put(guides::admin_link_error_guide),
         },
         // Guides (#71): written by admins, from anywhere; nothing here
@@ -491,108 +496,107 @@ pub fn routes() -> Vec<Route> {
             method: Method::GET,
             path: "/api/admin/guides",
             effect: Effect::Read,
+            need: Need::Class(Class::Admin),
             reach: Reach::Anywhere,
-            who: Who::Admin,
             handler: get(guides::admin_list),
         },
         Route {
             method: Method::POST,
             path: "/api/admin/guides",
             effect: Effect::Content,
+            need: Need::Class(Class::Admin),
             reach: Reach::Anywhere,
-            who: Who::Admin,
             handler: post(guides::admin_create),
         },
         Route {
             method: Method::GET,
             path: "/api/admin/guides/{slug}",
             effect: Effect::Read,
+            need: Need::Class(Class::Admin),
             reach: Reach::Anywhere,
-            who: Who::Admin,
             handler: get(guides::admin_get),
         },
         Route {
             method: Method::PUT,
             path: "/api/admin/guides/{slug}",
             effect: Effect::Content,
+            need: Need::Class(Class::Admin),
             reach: Reach::Anywhere,
-            who: Who::Admin,
             handler: put(guides::admin_update),
         },
         Route {
             method: Method::POST,
             path: "/api/admin/guides/{slug}/images",
             effect: Effect::Content,
+            need: Need::Class(Class::Admin),
             reach: Reach::Anywhere,
-            who: Who::Admin,
             handler: post(guides::admin_add_image),
         },
         Route {
             method: Method::GET,
             path: "/api/admin/guides/{slug}/images/{id}",
             effect: Effect::Read,
+            need: Need::Class(Class::Admin),
             reach: Reach::Anywhere,
-            who: Who::Admin,
             handler: get(guides::admin_image),
         },
         Route {
             method: Method::GET,
             path: "/api/admin/notify",
             effect: Effect::Read,
-            reach: Reach::LocalOnly,
-            who: Who::Admin,
+            need: Need::Class(Class::Admin),
+            reach: Reach::Anywhere,
             handler: get(notify::settings),
         },
         Route {
             method: Method::PUT,
             path: "/api/admin/notify/discord",
-            // Where notices go, and a secret: from inside the space only.
+            // Where notices go, and a secret: admin-class, from anywhere (#12).
             effect: Effect::Settings,
-            reach: Reach::LocalOnly,
-            who: Who::Admin,
+            need: Need::Class(Class::Admin),
+            reach: Reach::Anywhere,
             handler: put(notify::set_webhook),
         },
         Route {
             method: Method::DELETE,
             path: "/api/admin/notify/discord",
             effect: Effect::Settings,
-            reach: Reach::LocalOnly,
-            who: Who::Admin,
+            need: Need::Class(Class::Admin),
+            reach: Reach::Anywhere,
             handler: delete(notify::clear_webhook),
         },
         Route {
             method: Method::POST,
             path: "/api/admin/notify/discord/test",
             effect: Effect::Settings,
-            reach: Reach::LocalOnly,
-            who: Who::Admin,
+            need: Need::Class(Class::Admin),
+            reach: Reach::Anywhere,
             handler: post(notify::test_webhook),
         },
         Route {
             method: Method::PUT,
             path: "/api/admin/printers/{bam_id}/access-code",
-            // A printer's settings: from inside the space only (#7).
+            // A printer's settings: admin-class, from anywhere (#12).
             effect: Effect::ControlsPrinter,
-            reach: Reach::LocalOnly,
-            who: Who::Admin,
+            need: Need::Class(Class::Admin),
+            reach: Reach::Anywhere,
             handler: put(printers::set_access_code),
         },
         Route {
             method: Method::PUT,
             path: "/api/admin/printers/{bam_id}/camera-login",
-            // A printer's settings: from inside the space only, as its
-            // access code is (#150).
+            // A printer's settings: admin-class, as its access code (#150).
             effect: Effect::ControlsPrinter,
-            reach: Reach::LocalOnly,
-            who: Who::Admin,
+            need: Need::Class(Class::Admin),
+            reach: Reach::Anywhere,
             handler: put(printers::set_camera_login),
         },
         Route {
             method: Method::DELETE,
             path: "/api/admin/printers/{bam_id}/camera-login",
             effect: Effect::ControlsPrinter,
-            reach: Reach::LocalOnly,
-            who: Who::Admin,
+            need: Need::Class(Class::Admin),
+            reach: Reach::Anywhere,
             handler: delete(printers::clear_camera_login),
         },
         // ---- automatic upgrades (#148) ----
@@ -602,25 +606,61 @@ pub fn routes() -> Vec<Route> {
             effect: Effect::Read,
             // For the updater, on this machine: it says which printers are
             // printing, and nothing more.
-            reach: Reach::LocalOnly,
-            who: Who::Anyone,
+            need: Need::Anyone,
+            reach: Reach::ThisMachine,
             handler: get(updater::quiet),
         },
         Route {
             method: Method::GET,
             path: "/api/admin/updater",
             effect: Effect::Read,
+            need: Need::Class(Class::Admin),
             reach: Reach::Anywhere,
-            who: Who::Admin,
             handler: get(updater::status),
+        },
+        // ---- kiosks (#12): the print stations, and their word ----
+        Route {
+            method: Method::POST,
+            path: "/api/kiosk/checkin",
+            // Its credential is its need: a kiosk that is not enrolled is
+            // refused by the handler, and what it vouches for is where the
+            // request came from, never anything in it.
+            effect: Effect::Read,
+            need: Need::Anyone,
+            reach: Reach::Anywhere,
+            handler: post(kiosks::checkin),
+        },
+        Route {
+            method: Method::GET,
+            path: "/api/admin/kiosks",
+            effect: Effect::Read,
+            need: Need::Class(Class::Admin),
+            reach: Reach::Anywhere,
+            handler: get(kiosks::list),
+        },
+        Route {
+            method: Method::POST,
+            path: "/api/admin/kiosks",
+            effect: Effect::Settings,
+            need: Need::Class(Class::Admin),
+            reach: Reach::Anywhere,
+            handler: post(kiosks::enroll),
+        },
+        Route {
+            method: Method::DELETE,
+            path: "/api/admin/kiosks/{id}",
+            effect: Effect::Settings,
+            need: Need::Class(Class::Admin),
+            reach: Reach::Anywhere,
+            handler: delete(kiosks::revoke),
         },
         // ---- the audit log (#8) ----
         Route {
             method: Method::GET,
             path: "/api/admin/audit",
             effect: Effect::Read,
+            need: Need::Class(Class::Admin),
             reach: Reach::Anywhere,
-            who: Who::Admin,
             handler: get(auth::audit_log),
         },
     ]

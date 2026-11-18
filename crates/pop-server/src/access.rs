@@ -1,20 +1,31 @@
-//! Control is local (ADR 0001, #7): anyone with access can watch from
-//! anywhere, but nothing outside the space can start, pause, stop or resume a
-//! printer, or change one. That is a property of the server, not of which
-//! buttons a screen happens to hide.
+//! Who may do what, and from where (#7, #12): three classes of permission,
+//! each including the one before it (cal, 2026-11-18, on #12).
 //!
-//! Every route is declared in one table ([`Route`]), with what it does
-//! ([`Effect`]) and from where it may be reached ([`Reach`]). The router is
-//! built from that table, and every local-only route is guarded: a remote
-//! request gets 403. [`violations`] is the check that no route which controls
-//! a printer is reachable from outside; a test runs it on the real table.
+//! - **visibility**: see everything going on, names included;
+//! - **printer**: control printers;
+//! - **admin**: configure the system.
 //!
-//! A request is local when it comes from this machine or one of the
-//! configured `access.local_networks` (and, once kiosk sessions exist (#12),
-//! from a kiosk session). Forwarding headers are believed only from a
-//! configured `access.trusted_proxies` peer; from anything else they make a
-//! request remote, because a proxy on this machine would otherwise make every
-//! request it passes on look local.
+//! | | not signed in | member | admin |
+//! |---|---|---|---|
+//! | local: the kiosk, or a device on the space's network | visibility | printer | admin |
+//! | online | none | visibility | admin |
+//!
+//! A request is LOCAL when it began on one of the configured
+//! `access.local_networks` AND an enrolled kiosk has checked in from that same
+//! network within [`crate::kiosks::FRESH`] (crate::kiosks). The kiosk confirms
+//! from its own side: POP believes the address its check-in came from, never
+//! anything a request says about itself, so a mistyped network or a POP moved
+//! elsewhere grants nothing on its own.
+//!
+//! Every route is declared in one table ([`Route`]) with what it does
+//! ([`Effect`]) and what it needs ([`Need`]); the router is built from that
+//! table, so a route cannot exist without being guarded. [`violations`] is the
+//! check that no route which controls a printer needs less than printer-class.
+//!
+//! Forwarding headers are believed only from a configured
+//! `access.trusted_proxies` peer; from anything else they make a request
+//! remote, because a proxy on this machine would otherwise make every request
+//! it passes on look local.
 
 use std::net::{IpAddr, SocketAddr};
 
@@ -50,26 +61,47 @@ pub enum Effect {
     Content,
 }
 
-/// Who may use a route (#11).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Who {
-    /// Anyone, signed in or not.
-    Anyone,
-    /// Anyone signed in.
-    Member,
-    /// Anyone signed in, and anyone at the space, signed in or not: the kiosk,
-    /// which has no session of its own until kiosk sessions (#12). Watching a
-    /// camera (#58).
-    MemberOrLocal,
-    /// An admin.
+/// The classes of permission, each including the ones before it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Class {
+    /// See everything going on, names included.
+    Visibility,
+    /// Control printers.
+    Printer,
+    /// Configure the system.
     Admin,
 }
 
-/// From where a route may be reached.
+/// A request's class: local or online, signed in or not, as cal's table
+/// says. None is no class at all: a stranger online.
+pub fn class(local: bool, role: Option<crate::api::Role>) -> Option<Class> {
+    use crate::api::Role;
+    match (local, role) {
+        (_, Some(Role::Admin)) => Some(Class::Admin),
+        (true, Some(Role::Member)) => Some(Class::Printer),
+        (true, None) | (false, Some(Role::Member)) => Some(Class::Visibility),
+        (false, None) => None,
+    }
+}
+
+/// What a route needs of a request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Need {
+    /// Nothing: anyone, from anywhere.
+    Anyone,
+    /// A signed-in account, of any class: its own session and settings.
+    Account,
+    /// At least this class.
+    Class(Class),
+}
+
+/// From where a route may be reached, beside its [`Need`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Reach {
+    /// Wherever its need is met.
     Anywhere,
-    LocalOnly,
+    /// From this machine only, with no proxy in between: the updater (#148).
+    ThisMachine,
 }
 
 /// One route of the server.
@@ -77,8 +109,8 @@ pub struct Route {
     pub method: Method,
     pub path: &'static str,
     pub effect: Effect,
+    pub need: Need,
     pub reach: Reach,
-    pub who: Who,
     pub handler: MethodRouter<AppState>,
 }
 
@@ -89,12 +121,18 @@ pub struct Violation {
     pub path: &'static str,
 }
 
-/// Every route in `table` that controls a printer but is reachable from
-/// anywhere. Empty is the only acceptable answer.
+/// Every route in `table` that controls a printer and needs less than
+/// printer-class, or changes a setting and needs less than admin-class.
+/// Empty is the only acceptable answer.
 pub fn violations(table: &[Route]) -> Vec<Violation> {
+    let at_least = |r: &Route, c: Class| matches!(r.need, Need::Class(n) if n >= c);
     table
         .iter()
-        .filter(|r| r.effect == Effect::ControlsPrinter && r.reach != Reach::LocalOnly)
+        .filter(|r| match r.effect {
+            Effect::ControlsPrinter => !at_least(r, Class::Printer),
+            Effect::Settings => !at_least(r, Class::Admin),
+            _ => false,
+        })
         .map(|r| Violation {
             method: r.method.clone(),
             path: r.path,
@@ -104,7 +142,7 @@ pub fn violations(table: &[Route]) -> Vec<Violation> {
 
 /// Whether a stranger can use `r`: anyone, from anywhere.
 pub fn is_public(r: &Route) -> bool {
-    r.who == Who::Anyone && r.reach == Reach::Anywhere
+    r.need == Need::Anyone && r.reach == Reach::Anywhere
 }
 
 /// Every public route of `table` that can change something. Signing in is
@@ -123,22 +161,21 @@ pub fn public_changes(table: &[Route]) -> Vec<Violation> {
 }
 
 /// A router with every route of `table`, each guarded as it declares: only
-/// JSON for a request that changes something, then local-only, then who.
+/// JSON for a request that changes something, then its reach, then its need.
 pub fn build(table: Vec<Route>, state: &AppState) -> Router<AppState> {
     let mut router = Router::new();
     for r in table {
         // Layers run outermost first: the last added is checked first.
-        let who = r.who;
-        let mut handler = match who {
-            Who::Anyone => r.handler,
+        let need = r.need;
+        let mut handler = match need {
+            Need::Anyone => r.handler,
             _ => r.handler.route_layer(middleware::from_fn_with_state(
                 state.clone(),
-                move |s: State<AppState>, req: Request, next: Next| require(s, who, req, next),
+                move |s: State<AppState>, req: Request, next: Next| require(s, need, req, next),
             )),
         };
-        if r.reach == Reach::LocalOnly {
-            handler =
-                handler.route_layer(middleware::from_fn_with_state(state.clone(), local_only));
+        if r.reach == Reach::ThisMachine {
+            handler = handler.route_layer(middleware::from_fn(this_machine));
         }
         if matches!(r.method, Method::POST | Method::PUT | Method::PATCH) {
             handler = handler.route_layer(middleware::from_fn(json_only));
@@ -194,11 +231,19 @@ pub fn session_token(headers: &HeaderMap) -> Option<String> {
         .map(|(_, v)| v.to_owned())
 }
 
-/// Lets through who `who` names, with their account as an extension for the
-/// handler; 401 for no one signed in, 403 for a member on an admin route.
+/// The peer address of a request, as the socket gives it.
+pub fn peer(req: &Request) -> Option<IpAddr> {
+    req.extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|c| c.0.ip())
+}
+
+/// Lets through what `need` names, with the account, if any, as an
+/// extension for the handler; 401 when signing in would help, 403 when it
+/// would not.
 async fn require(
     State(state): State<AppState>,
-    who: Who,
+    need: Need,
     mut req: Request,
     next: Next,
 ) -> Response {
@@ -215,63 +260,95 @@ async fn require(
             }
         },
     };
-    let Some(user) = user else {
-        if who == Who::MemberOrLocal {
-            let peer = req
-                .extensions()
-                .get::<ConnectInfo<SocketAddr>>()
-                .map(|c| c.0.ip());
-            if is_local(&state.access, peer, req.headers()) {
-                return next.run(req).await;
-            }
+    let local = is_local(&state, peer(&req), req.headers());
+    let has = class(local, user.as_ref().map(|u| u.role));
+    let refused = match need {
+        Need::Anyone => None,
+        Need::Account => user
+            .is_none()
+            .then_some((StatusCode::UNAUTHORIZED, "sign in first")),
+        Need::Class(c) if has >= Some(c) => None,
+        Need::Class(Class::Admin) if user.is_some() => {
+            Some((StatusCode::FORBIDDEN, "only an admin can do this"))
         }
-        return refuse(StatusCode::UNAUTHORIZED, "sign in first");
+        Need::Class(Class::Printer) if user.is_some() => Some((
+            StatusCode::FORBIDDEN,
+            "this is done at the space: at the print station, or on the space's network",
+        )),
+        Need::Class(_) => Some((StatusCode::UNAUTHORIZED, "sign in first")),
     };
-    if who == Who::Admin && user.role != crate::api::Role::Admin {
-        return refuse(StatusCode::FORBIDDEN, "only an admin can do this");
+    if let Some((code, why)) = refused {
+        return refuse(code, why);
     }
-    req.extensions_mut().insert(user);
+    if let Some(user) = user {
+        req.extensions_mut().insert(user);
+    }
     next.run(req).await
 }
 
-async fn local_only(State(state): State<AppState>, req: Request, next: Next) -> Response {
-    let peer = req
-        .extensions()
-        .get::<ConnectInfo<SocketAddr>>()
-        .map(|c| c.0.ip());
-    if is_local(&state.access, peer, req.headers()) {
+/// From this machine, directly: a loopback peer and no forwarding header,
+/// since a proxy on this machine would otherwise pass anyone off as it.
+async fn this_machine(req: Request, next: Next) -> Response {
+    let direct = peer(&req).is_some_and(|p| canonical(p).is_loopback())
+        && forwarded_for(req.headers()).is_none();
+    if direct {
         next.run(req).await
     } else {
-        refuse(StatusCode::FORBIDDEN, "this can only be done at the space")
+        refuse(StatusCode::FORBIDDEN, "this is for POP's own machine")
     }
 }
 
-/// Whether a request from `peer`, with `headers`, is from inside the space.
-/// No peer address at all is remote: the check fails closed.
-pub fn is_local(access: &Access, peer: Option<IpAddr>, headers: &HeaderMap) -> bool {
-    let Some(peer) = peer.map(canonical) else {
+/// Whether a request from `peer`, with `headers`, is LOCAL: it began on one of
+/// the space's networks, and an enrolled kiosk has checked in from that same
+/// network lately. No peer at all is not local: the check fails closed.
+pub fn is_local(state: &AppState, peer: Option<IpAddr>, headers: &HeaderMap) -> bool {
+    let Some(client) = space_network_client(&state.access, peer, headers) else {
         return false;
     };
+    state
+        .access
+        .local_networks
+        .iter()
+        .filter(|n| n.contains(&client))
+        .any(|n| state.kiosks.seen_on(n))
+}
+
+/// Where a request began, when that is one of the space's networks: the
+/// client's address, the forwarding chain believed only from a trusted proxy.
+/// None is outside, or unknowable, and both are treated as outside. This alone
+/// is not "local": that needs a kiosk's word too ([`is_local`]).
+pub fn space_network_client(
+    access: &Access,
+    peer: Option<IpAddr>,
+    headers: &HeaderMap,
+) -> Option<IpAddr> {
+    client_address(access, peer, headers).filter(|c| within(&access.local_networks, *c))
+}
+
+/// Where a request began: the peer, or the forwarding chain's client when the
+/// peer is a trusted proxy. None when that cannot be known.
+pub fn client_address(
+    access: &Access,
+    peer: Option<IpAddr>,
+    headers: &HeaderMap,
+) -> Option<IpAddr> {
+    let peer = peer.map(canonical)?;
     let forwarded = forwarded_for(headers);
     let client = match forwarded {
         None => peer,
-        Some(_) if !within(&access.trusted_proxies, peer) => return false,
+        Some(_) if !within(&access.trusted_proxies, peer) => return None,
         Some(chain) => {
             // The client is the rightmost address no trusted proxy added: any
             // to its left came from the client, and can say anything.
-            match chain
+            // Every hop a trusted proxy, or an address that would not parse:
+            // nothing says where the request began.
+            chain
                 .into_iter()
                 .rev()
-                .find(|ip| !within(&access.trusted_proxies, *ip))
-            {
-                Some(ip) => ip,
-                // Every hop a trusted proxy, or an address that would not
-                // parse: nothing says where the request began.
-                None => return false,
-            }
+                .find(|ip| !within(&access.trusted_proxies, *ip))?
         }
     };
-    client.is_loopback() || within(&access.local_networks, client)
+    Some(canonical(client))
 }
 
 /// The addresses a forwarding header names, oldest first, or None if the
@@ -380,30 +457,41 @@ mod tests {
 
     const SHOP: &[&str] = &["192.168.1.0/24"];
 
+    /// Whether a request began on the space's network: the address half of
+    /// "local", which a kiosk's check-in completes (tests/access.rs).
+    fn on(a: &Access, peer: Option<IpAddr>, h: &HeaderMap) -> bool {
+        space_network_client(a, peer, h).is_some()
+    }
+
+    /// POP's own machine is not the space unless it is on a configured
+    /// network: a tunnel to it (SSH, a tunnel daemon) once counted as local
+    /// (threat model gap 2), and under #12 nothing does by its address alone.
     #[test]
-    fn this_machine_is_local() {
+    fn this_machine_is_not_the_space_by_itself() {
         let a = access(&[], &[]);
-        assert!(is_local(&a, ip("127.0.0.1"), &HeaderMap::new()));
-        assert!(is_local(&a, ip("::1"), &HeaderMap::new()));
+        assert!(!on(&a, ip("127.0.0.1"), &HeaderMap::new()));
+        assert!(!on(&a, ip("::1"), &HeaderMap::new()));
+        let a = access(&["127.0.0.0/8"], &[]);
+        assert!(on(&a, ip("127.0.0.1"), &HeaderMap::new()), "named, it is");
     }
 
     #[test]
     fn the_spaces_network_is_local_and_nowhere_else_is() {
         let a = access(SHOP, &[]);
-        assert!(is_local(&a, ip("192.168.1.40"), &HeaderMap::new()));
-        assert!(!is_local(&a, ip("192.168.2.40"), &HeaderMap::new()));
-        assert!(!is_local(&a, ip("203.0.113.9"), &HeaderMap::new()));
+        assert!(on(&a, ip("192.168.1.40"), &HeaderMap::new()));
+        assert!(!on(&a, ip("192.168.2.40"), &HeaderMap::new()));
+        assert!(!on(&a, ip("203.0.113.9"), &HeaderMap::new()));
     }
 
     #[test]
     fn an_ipv4_address_carried_in_ipv6_matches_its_network() {
         let a = access(SHOP, &[]);
-        assert!(is_local(&a, ip("::ffff:192.168.1.40"), &HeaderMap::new()));
+        assert!(on(&a, ip("::ffff:192.168.1.40"), &HeaderMap::new()));
     }
 
     #[test]
     fn no_peer_address_is_remote() {
-        assert!(!is_local(&access(SHOP, &[]), None, &HeaderMap::new()));
+        assert!(!on(&access(SHOP, &[]), None, &HeaderMap::new()));
     }
 
     #[test]
@@ -415,24 +503,24 @@ mod tests {
             headers(&[("x-forwarded-for", "192.168.1.40")]),
             headers(&[("forwarded", "for=192.168.1.40")]),
         ] {
-            assert!(!is_local(&a, ip("127.0.0.1"), &h), "{h:?}");
+            assert!(!on(&a, ip("127.0.0.1"), &h), "{h:?}");
         }
     }
 
     #[test]
     fn a_trusted_proxy_passes_on_where_the_request_began() {
         let a = access(SHOP, &["127.0.0.1/32"]);
-        assert!(is_local(
+        assert!(on(
             &a,
             ip("127.0.0.1"),
             &headers(&[("x-forwarded-for", "192.168.1.40")])
         ));
-        assert!(!is_local(
+        assert!(!on(
             &a,
             ip("127.0.0.1"),
             &headers(&[("x-forwarded-for", "203.0.113.9")])
         ));
-        assert!(is_local(
+        assert!(on(
             &a,
             ip("127.0.0.1"),
             &headers(&[(
@@ -448,7 +536,7 @@ mod tests {
         // appended the address it really came from.
         let a = access(SHOP, &["127.0.0.1/32"]);
         let h = headers(&[("x-forwarded-for", "192.168.1.40, 203.0.113.9")]);
-        assert!(!is_local(&a, ip("127.0.0.1"), &h));
+        assert!(!on(&a, ip("127.0.0.1"), &h));
     }
 
     #[test]
@@ -460,19 +548,19 @@ mod tests {
             ("forwarded", "for=203.0.113.9"),
             ("x-forwarded-for", "192.168.1.40"),
         ]);
-        assert!(!is_local(&a, ip("127.0.0.1"), &forged));
+        assert!(!on(&a, ip("127.0.0.1"), &forged));
         // Even when both name an address inside the space.
         let both_local = headers(&[
             ("forwarded", "for=192.168.1.40"),
             ("x-forwarded-for", "192.168.1.40"),
         ]);
-        assert!(!is_local(&a, ip("127.0.0.1"), &both_local));
+        assert!(!on(&a, ip("127.0.0.1"), &both_local));
         // Either one alone still passes the space on.
         for h in [
             headers(&[("forwarded", "for=192.168.1.40")]),
             headers(&[("x-forwarded-for", "192.168.1.40")]),
         ] {
-            assert!(is_local(&a, ip("127.0.0.1"), &h));
+            assert!(on(&a, ip("127.0.0.1"), &h));
         }
     }
 
@@ -480,7 +568,7 @@ mod tests {
     fn a_chain_of_trusted_proxies_is_walked_back_to_the_client() {
         let a = access(SHOP, &["127.0.0.1/32", "10.0.0.0/8"]);
         let h = headers(&[("x-forwarded-for", "203.0.113.9, 192.168.1.40, 10.1.2.3")]);
-        assert!(is_local(&a, ip("127.0.0.1"), &h));
+        assert!(on(&a, ip("127.0.0.1"), &h));
     }
 
     #[test]
@@ -494,14 +582,14 @@ mod tests {
             };
             let mut h = HeaderMap::new();
             h.append(name, v.parse().unwrap());
-            assert!(!is_local(&a, ip("127.0.0.1"), &h), "{name}: {v}");
+            assert!(!on(&a, ip("127.0.0.1"), &h), "{name}: {v}");
         }
     }
 
     #[test]
     fn a_chain_of_nothing_but_trusted_proxies_is_remote() {
         let a = access(SHOP, &["127.0.0.1/32", "10.0.0.0/8"]);
-        assert!(!is_local(
+        assert!(!on(
             &a,
             ip("127.0.0.1"),
             &headers(&[("x-forwarded-for", "10.0.0.1")])

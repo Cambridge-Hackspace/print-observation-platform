@@ -202,7 +202,8 @@ pub enum Names {
 
 /// Whose names this request may see.
 async fn names_for(state: &AppState, peer: Option<std::net::IpAddr>, headers: &HeaderMap) -> Names {
-    if crate::access::is_local(&state.access, peer, headers) {
+    // Visibility-class (#12): local, or signed in.
+    if crate::access::is_local(state, peer, headers) {
         return Names::All;
     }
     if let Some(token) = crate::access::session_token(headers)

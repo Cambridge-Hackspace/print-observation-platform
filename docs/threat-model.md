@@ -21,27 +21,61 @@ claim here that nothing enforces.
 POP does not defend against someone with a shell on its machine, or with
 its configuration or environment. Those hold the keys to everything below.
 
-## Local and remote
+## Classes, local and online
 
-"Watch from anywhere, control only at the space" is enforced by the server,
-not by the screens (#7).
+Who may do what, and from where, is enforced by the server, not by the
+screens (#7, #12). There are three classes of permission, each including the
+one before it (cal, 2026-11-18, on #12):
 
-**How a request is judged.**
-- A request is **local** if it comes from this machine (loopback) or from
-  `access.local_networks`. Anything else is **remote**.
-  `crates/pop-server/src/access.rs::tests::this_machine_is_local`,
-  `crates/pop-server/src/access.rs::tests::the_spaces_network_is_local_and_nowhere_else_is`.
-- With no peer address at all, a request is remote: the check fails
-  closed. `crates/pop-server/src/access.rs::tests::no_peer_address_is_remote`,
-  `crates/pop-server/tests/access.rs::a_local_only_route_refuses_a_request_with_no_peer_address`.
+- **visibility**: see everything going on, names included;
+- **printer**: control printers;
+- **admin**: configure the system.
+
+| | not signed in | member | admin |
+|---|---|---|---|
+| **local**: the kiosk, or a device on the space's network | visibility | printer | admin |
+| **online** | none | visibility | admin |
+
+`crates/pop-server/tests/access.rs::the_classes_are_cals_table`,
+`crates/pop-server/tests/access.rs::printer_control_is_for_members_at_the_space_and_admins`,
+`crates/pop-server/tests/access.rs::every_admin_route_refuses_a_member_at_the_space`.
+
+**What makes a request local.** Both of these, never one alone:
+- it began on one of `access.local_networks`;
+- an enrolled kiosk has checked in FROM THAT SAME NETWORK within two minutes.
+
+The kiosk confirms from its own side: POP believes the address a check-in
+came from, never anything in it, so a mistyped network, a POP moved
+elsewhere, or a tunnel to POP's machine grants nothing.
+`crates/pop-server/tests/access.rs::the_spaces_network_is_local_only_while_a_kiosk_vouches_for_it`,
+`crates/pop-server/tests/access.rs::a_kiosk_vouches_for_its_own_network_only`,
+`crates/pop-server/tests/access.rs::outside_this_machine_and_no_address_are_not_local`,
+`crates/pop-server/tests/kiosks.rs::a_kiosks_checkin_makes_its_own_network_local`,
+`crates/pop-server/tests/kiosks.rs::a_kiosk_cannot_say_where_it_is`.
+- POP's own machine is not the space by its address: a tunnel to it once
+  counted as local, and no longer does.
+  `crates/pop-server/src/access.rs::tests::this_machine_is_not_the_space_by_itself`.
+- With no peer address at all, a request is not local: the check fails
+  closed. `crates/pop-server/src/access.rs::tests::no_peer_address_is_remote`.
 - An IPv4 address carried in IPv6 is matched as IPv4.
   `crates/pop-server/src/access.rs::tests::an_ipv4_address_carried_in_ipv6_matches_its_network`.
 
+**Kiosks.** An admin enrols a kiosk once, from its own browser. Its credential
+is a random token in an `HttpOnly`, `SameSite=Strict` cookie sent only to the
+check-in, kept by POP only as its SHA-256; a session is not one, and a revoked
+kiosk vouches for nothing from that moment. A check-in is not an audit entry;
+enrolling and revoking are.
+`crates/pop-server/tests/kiosks.rs::an_admin_enrolls_a_kiosk_whose_credential_pop_keeps_only_as_a_hash`,
+`crates/pop-server/tests/kiosks.rs::a_checkin_without_a_kiosks_credential_counts_for_nothing`,
+`crates/pop-server/tests/kiosks.rs::a_revoked_kiosk_vouches_for_nothing_at_once`,
+`crates/pop-server/tests/kiosks.rs::a_checkin_is_not_an_audit_entry`.
+
 **Proxies.** Forwarding headers (`Forwarded`, `X-Forwarded-For`) are
 believed only from `access.trusted_proxies`.
-- From any other peer they make the request remote.
+- From any other peer they make the request remote, and a kiosk's check-in
+  through one has no address at all.
   `crates/pop-server/src/access.rs::tests::forwarding_headers_from_an_untrusted_peer_make_a_request_remote`,
-  `crates/pop-server/tests/access.rs::a_local_only_route_refuses_what_an_unnamed_proxy_passes_on`.
+  `crates/pop-server/tests/access.rs::forwarding_headers_count_only_from_a_trusted_proxy_and_only_one_kind`.
 - From a trusted proxy, the client is the rightmost address that no trusted
   proxy added. Addresses to its left were written by the client and are
   ignored.
@@ -53,41 +87,34 @@ believed only from `access.trusted_proxies`.
   `crates/pop-server/src/access.rs::tests::a_chain_of_nothing_but_trusted_proxies_is_remote`,
   `crates/pop-server/src/access.rs::tests::a_forwarding_header_that_cannot_be_read_is_remote`.
 - A request carrying both headers is remote, because a client could have
-  written either one. Before this was fixed, a client could pass as local
-  through a proxy that set `Forwarded` and passed on `X-Forwarded-For`.
-  `crates/pop-server/src/access.rs::tests::a_request_with_both_forwarding_headers_is_remote`,
-  `crates/pop-server/tests/access.rs::a_local_only_route_refuses_a_client_that_forges_one_forwarding_header_beside_another`.
+  written either one.
+  `crates/pop-server/src/access.rs::tests::a_request_with_both_forwarding_headers_is_remote`.
 
-**What only the space can do.**
-- No route that controls a printer is reachable from outside the space. The
-  check enumerates every route in the real table, and it is self-tested
-  with a deliberately mis-marked route.
-  `crates/pop-server/tests/access.rs::no_route_that_controls_a_printer_is_reachable_from_outside`,
-  `crates/pop-server/tests/access.rs::the_check_fails_a_printer_route_marked_reachable_from_anywhere`.
-- Every local-only route in the real table refuses a remote request.
-  `crates/pop-server/tests/access.rs::every_local_only_route_of_the_real_table_refuses_a_remote_request`.
-- Today those routes are:
-  - adding and declining a printer from BAM!
-    (`crates/pop-server/tests/tower.rs::which_printers_the_tower_runs_is_decided_only_at_the_space`);
-  - entering a Bambu access code
-    (`crates/pop-server/tests/printers.rs::a_code_is_entered_only_from_inside_the_space`);
-  - setting, clearing and testing the Discord webhook
-    (`crates/pop-server/tests/notify.rs::where_notices_go_is_set_only_at_the_space_and_only_by_an_admin`).
-- No route to start, pause, stop or resume a print exists yet. When one
-  does, the enumeration above covers it from its first commit.
+**The route table.** Every route declares what it needs, and the router is
+built from the table. No route that controls a printer needs less than
+printer-class, and no route that changes a setting less than admin-class; the
+check walks the real table and is self-tested with routes built to fail it.
+`crates/pop-server/tests/access.rs::no_route_needs_less_than_what_it_does`,
+`crates/pop-server/tests/access.rs::the_check_fails_a_printer_route_that_needs_too_little`.
+No route to start, pause, stop or resume a print exists yet; when one does,
+the check covers it from its first commit.
+
+The updater's route (`/api/updater/quiet`, #148) is for POP's own machine,
+directly: not through a proxy on it, and not from the space.
+`crates/pop-server/tests/access.rs::a_this_machine_route_is_for_this_machine_directly`.
 
 **What anyone can reach, from anywhere.** Health, status, the live stream
-(`/api/events`), signing in, and the published guides.
+(`/api/events`), signing in, a kiosk's check-in (which vouches for nothing
+without an enrolled kiosk's credential), and the published guides.
 
 The live stream carries printer names, job file names, error text and group
 notices, and every field it carries is pinned: a new one fails the test until
 someone has decided it may go out.
 `crates/pop-server/tests/public_stream.rs::the_public_stream_carries_only_reviewed_fields`.
-Whose print is whose goes out to the public only as `[public] owner_names`
-says: off (the default), nobody is named, in a printer's job or a notice; on,
-first names only. A screen signed in, or on the space's own network (the
-kiosk), sees names either way; a session cookie that is not a session counts
-for nothing.
+Whose print is whose is visibility-class: it goes to the public only as
+`[public] owner_names` says (off, the default: nobody is named; on, first
+names only), and in full to a screen signed in or local. A session cookie that
+is not a session counts for nothing.
 `crates/pop-server/tests/public_stream.rs::with_owner_names_off_the_public_sees_nobody_named`,
 `crates/pop-server/tests/public_stream.rs::with_owner_names_on_the_public_sees_first_names_only`,
 `crates/pop-server/tests/public_stream.rs::signed_in_or_at_the_space_names_are_seen_either_way`,
@@ -97,20 +124,22 @@ anything except signing in, and that check is self-tested too.
 `crates/pop-server/tests/access.rs::no_public_route_changes_anything_but_signing_in`,
 `crates/pop-server/tests/access.rs::the_check_fails_a_public_route_that_writes`.
 
-**Roles.** Every route refuses whoever its table entry does not name:
-- anonymous callers get 401 on member and admin routes;
-- members get 403 on admin routes.
-
+**Online, signed in.** Every route refuses whoever its need does not cover:
+nobody signed in gets 401 on any route that needs an account or a class, and
+a member online gets 403 on every printer and admin route.
 `crates/pop-server/tests/users.rs::every_route_refuses_whoever_it_does_not_name`,
 `crates/pop-server/tests/users.rs::every_admin_route_is_under_api_admin_and_nothing_else_is`.
 
-**An admin signed in from outside the space can:**
-- manage accounts: add them, reset passwords, change roles and deactivate;
-- write and publish guides;
-- read the audit log.
-
-They cannot control a printer, enter an access code, or change where
-notices go.
+**An admin online holds every class** (cal, #12): accounts, guides, the audit
+log, printers' settings and secrets, where notices go, kiosks, and printer
+control. Each admin sign-in from outside the space is recorded as such and
+told to the group chat.
+`crates/pop-server/tests/kiosks.rs::an_admin_signing_in_from_outside_is_told_to_the_group`,
+`crates/pop-server/tests/tower.rs::which_printers_the_tower_runs_is_decided_by_an_admin_from_anywhere`,
+`crates/pop-server/tests/printers.rs::an_admin_enters_a_code_from_anywhere`,
+`crates/pop-server/tests/notify.rs::where_notices_go_is_set_by_an_admin_from_anywhere_and_nobody_else`.
+A stolen admin password therefore reaches everything from anywhere; a second
+factor for admins online is #175 (gap 18).
 
 ## Signing in
 
@@ -253,9 +282,9 @@ on BAM! without naming its address.
   `crates/pop-integrations/tests/go2rtc.rs::whether_go2rtc_asks_for_its_password_is_seen`.
 - A wrong go2rtc password is said as such on `/healthz`, and nothing goes in.
   `crates/pop-server/tests/cameras.rs::a_wrong_go2rtc_password_is_said_and_cameras_read_unknown`.
-- Watching is for members, and for anyone at the space without signing in
-  (the kiosk, until kiosk sessions: #58); from outside, only members. Only a
-  tower printer's camera: no go2rtc stream can be named.
+- Watching is visibility-class (#12): anyone local, signed in or not, and any
+  member online; nobody else. Only a tower printer's camera: no go2rtc
+  stream can be named.
   `crates/pop-server/tests/cameras.rs::only_members_watch_and_only_a_tower_printers_camera`,
   `crates/pop-server/tests/cameras.rs::the_space_watches_without_signing_in_and_outside_does_not`.
 - Watching is read-only: nothing a viewer sends reaches go2rtc but a codec
@@ -401,17 +430,18 @@ docs/integrations/github-feedback.md), so what a report carries is public.
 Each of these is true of POP today, or untested, and none is claimed above.
 
 **Reach.**
-1. **Kiosk sessions do not exist yet (#12).** "Local" means only the
-   network. Anyone on the space's network, not just the kiosk, can use
-   local-only routes once signed in as an admin. Tracked in #131.
-2. **Anything that reaches POP from its own machine is local.** That
-   includes an SSH tunnel or a tunnel daemon that adds no forwarding header.
-   For remote watching, use a proxy that sets one forwarding header, and
-   name it in `trusted_proxies`. Tracked in #132.
-3. **Three local-only routes have no test that fails if they are re-marked
-   as reachable from anywhere:** reading the notification settings, clearing
-   the webhook, and testing it. The enumeration test covers only routes that
-   control printers. Tracked in #133.
+1. **Superseded (#12).** This gap asked that the kiosk alone, and not any
+   other device on the space's network, could use the space's routes (#131).
+   cal decided otherwise on #12: a device on the space's network holds the
+   same classes as the kiosk, and a network counts only while an enrolled
+   kiosk vouches for it. See "Classes, local and online".
+2. **Closed (#12).** POP's own machine was local by its address, tunnels
+   included (#132); now nothing is local without a kiosk's check-in from its
+   network. `crates/pop-server/src/access.rs::tests::this_machine_is_not_the_space_by_itself`.
+3. **Closed (#12).** The settings routes had no test that failed if they
+   were opened up (#133); now every route that changes a setting must need
+   admin-class, which the table check enforces and its self-test proves.
+   `crates/pop-server/tests/access.rs::the_check_fails_a_printer_route_that_needs_too_little`.
 4. **Closed (#134).** The live stream's fields are pinned, and owners'
    names on it follow `[public] owner_names`; see "What anyone can reach".
 
@@ -459,3 +489,16 @@ Each of these is true of POP today, or untested, and none is claimed above.
     POP does not set the file's permissions; docs/deployment.md installs
     it `0600`, owned by the go2rtc user, and go2rtc's unit runs with
     `UMask=0077`.
+
+**Admins and kiosks (#12).**
+18. **An admin online needs only a password.** An admin signed in from
+    outside the space holds every class, so a stolen admin password reaches
+    everything from anywhere. Each such sign-in is told to the group chat, so
+    it is seen, but nothing refuses it. A second factor is #175.
+19. **A kiosk's credential vouches wherever it is used.** It is a cookie, and
+    on a space network served over plain HTTP it crosses the network in the
+    clear. Copied to another device, it makes that device's network the
+    space's: harmless on the kiosk's own network, which is already local, but
+    it would make another configured network local too. Serve POP over HTTPS
+    at the space (docs/remote-access.md), configure only the networks that
+    are the space, and revoke a kiosk you suspect on the desk.

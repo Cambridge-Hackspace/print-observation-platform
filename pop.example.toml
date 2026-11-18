@@ -29,10 +29,11 @@ level = "info"
 format = "text"
 
 [access]
-# The space's own networks, in CIDR notation. Requests from these, or from a
-# kiosk session, may control printers; requests from anywhere else can watch,
-# report a problem and upload, but never touch a printer. Empty means only
-# this machine is local.
+# The space's own networks, in CIDR notation. A request from one of these is
+# LOCAL while an enrolled kiosk has checked in from that same network in the
+# last two minutes (#12): signed out it sees everything, a member controls
+# printers. Online, a member only watches and a stranger sees nothing. Admins
+# hold every class from anywhere. Empty: nothing is local.
 #
 # local_networks = ["192.168.1.0/24"]
 local_networks = []
