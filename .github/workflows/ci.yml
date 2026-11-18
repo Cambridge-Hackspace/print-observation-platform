@@ -25,6 +25,8 @@ jobs:
   # architectures, and the systemd units installed and started.
   package:
     strategy:
+      # Each architecture says for itself: one failing does not cancel the other.
+      fail-fast: false
       matrix:
         runner: [ubuntu-24.04, ubuntu-24.04-arm]
     runs-on: ${{ matrix.runner }}
