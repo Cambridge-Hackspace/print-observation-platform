@@ -587,18 +587,32 @@ pub async fn start_session(
     user: &User,
     outside: bool,
 ) -> Result<String, UserError> {
+    start_session_with(db, user, outside, None).await
+}
+
+/// The same, as a kiosk session when `idle_secs` is given: it ends after
+/// that long unused, whatever its expiry (#12).
+pub async fn start_session_with(
+    db: &SqlitePool,
+    user: &User,
+    outside: bool,
+    idle_secs: Option<u32>,
+) -> Result<String, UserError> {
     let mut b = [0u8; 32];
     rand::rngs::OsRng.fill_bytes(&mut b);
     let token = URL_SAFE_NO_PAD.encode(b);
     let t = now();
     let mut tx = db.begin().await?;
     sqlx::query(
-        "INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
+        "INSERT INTO sessions (token_hash, user_id, created_at, expires_at, idle_secs, last_used_at)
+         VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(token_hash(&token))
     .bind(user.id)
     .bind(t)
     .bind(t + SESSION_SECS)
+    .bind(idle_secs.map(i64::from))
+    .bind(t)
     .execute(&mut *tx)
     .await?;
     audit::record(
@@ -608,10 +622,10 @@ pub async fn start_session(
             kind: AuditKind::SignedIn,
             printer: None,
             subject: Some((user.id, &user.name)),
-            summary: if outside {
-                format!("{} signed in from outside the space", user.name)
-            } else {
-                format!("{} signed in", user.name)
+            summary: match (idle_secs.is_some(), outside) {
+                (true, _) => format!("{} signed in at the kiosk", user.name),
+                (false, true) => format!("{} signed in from outside the space", user.name),
+                (false, false) => format!("{} signed in", user.name),
             },
         },
     )
@@ -642,16 +656,41 @@ pub async fn sign_in_failed(db: &SqlitePool, username: &str) -> Result<(), UserE
 
 /// The account a session token belongs to, if the session is live.
 pub async fn session_user(db: &SqlitePool, token: &str) -> Result<Option<User>, UserError> {
-    Ok(sqlx::query_as::<_, Row>(
+    let t = now();
+    let user: Option<User> = sqlx::query_as::<_, Row>(
         "SELECT u.id, u.username, u.name, u.role
            FROM sessions s JOIN users u ON u.id = s.user_id
-          WHERE s.token_hash = ? AND s.expires_at > ? AND u.active = 1",
+          WHERE s.token_hash = ? AND s.expires_at > ? AND u.active = 1
+            AND (s.idle_secs IS NULL OR s.last_used_at + s.idle_secs > ?)",
     )
     .bind(token_hash(token))
-    .bind(now())
+    .bind(t)
+    .bind(t)
     .fetch_optional(db)
     .await?
-    .map(Into::into))
+    .map(Into::into);
+    if user.is_some() {
+        // Used now: a kiosk session's idle time starts again (#12). An
+        // ordinary one is not written to on every request.
+        sqlx::query(
+            "UPDATE sessions SET last_used_at = ? WHERE token_hash = ? AND idle_secs IS NOT NULL",
+        )
+        .bind(t)
+        .bind(token_hash(token))
+        .execute(db)
+        .await?;
+    }
+    Ok(user)
+}
+
+/// A live session's idle limit, if it is a kiosk session (#12).
+pub async fn session_idle_secs(db: &SqlitePool, token: &str) -> Result<Option<u32>, UserError> {
+    let v: Option<Option<i64>> =
+        sqlx::query_scalar("SELECT idle_secs FROM sessions WHERE token_hash = ?")
+            .bind(token_hash(token))
+            .fetch_optional(db)
+            .await?;
+    Ok(v.flatten().and_then(|s| u32::try_from(s).ok()))
 }
 
 /// End the session `token`, signing out `user`.

@@ -93,6 +93,11 @@ license = ""
 # Whether search engines may index the public guides at /guides.
 indexable = false
 
+[kiosk]
+# How long a session started at the kiosk lasts with the screen left alone, in
+# seconds (#12): the countdown it shows. 15 to 3600.
+idle_secs = 90
+
 [public]
 # What the live stream (/api/events) carries to anyone who is neither signed
 # in nor on the space's network: the public, watching from outside. Whether

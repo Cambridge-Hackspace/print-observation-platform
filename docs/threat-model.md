@@ -153,6 +153,12 @@ factor for admins online is #175 (gap 18).
 - **Sessions end:**
   - when they expire
     (`crates/pop-server/tests/users.rs::an_expired_session_signs_nobody_in`);
+  - at a kiosk, when the screen is left alone for `[kiosk] idle_secs`: every
+    sign-in from an enrolled kiosk's browser is a kiosk session, ended by POP
+    itself, and use keeps it going
+    (`crates/pop-server/tests/kiosks.rs::a_sign_in_at_a_kiosk_ends_when_the_screen_is_left_alone`,
+    `crates/pop-server/tests/kiosks.rs::using_a_kiosk_session_keeps_it_going`,
+    `crates/pop-server/tests/kiosks.rs::a_kiosk_session_lasts_as_configured`);
   - on sign-out
     (`crates/pop-server/tests/users.rs::signing_out_ends_the_session`);
   - when the account's password is reset
@@ -449,8 +455,9 @@ Each of these is true of POP today, or untested, and none is claimed above.
 5. **There is no rate limit or lockout on signing in.** Every failed try
    costs an Argon2 hash and adds an audit row. Tracked in #135.
 6. **The session cookie is not `Secure` (#93), and lasts 30 days.** Expired
-   sessions are never deleted. A sign-in at the kiosk's browser lasts until
-   someone signs out; there is no idle sign-out. Tracked in #136.
+   sessions are never deleted. (A sign-in at an enrolled kiosk now ends left
+   alone, #12; one on a kiosk that is not enrolled is an ordinary session.)
+   Tracked in #136.
 7. **The Argon2 parameters are the library's defaults**, and untested.
    **Equal timing** for unknown, deactivated and wrong-password sign-ins is
    intended, and untested. Tracked in #137.

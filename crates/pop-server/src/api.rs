@@ -495,6 +495,15 @@ pub struct UpdaterEvent {
     pub summary: String,
 }
 
+/// `GET /api/session` (#12).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct SessionInfo {
+    pub user: User,
+    /// At a kiosk: how long the session lasts with the screen left alone, in
+    /// seconds. None elsewhere.
+    pub idle_secs: Option<u32>,
+}
+
 /// `POST /api/admin/kiosks` (#12): make this browser a kiosk.
 #[derive(Debug, Clone, Deserialize, TS)]
 pub struct NewKiosk {
