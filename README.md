@@ -37,6 +37,15 @@ default, and `pop config check` validates a file without starting the server.
 Any key can be overridden from the environment as `POP_<SECTION>_<KEY>`:
 `POP_SERVER_LISTEN` overrides `server.listen`.
 
+## Deploying
+
+[docs/deployment.md](docs/deployment.md) takes POP from nothing to running
+at the space, step by step: the binary or the container image from a
+release, the configuration and its secrets, the systemd units
+(`packaging/systemd`), BAM!, cameras through go2rtc, the group chat,
+feedback, watching from outside ([docs/remote-access.md](docs/remote-access.md)),
+backups and upgrading.
+
 ## Accounts
 
 Create the first admin from the command line; they create everyone else.
