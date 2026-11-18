@@ -27,6 +27,32 @@ something on the network is pretending to be it), POP refuses to connect
 and the printer shows the reason. An admin has to confirm it is the same
 printer before POP trusts the new certificate.
 
+## The camera
+
+Bambu printers have two kinds of camera stream, by model (OpenBambuAPI's
+`video.md`):
+
+| Models | Stream | How POP shows it |
+| ------ | ------ | ---------------- |
+| X1 series, P2S | RTSPS on port 322, `rtsps://<printer>:322/streaming/live/1` | through go2rtc (docs/integrations/go2rtc.md) |
+| H2S, H2D | the same, once **LAN Only Liveview** is turned on at the printer; it is off by default | through go2rtc |
+| A1 and P1 series | JPEG pictures over TLS on port 6000 | decoded by POP |
+
+Both sign in as `bblp` with the printer's LAN access code, which POP keeps
+sealed (#21).
+
+The port-6000 stream is a 16-byte header giving each picture's size, then
+the JPEG. POP reads it with a decoder held to never panic, never take a
+picture over 4 MB, and never keep a picture that is not a whole JPEG,
+whatever the printer or the network sends: it is fuzzed with random,
+truncated and corrupted streams on every test run
+(`crates/pop-printers/tests/bambu_camera.rs`; the run prints its seed, and
+`POP_FUZZ_SEED` replays it). The camera's certificate is pinned like the
+printer's, under its own key, since the sources do not say whether the two
+ports present the same certificate.
+
+How a printer's camera reaches the screens is #33's second part.
+
 ## What it has been tested against
 
 The protocol is not documented by Bambu. The driver follows the community's
