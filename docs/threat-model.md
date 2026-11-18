@@ -283,6 +283,19 @@ Each route has its own test that it is recorded, for example:
 - `crates/pop-server/tests/tower.rs::adding_and_declining_are_recorded`
 - `crates/pop-server/tests/guides.rs::writing_editing_publishing_and_renaming_are_recorded`
 
+## Flagging a problem
+
+A member watching can flag that something looks wrong (#63), and POP tells
+the group chat (docs/integrations/discord.md). It never touches the printer:
+the printer is asked nothing new.
+`crates/pop-server/tests/report.rs::a_report_never_touches_the_printer`.
+Only members signed in can flag, a limited number of times an hour, and a
+printer is not posted about again for ten minutes; what they write is posted
+as plain text that can ping nobody.
+`crates/pop-server/tests/report.rs::only_members_flag_and_only_a_printer_on_the_tower`,
+`crates/pop-server/tests/report.rs::a_printer_flagged_a_moment_ago_is_not_posted_about_again`,
+`crates/pop-server/tests/report.rs::what_a_member_writes_is_posted_as_plain_text`.
+
 ## Feedback
 
 Feedback is filed as issues on a public repository (#96,

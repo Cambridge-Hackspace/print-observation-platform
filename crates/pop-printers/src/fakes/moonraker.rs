@@ -40,6 +40,8 @@ struct Shared {
     objects: Mutex<Map<String, Value>>,
     faults: Mutex<Faults>,
     connections: Mutex<u32>,
+    /// Every method a client asked for, in order.
+    asked: Mutex<Vec<String>>,
     pushes: broadcast::Sender<Push>,
 }
 
@@ -77,6 +79,7 @@ impl FakeMoonraker {
             ),
             faults: Mutex::new(Faults::default()),
             connections: Mutex::new(0),
+            asked: Mutex::new(Vec::new()),
             pushes: broadcast::channel(256).0,
         });
         let s = shared.clone();
@@ -95,6 +98,12 @@ impl FakeMoonraker {
     }
 
     /// How many connections it has accepted.
+    /// Every method clients have asked for, in order: a test can say no
+    /// command was ever sent.
+    pub fn asked(&self) -> Vec<String> {
+        self.shared.asked.lock().unwrap().clone()
+    }
+
     pub fn connections(&self) -> u32 {
         *self.shared.connections.lock().unwrap()
     }
@@ -185,6 +194,9 @@ async fn serve(stream: tokio::net::TcpStream, s: Arc<Shared>) {
             m = ws.next() => {
                 let Some(Ok(Message::Text(t))) = m else { return };
                 let Ok(req) = serde_json::from_str::<Value>(&t) else { continue };
+                if let Some(method) = req.get("method").and_then(Value::as_str) {
+                    s.asked.lock().unwrap().push(method.to_owned());
+                }
                 if req.get("method").and_then(Value::as_str) != Some("printer.objects.subscribe") {
                     continue;
                 }

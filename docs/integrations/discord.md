@@ -35,6 +35,15 @@ chat saw it, with the time Discord took it, while the printer still needs a
 hand. A notice Discord never took (no webhook, or POP gave up) is not shown;
 the screen says POP hasn't posted it instead.
 
+When a member watching flags that something looks wrong (#63): "Kim,
+watching, thinks something looks wrong with Voron 2.4: “smoke from the
+hotend”. Could someone at the space check it?" What they wrote is posted as
+plain text, its markdown escaped, so it cannot make a link or a heading. Only
+members signed in can flag, at most 5 times an hour each, and a printer
+flagged in the last 10 minutes is not posted about again: whoever flags it
+then is told the group already knows. With no webhook saved, POP says so
+rather than taking the report. Flagging never touches the printer.
+
 ## When Discord does not answer
 
 Notices go out one at a time, in order. A failure is tried again after a wait

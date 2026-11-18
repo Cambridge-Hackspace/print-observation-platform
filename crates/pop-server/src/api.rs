@@ -131,6 +131,22 @@ pub struct User {
     pub role: Role,
 }
 
+/// `POST /api/printers/{bam_id}/report`: something looks wrong (#63).
+#[derive(Debug, Clone, Deserialize, TS)]
+pub struct NewReport {
+    /// What looks wrong, in a few words; may be empty.
+    #[serde(default)]
+    pub note: String,
+}
+
+/// What became of a report.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct ReportTaken {
+    /// The group chat is told now; false when someone flagged the same
+    /// printer a few minutes ago, and it was told then.
+    pub told: bool,
+}
+
 /// What a piece of feedback is (#96).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
@@ -300,6 +316,9 @@ pub enum AuditKind {
     TrainingChanged,
     /// Feedback was filed on GitHub as an issue (#96); the summary has its URL.
     FeedbackFiled,
+    /// Someone watching flagged that something looks wrong with a printer
+    /// (#63), and the group chat was told.
+    ProblemReported,
     /// A kind this build does not know, written by a newer POP. Shown, never
     /// hidden.
     Other,
