@@ -94,11 +94,30 @@ fn read_by_code() -> String {
     src.push(r.join("web/playwright.config.ts"));
     // Not this file: it names variables only to test the check.
     let me = r.join("crates/pop-server/tests/docs.rs");
-    src.iter()
+    let mut text = src
+        .iter()
         .filter(|p| p.canonicalize().ok() != me.canonicalize().ok())
         .filter_map(|p| fs::read_to_string(p).ok())
         .collect::<Vec<_>>()
-        .join("\n")
+        .join("\n");
+    // A variable a service unit defines for what it starts is read there:
+    // the `Environment=` lines of packaging's units, and nothing else in
+    // them, so a unit cannot vouch for a name it only mentions.
+    let mut units = Vec::new();
+    files(
+        &r.join("packaging"),
+        &|p| p.extension().is_some_and(|e| e == "service"),
+        &mut units,
+    );
+    for u in units {
+        for line in fs::read_to_string(u).unwrap_or_default().lines() {
+            if let Some(def) = line.strip_prefix("Environment=") {
+                text.push('\n');
+                text.push_str(def);
+            }
+        }
+    }
+    text
 }
 
 /// The variables in `docs` that `code` never reads.
@@ -190,6 +209,12 @@ fn the_checks_fail_a_document_that_names_what_is_gone() {
     let code = read_by_code();
     let doc = "Set POP_BAM_TOKEN and POP_NO_SUCH_SETTING, not MY_POP_THING.";
     assert_eq!(unread(&variables(doc), &code), ["POP_NO_SUCH_SETTING"]);
+    // A unit mentioning a name it does not define does not vouch for it.
+    assert!(!code.contains("POP_NOT_DEFINED_BY_A_UNIT"));
+    assert!(
+        code.contains("POP_KIOSK_URL=http"),
+        "the kiosk unit's definition is read"
+    );
     let r = root();
     let gone: Vec<String> = paths(
         "see `docs/deployment.md` and docs/not-a-guide.md, and packaging/systemd/pop.service.",

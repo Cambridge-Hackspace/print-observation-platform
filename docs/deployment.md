@@ -213,5 +213,5 @@ in the restored database.
 
 ## The kiosk
 
-The tower's own screen opens `/kiosk` full screen. Setting up the box to do
-that on its own, on boot, is #10.
+The tower's own screen opens `/kiosk` full screen, from boot: docs/kiosk.md
+sets the box up to do it (`packaging/kiosk/setup.sh`).

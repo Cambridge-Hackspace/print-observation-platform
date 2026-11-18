@@ -6,6 +6,7 @@
 #
 #   tools/package-test.sh image        build the image, run it, ask /healthz
 #   tools/package-test.sh systemd      install the units on this machine (root)
+#   tools/package-test.sh kiosk        the kiosk's packages and unit, in Debian
 #
 # Run by ci.yml's package job, on runners of both architectures; the systemd
 # half needs a machine it may install services on, which CI's runners are.
@@ -106,11 +107,37 @@ systemd() {
   echo "package-test: go2rtc.service runs, asks for its password, and can keep POP's streams"
 }
 
+# The kiosk's packages and unit (#10), in the Debian the box runs: what the
+# unit starts is there, by the path it names, and systemd accepts the unit.
+# What needs the tower's own screen and touch panel is not tested here
+# (docs/kiosk.md, "What is not tested").
+kiosk() {
+  debian="docker.io/library/debian@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3"
+  # The script runs in the container, so its $ are the container's.
+  # shellcheck disable=SC2016
+  "$CONTAINER" run --rm -v "$ROOT:/src:ro" "$debian" sh -c '
+    set -eu
+    apt-get update -qq
+    apt-get install -y -qq --no-install-recommends cage chromium systemd >/dev/null
+    for b in $(sed -n "s/^ExecStart=\([^ ]*\) .* -- \([^ ]*\) .*/\1 \2/p" /src/packaging/kiosk/pop-kiosk@.service); do
+      [ -x "$b" ] || { echo "package-test: the unit starts $b, which the packages do not install" >&2; exit 1; }
+    done
+    cage -v
+    chromium --version
+    useradd --create-home --shell /usr/sbin/nologin kiosk
+    install -m 0644 /src/packaging/kiosk/pop-kiosk@.service /etc/systemd/system/pop-kiosk@.service
+    install -m 0644 /src/packaging/kiosk/pam-pop-kiosk /etc/pam.d/pop-kiosk
+    systemd-analyze verify /etc/systemd/system/pop-kiosk@tty1.service
+  '
+  echo "package-test: the kiosk's packages install, and its unit is one systemd accepts"
+}
+
 case "${1:-}" in
   image) image ;;
   systemd) systemd ;;
+  kiosk) kiosk ;;
   *)
-    echo "usage: $0 image|systemd" >&2
+    echo "usage: $0 image|systemd|kiosk" >&2
     exit 2
     ;;
 esac

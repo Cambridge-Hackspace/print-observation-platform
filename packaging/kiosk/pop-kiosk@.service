@@ -1,0 +1,50 @@
+# The tower's screen (#10): Chromium, full screen, under cage, a Wayland
+# compositor that runs one application and nothing else, started on boot on
+# a virtual terminal and logged in as the kiosk user.
+#
+# From cage's own boot unit (cage wiki, "Starting Cage on boot with systemd",
+# cage 0.3.1), with POP's kiosk page as the application. Installed by
+# packaging/kiosk/setup.sh; enabled as pop-kiosk@tty1.service.
+#
+# What it does for the tower:
+# - Starts on boot, and comes back if Chromium crashes or quits: cage exits
+#   when its application does, and Restart=always starts both again.
+# - Never blanks the screen: cage only reports idleness to other programs and
+#   blanks nothing itself, and the setup installs nothing that would.
+# - Hides the cursor: cage shows none while the seat has no pointer, that is,
+#   while no mouse is plugged in (cage's seat.c).
+# - Touch works with no keyboard: cage passes touches to Chromium as taps.
+
+[Unit]
+Description=POP's kiosk screen on %I
+After=systemd-user-sessions.service plymouth-quit-wait.service network-online.target pop.service
+Wants=network-online.target
+Before=graphical.target
+ConditionPathExists=/dev/tty0
+Wants=dbus.socket systemd-logind.service
+After=dbus.socket systemd-logind.service
+Conflicts=getty@%i.service
+After=getty@%i.service
+
+[Service]
+Type=simple
+# POP's kiosk page; /etc/pop/kiosk.env may name another POP.
+Environment=POP_KIOSK_URL=http://127.0.0.1:8080/kiosk
+EnvironmentFile=-/etc/pop/kiosk.env
+ExecStart=/usr/bin/cage -d -- /usr/bin/chromium --kiosk --ozone-platform=wayland --no-first-run --noerrdialogs --disable-infobars --disable-pinch --overscroll-history-navigation=0 --check-for-update-interval=31536000 ${POP_KIOSK_URL}
+ExecStartPost=+sh -c "tty_name='%i'; exec chvt $${tty_name#tty}"
+Restart=always
+RestartSec=2
+User=kiosk
+UtmpIdentifier=%I
+UtmpMode=user
+TTYPath=/dev/%I
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty-fail
+PAMName=pop-kiosk
+
+[Install]
+WantedBy=graphical.target
+DefaultInstance=tty1
