@@ -87,6 +87,22 @@ describe('the tower', () => {
     ]);
   });
 
+  it('offers a printer’s camera, full screen, only for one that has a camera', async () => {
+    const oncamera = vi.fn();
+    const printers = [
+      printer('Voron 2.4', state({ status: 'printing', progress: 0.4 }), { camera: true }),
+      printer('Mk4', state({ status: 'idle' })),
+      printer('Ender 3', state({ status: 'needs_hand', progress: 0.3 }), { camera: true }),
+    ];
+    const r = render(TowerView, { screen: screen(printers), connection: 'live', now: NOW, oncamera });
+    expect(r.queryByRole('button', { name: "Watch Mk4's camera" })).toBeNull();
+    await fireEvent.click(r.getByRole('button', { name: "Watch Voron 2.4's camera" }));
+    expect(oncamera).toHaveBeenCalledWith('id-Voron 2.4');
+    // On a card that needs a hand too: the camera, not the card, is what opens.
+    await fireEvent.click(r.getByRole('button', { name: "Watch Ender 3's camera" }));
+    expect(oncamera).toHaveBeenLastCalledWith('id-Ender 3');
+  });
+
   it('gives each printing printer a QR code that follows that print on a phone', () => {
     const printers = [
       printer('Voron 2.4', state({ status: 'printing', progress: 0.4, seconds_left: 600, job: { name: 'gear.gcode', owner: null } })),

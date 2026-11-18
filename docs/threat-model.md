@@ -207,9 +207,11 @@ on BAM! without naming its address.
   `crates/pop-integrations/tests/go2rtc.rs::whether_go2rtc_asks_for_its_password_is_seen`.
 - A wrong go2rtc password is said as such on `/healthz`, and nothing goes in.
   `crates/pop-server/tests/cameras.rs::a_wrong_go2rtc_password_is_said_and_cameras_read_unknown`.
-- Watching is for members, and only a tower printer's camera: no go2rtc
-  stream can be named.
-  `crates/pop-server/tests/cameras.rs::only_members_watch_and_only_a_tower_printers_camera`.
+- Watching is for members, and for anyone at the space without signing in
+  (the kiosk, until kiosk sessions: #58); from outside, only members. Only a
+  tower printer's camera: no go2rtc stream can be named.
+  `crates/pop-server/tests/cameras.rs::only_members_watch_and_only_a_tower_printers_camera`,
+  `crates/pop-server/tests/cameras.rs::the_space_watches_without_signing_in_and_outside_does_not`.
 - Watching is read-only: nothing a viewer sends reaches go2rtc but a codec
   list POP has checked, and go2rtc's own words about a camera never reach the
   viewer.

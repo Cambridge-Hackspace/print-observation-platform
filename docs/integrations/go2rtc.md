@@ -66,7 +66,8 @@ never reach go2rtc directly; they watch through POP (#67).
 ## Watching
 
 Members watch a tower printer's camera through POP, signed in, from inside
-the space or out (#67). Two ways, because cameras send two kinds of video:
+the space or out (#67). At the space, anyone may watch without signing in,
+as the kiosk does (#58); from outside, signing in is still needed. Two ways, because cameras send two kinds of video:
 
 - **MSE**, for cameras that send H.264 or H.265 (most RTSP cameras):
   a WebSocket at `/api/printers/<BAM! id>/camera/mse`. The browser sends

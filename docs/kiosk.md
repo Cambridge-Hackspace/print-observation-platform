@@ -39,6 +39,11 @@ address the screen opens.
 - **Touch, no keyboard:** taps are clicks. Chromium is in kiosk mode, so
   there is no address bar, no pinch-zoom and no swipe-back to leave the page.
 
+A printer with a camera has a camera button on its card: it opens the camera
+full screen, through POP, and the tower comes back after five minutes or a
+tap on Back (#58). The space's own network may watch without signing in, so
+the kiosk needs no session for it.
+
 Signing in at the kiosk needs a keyboard until kiosk sessions start by a card
 tap (#12): plug one in to sign in as an admin there.
 
