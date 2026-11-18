@@ -177,19 +177,39 @@ Copy them off the box. To restore onto a fresh data directory:
 
 ## 12. Upgrading
 
-Until upgrading has its own command (#147), by hand:
+Replace the binary and restart; POP does the rest (#147):
 
 ```sh
-sudo -u pop env POP_STORAGE_DATA_DIR=/var/lib/pop pop --config /etc/pop/pop.toml backup /var/backups/pop/before-upgrade.tar.gz
 sudo systemctl stop pop
 sudo install -m 0755 pop-<new>-linux-$(uname -m) /usr/local/bin/pop    # checked against SHA256SUMS
 sudo systemctl start pop
+journalctl -u pop -n 20        # "upgrading the database from schema N to M; backed up first to ..."
 curl -s http://127.0.0.1:8080/healthz
 ```
 
-POP brings its database up to date as it starts. To go back, put the old
-binary back and restore the backup taken first: a database a newer POP has
-changed may not open in an older one.
+When the new POP knows database changes the old one did not, it backs the
+database up before making them, into `/var/lib/pop/backups/`
+(`before-schema-<new>-from-<old>-<time>.tar.gz`), keeps the newest three,
+and says where in its log. Then it brings the database up to date. An
+upgrade with no database changes takes no backup.
+
+To go back to the old POP:
+
+```sh
+sudo systemctl stop pop
+sudo install -m 0755 pop-<old>-linux-$(uname -m) /usr/local/bin/pop
+sudo mv /var/lib/pop /var/lib/pop.upgraded                  # kept, not deleted
+sudo install -d -o pop -g pop -m 0700 /var/lib/pop
+sudo -u pop env POP_STORAGE_DATA_DIR=/var/lib/pop pop --config /etc/pop/pop.toml \
+  restore /var/lib/pop.upgraded/backups/before-schema-<new>-from-<old>-<time>.tar.gz
+sudo systemctl start pop
+```
+
+The old POP refuses a database the new one has changed, rather than opening
+a schema it does not know: it says "this database was last used by a newer
+POP", and points here. Restoring the backup taken before the upgrade is the
+way back. Anything done after the upgrade is in `/var/lib/pop.upgraded`, not
+in the restored database.
 
 ## The kiosk
 

@@ -33,7 +33,7 @@ use crate::db;
 /// The archive layout this build writes and reads.
 pub const FORMAT: u32 = 1;
 const MANIFEST: &str = "MANIFEST.json";
-const DATABASE: &str = "pop.db";
+pub const DATABASE: &str = "pop.db";
 /// Stored print files, under the data directory.
 pub const FILES_DIR: &str = "files";
 
