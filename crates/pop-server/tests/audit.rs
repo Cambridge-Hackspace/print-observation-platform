@@ -27,6 +27,11 @@ use tower::ServiceExt;
 const WRITE_ROUTES: &[(&str, &str, &str)] = &[
     (
         "POST",
+        "/api/feedback",
+        "tests/feedback.rs: a_report_becomes_an_issue_that_shows_its_screenshot",
+    ),
+    (
+        "POST",
         "/api/session",
         "signing_in_is_recorded, a_failed_sign_in_is_recorded_without_the_password",
     ),

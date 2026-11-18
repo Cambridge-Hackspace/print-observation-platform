@@ -128,6 +128,72 @@ pub struct User {
     pub role: Role,
 }
 
+/// What a piece of feedback is (#96).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum FeedbackKind {
+    Bug,
+    Suggestion,
+    Question,
+}
+
+/// Where feedback was filed from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum Device {
+    Kiosk,
+    Phone,
+    Desk,
+}
+
+/// `POST /api/feedback`: a report, its annotated screenshot, and what the
+/// screen knew. Everything in it goes into a public issue.
+#[derive(Debug, Clone, Deserialize, TS)]
+pub struct NewFeedback {
+    pub kind: FeedbackKind,
+    pub title: String,
+    pub description: String,
+    pub device: Device,
+    /// The screenshot, redacted and annotated, as a PNG in base64.
+    pub screenshot: String,
+    /// What the screen knew: its route, viewport, recent console errors and
+    /// failed requests. Scrubbed again on the server.
+    #[ts(type = "Record<string, unknown>")]
+    pub context: serde_json::Value,
+}
+
+/// Where a report stands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum FeedbackState {
+    /// Kept, and being sent; tried again while GitHub cannot be reached.
+    Pending,
+    /// Filed: the issue exists.
+    Sent,
+    /// GitHub refused it, and trying again will not help.
+    Failed,
+}
+
+/// `GET /api/feedback/{id}`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct FeedbackStatus {
+    pub id: String,
+    pub state: FeedbackState,
+    /// The issue, once filed.
+    pub issue_url: Option<String>,
+}
+
+/// `GET /api/feedback`: whether this person can file feedback.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct FeedbackSettings {
+    /// Feedback is configured.
+    pub enabled: bool,
+    /// And this person may file it.
+    pub allowed: bool,
+    /// How many reports a person may file in an hour.
+    pub per_hour: u32,
+}
+
 /// `POST /api/session`.
 #[derive(Debug, Clone, Deserialize, TS)]
 pub struct SignIn {
@@ -229,6 +295,8 @@ pub enum AuditKind {
     AccountReactivated,
     /// An admin changed the training an account holds.
     TrainingChanged,
+    /// Feedback was filed on GitHub as an issue (#96); the summary has its URL.
+    FeedbackFiled,
     /// A kind this build does not know, written by a newer POP. Shown, never
     /// hidden.
     Other,

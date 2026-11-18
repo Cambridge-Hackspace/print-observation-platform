@@ -1567,6 +1567,7 @@ version = "0.1.0"
 name = "pop-integrations"
 version = "0.1.0"
 dependencies = [
+ "aws-lc-rs",
  "axum",
  "base64 0.22.1",
  "futures-util",

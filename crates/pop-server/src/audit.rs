@@ -68,6 +68,7 @@ pub fn kind_str(k: AuditKind) -> &'static str {
         AuditKind::AccountDeactivated => "account_deactivated",
         AuditKind::AccountReactivated => "account_reactivated",
         AuditKind::TrainingChanged => "training_changed",
+        AuditKind::FeedbackFiled => "feedback_filed",
         AuditKind::Other => "other",
     }
 }
@@ -96,6 +97,7 @@ fn kind_from(s: &str) -> AuditKind {
         AuditKind::AccountDeactivated,
         AuditKind::AccountReactivated,
         AuditKind::TrainingChanged,
+        AuditKind::FeedbackFiled,
     ]
     .into_iter()
     .find(|k| kind_str(*k) == s)

@@ -3,4 +3,4 @@
 /**
  * What an audit entry records.
  */
-export type AuditKind = "signed_in" | "sign_in_failed" | "signed_out" | "user_created" | "password_reset" | "role_changed" | "access_code_set" | "printer_added" | "printer_declined" | "printer_retired" | "webhook_set" | "webhook_cleared" | "webhook_tested" | "guide_created" | "guide_edited" | "error_guide_linked" | "name_changed" | "account_deactivated" | "account_reactivated" | "training_changed" | "other";
+export type AuditKind = "signed_in" | "sign_in_failed" | "signed_out" | "user_created" | "password_reset" | "role_changed" | "access_code_set" | "printer_added" | "printer_declined" | "printer_retired" | "webhook_set" | "webhook_cleared" | "webhook_tested" | "guide_created" | "guide_edited" | "error_guide_linked" | "name_changed" | "account_deactivated" | "account_reactivated" | "training_changed" | "feedback_filed" | "other";

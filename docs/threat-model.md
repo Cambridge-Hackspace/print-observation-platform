@@ -283,6 +283,26 @@ Each route has its own test that it is recorded, for example:
 - `crates/pop-server/tests/tower.rs::adding_and_declining_are_recorded`
 - `crates/pop-server/tests/guides.rs::writing_editing_publishing_and_renaming_are_recorded`
 
+## Feedback
+
+Feedback is filed as issues on a public repository (#96,
+docs/integrations/github-feedback.md), so what a report carries is public.
+
+- Only roles named in `[feedback] roles` (admins, by default) may file it.
+  `crates/pop-server/tests/feedback.rs::only_those_holding_feedback_file_can_file_and_see_the_button`.
+- The context is scrubbed on the server of tokens, cookies, `Authorization`
+  values and query strings, each kind caught on its own; the printers'
+  states in it name nobody.
+  `crates/pop-server/tests/feedback.rs::no_token_cookie_or_authorization_reaches_the_issue`,
+  `crates/pop-server/tests/feedback.rs::each_kind_of_token_is_caught_by_itself`.
+- The screenshot is a PNG with its metadata taken out.
+  `crates/pop-server/tests/feedback.rs::metadata_goes_and_the_picture_stays`.
+- The GitHub App's private key stays on the server; the browser never sees
+  it. A report names who filed it, by name, as the issue says it will.
+
+What the server cannot do is redact the screenshot: that happens on the
+screen, before the picture is taken (#96's second half).
+
 ## Gaps
 
 Each of these is true of POP today, or untested, and none is claimed above.

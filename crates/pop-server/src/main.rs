@@ -279,6 +279,37 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
     if config.bam.url.is_empty() && !config.go2rtc.url.is_empty() {
         tracing::warn!("go2rtc is set, but the cameras come from BAM!: set [bam] to show any");
     }
+    // Feedback from any screen, filed as GitHub issues (#96).
+    if !config.feedback.app_id.is_empty() {
+        let f = &config.feedback;
+        let key = std::fs::read_to_string(&f.private_key_file).map_err(|e| {
+            format!(
+                "feedback.private_key_file: cannot read {}: {e}",
+                f.private_key_file
+            )
+        })?;
+        let (owner, repo) = f.repo.split_once('/').unwrap_or_default();
+        let github = pop_integrations::github::GitHub::new(pop_integrations::github::AppConfig {
+            api: f.api.clone(),
+            app_id: f.app_id.clone(),
+            installation_id: f.installation_id.clone(),
+            private_key: key,
+            owner: owner.to_owned(),
+            repo: repo.to_owned(),
+        })
+        .map_err(|e| format!("feedback: {e}"))?;
+        let feedback = Arc::new(pop_server::feedback::Feedback {
+            config: f.clone(),
+            github,
+            wake: Arc::new(tokio::sync::Notify::new()),
+        });
+        let _sender = pop_server::feedback::spawn(
+            state.db.clone(),
+            feedback.clone(),
+            pop_server::feedback::Options::default(),
+        );
+        state = state.with_feedback(feedback);
+    }
     // Group notices (#68), to the Discord webhook as saved at each one.
     let (notifier, _delivery) = pop_server::notify::spawn(
         state.db.clone(),
