@@ -53,6 +53,8 @@ pub struct Runner {
 struct Running {
     config: PrinterConfig,
     access_code: Option<String>,
+    /// The login POP keeps for its camera, if any (#150).
+    camera_login: Option<crate::secrets::CameraLogin>,
     watched: bool,
 }
 
@@ -148,7 +150,32 @@ async fn reconcile(r: &Runner, fleet: &mut Fleet, running: &mut BTreeMap<String,
                     }
                     _ => None,
                 };
-                wanted.insert(a.asset.id.clone(), (config, access_code));
+                // A camera at an address may have a login POP keeps; without
+                // it the camera is still tried, and says it refused.
+                let camera_login = match &config.camera {
+                    Some(pop_integrations::printers::Camera::Address { url }) => {
+                        let login = r
+                            .secrets
+                            .camera_login(&r.db, &a.asset.id)
+                            .await
+                            .unwrap_or_else(|e| {
+                                tracing::error!("{}: its camera's login: {e}", config.name);
+                                None
+                            });
+                        if login
+                            .as_ref()
+                            .is_some_and(|l| l.origin != crate::cameras::origin(url))
+                        {
+                            tracing::warn!(
+                                "{}: its camera's address changed in BAM!, so POP does not give it the login entered for the old one: enter it again on the desk",
+                                config.name
+                            );
+                        }
+                        login
+                    }
+                    _ => None,
+                };
+                wanted.insert(a.asset.id.clone(), (config, access_code, camera_login));
             }
             Err(problems) => tracing::warn!(
                 "{} is added to the tower but cannot run until it is right in BAM!: {}",
@@ -168,11 +195,12 @@ async fn reconcile(r: &Runner, fleet: &mut Fleet, running: &mut BTreeMap<String,
         }
         keep
     });
-    for (id, (config, access_code)) in wanted {
+    for (id, (config, access_code, camera_login)) in wanted {
         let f = factory(&config.connection, access_code.as_deref(), &r.pins);
         let next = Running {
             config,
             access_code,
+            camera_login,
             watched: f.is_some(),
         };
         if running.get(&id) == Some(&next) {
@@ -194,15 +222,16 @@ fn cameras(tx: &watch::Sender<crate::cameras::Wanted>, running: &BTreeMap<String
     let wanted: crate::cameras::Wanted = running
         .iter()
         .filter_map(|(id, r)| {
-            crate::cameras::source_of(&r.config, r.access_code.as_deref()).map(|source| {
-                (
-                    id.clone(),
-                    crate::cameras::Camera {
-                        name: r.config.name.clone(),
-                        source,
-                    },
-                )
-            })
+            crate::cameras::source_of(&r.config, r.access_code.as_deref(), r.camera_login.as_ref())
+                .map(|source| {
+                    (
+                        id.clone(),
+                        crate::cameras::Camera {
+                            name: r.config.name.clone(),
+                            source,
+                        },
+                    )
+                })
         })
         .collect();
     tx.send_if_modified(|w| {
@@ -230,7 +259,12 @@ fn publish(
             materials: r.config.materials.clone(),
             training: r.config.training.clone(),
             camera: cameras
-                && crate::cameras::source_of(&r.config, r.access_code.as_deref()).is_some(),
+                && crate::cameras::source_of(
+                    &r.config,
+                    r.access_code.as_deref(),
+                    r.camera_login.as_ref(),
+                )
+                .is_some(),
         })
         .collect();
     printers.sort_by_key(|a| a.name.to_lowercase());

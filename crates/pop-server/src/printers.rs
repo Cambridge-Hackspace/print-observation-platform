@@ -12,15 +12,18 @@ use axum::{
 };
 use pop_integrations::{
     bam::{Bam, BamError},
-    printers::{Connection, FieldMap, printer_from},
+    printers::{Camera, Connection, FieldMap, printer_from},
 };
 
 use crate::{
     AppState,
-    api::{AccessCode, AdminPrinter, ApiError, AuditKind, PrinterProblem, TowerState, User},
+    api::{
+        AccessCode, AdminPrinter, ApiError, AuditKind, CameraLoginBody, PrinterProblem, TowerState,
+        User,
+    },
     audit::{self, Actor, Event},
     health::{CheckFuture, HealthCheck},
-    secrets::{SecretError, Secrets},
+    secrets::{CameraLogin, SecretError, Secrets},
 };
 
 /// BAM!, as POP is configured to read it.
@@ -62,6 +65,25 @@ pub async fn list(State(state): State<AppState>) -> Response {
         Err(e) => return error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
     };
     let has_code = |id: &str| held.iter().any(|h| h == id);
+    let logins = match Secrets::with_camera_logins(&state.db).await {
+        Ok(h) => h,
+        Err(e) => return error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
+    };
+    // A login counts only for the address it was entered for.
+    let mut fitting = Vec::new();
+    for a in &assets {
+        if !logins.contains(&a.asset.id) {
+            continue;
+        }
+        if let Ok(Some(Camera::Address { url })) =
+            printer_from(a, &bam.fields, &has_code).map(|p| p.camera)
+            && let Ok(Some(l)) = state.secrets.camera_login(&state.db, &a.asset.id).await
+            && l.origin == crate::cameras::origin(&url)
+        {
+            fitting.push(a.asset.id.clone());
+        }
+    }
+    let has_login = |id: &str| fitting.iter().any(|h| h == id);
     let decided = match crate::tower::states(&state.db).await {
         Ok(d) => d,
         Err(e) => return error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
@@ -90,7 +112,10 @@ pub async fn list(State(state): State<AppState>) -> Response {
                 tower: tower(&a.asset.id),
                 categories: a.categories.iter().map(|c| c.name.clone()).collect(),
                 training: p.training,
+                camera_login_fits: matches!(p.camera, Some(Camera::Address { .. })),
                 camera: p.camera.is_some(),
+                access_code: has_code(&a.asset.id),
+                camera_login: has_login(&a.asset.id),
             },
             Err(problems) => AdminPrinter {
                 bam_id: a.asset.id.clone(),
@@ -102,12 +127,17 @@ pub async fn list(State(state): State<AppState>) -> Response {
                     .map(|p| PrinterProblem {
                         field: p.field,
                         problem: p.problem,
+                        in_pop: p.in_pop,
                     })
                     .collect(),
                 tower: tower(&a.asset.id),
                 categories: a.categories.iter().map(|c| c.name.clone()).collect(),
                 training: field(a, &bam.fields.training),
                 camera: field(a, &bam.fields.camera).is_some(),
+                access_code: has_code(&a.asset.id),
+                // Not until BAM! has the printer right.
+                camera_login_fits: false,
+                camera_login: has_login(&a.asset.id),
             },
         })
         .collect();
@@ -160,6 +190,8 @@ pub async fn set_access_code(
         };
         return error(status, e.to_string());
     }
+    // The tower runs it with the code now, not at BAM!'s next change.
+    state.decided.notify_one();
     let mut conn = match state.db.acquire().await {
         Ok(c) => c,
         Err(e) => return error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
@@ -180,6 +212,157 @@ pub async fn set_access_code(
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(e) => error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
     }
+}
+
+/// The printer's name, for the record; its id when BAM! cannot say. None
+/// when BAM! says it has no such printer.
+async fn name_of(state: &AppState, bam_id: &str) -> Option<String> {
+    match state.bam.as_ref() {
+        Some(b) => match b.client.asset(bam_id).await {
+            Ok(a) => Some(a.asset.name),
+            Err(BamError::NotFound) => None,
+            Err(_) => Some(bam_id.to_owned()),
+        },
+        None => Some(bam_id.to_owned()),
+    }
+}
+
+/// Record `kind` about `bam_id`, said by `summary`; 204, or why not.
+async fn recorded(
+    state: &AppState,
+    admin: &User,
+    kind: AuditKind,
+    bam_id: &str,
+    summary: String,
+) -> Response {
+    let mut conn = match state.db.acquire().await {
+        Ok(c) => c,
+        Err(e) => return error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
+    };
+    let done = audit::record(
+        &mut conn,
+        &Actor::user(admin.id, &admin.name),
+        Event {
+            kind,
+            printer: Some(bam_id),
+            subject: None,
+            summary,
+        },
+    )
+    .await;
+    match done {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(e) => error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
+    }
+}
+
+/// `PUT /api/admin/printers/{bam_id}/camera-login` (#150): the login for a
+/// printer's camera, kept sealed in POP so BAM! holds only its address.
+pub async fn set_camera_login(
+    State(state): State<AppState>,
+    Extension(admin): Extension<User>,
+    Path(bam_id): Path<String>,
+    body: Result<Json<CameraLoginBody>, JsonRejection>,
+) -> Response {
+    let Json(body) = match body {
+        Ok(b) => b,
+        Err(e) => return error(StatusCode::BAD_REQUEST, e.body_text()),
+    };
+    let username = body.username.trim();
+    if username.chars().count() > 64 || username.chars().any(char::is_control) {
+        return error(
+            StatusCode::BAD_REQUEST,
+            "username: the camera's user, up to 64 characters; empty if it asks for a password only",
+        );
+    }
+    if body.password.is_empty()
+        || body.password.chars().count() > 128
+        || body.password.chars().any(char::is_control)
+    {
+        return error(
+            StatusCode::BAD_REQUEST,
+            "password: the camera's password, 1 to 128 characters",
+        );
+    }
+    // The camera's address, from BAM!: the login is bound to it.
+    let Some(bam) = state.bam.as_ref() else {
+        return error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "POP has no BAM! to read the camera's address from",
+        );
+    };
+    let asset = match bam.client.asset(&bam_id).await {
+        Ok(a) => a,
+        Err(BamError::NotFound) => {
+            return error(
+                StatusCode::NOT_FOUND,
+                "BAM! has no such printer, or POP's token may not see it",
+            );
+        }
+        Err(e) => return error(StatusCode::BAD_GATEWAY, e.to_string()),
+    };
+    let held = Secrets::with_access_codes(&state.db)
+        .await
+        .unwrap_or_default();
+    let has_code = |id: &str| held.iter().any(|h| h == id);
+    let url = match printer_from(&asset, &bam.fields, &has_code).map(|p| p.camera) {
+        Ok(Some(Camera::Address { url })) => url,
+        _ => {
+            return error(
+                StatusCode::CONFLICT,
+                "BAM! gives this printer no camera address a login goes with: set its camera field to the camera's address, without the password",
+            );
+        }
+    };
+    let name = asset.asset.name;
+    let login = CameraLogin {
+        username: username.to_owned(),
+        password: body.password,
+        origin: crate::cameras::origin(&url),
+    };
+    if let Err(e) = state
+        .secrets
+        .set_camera_login(&state.db, &bam_id, &login)
+        .await
+    {
+        let status = if e == SecretError::NoKey {
+            StatusCode::CONFLICT
+        } else {
+            StatusCode::SERVICE_UNAVAILABLE
+        };
+        return error(status, e.to_string());
+    }
+    // go2rtc is given the login now, not at BAM!'s next change.
+    state.decided.notify_one();
+    // Never the password.
+    let summary = format!("{} entered the login for {name}'s camera", admin.name);
+    recorded(&state, &admin, AuditKind::CameraLoginSet, &bam_id, summary).await
+}
+
+/// `DELETE /api/admin/printers/{bam_id}/camera-login` (#150).
+pub async fn clear_camera_login(
+    State(state): State<AppState>,
+    Extension(admin): Extension<User>,
+    Path(bam_id): Path<String>,
+) -> Response {
+    match Secrets::clear_camera_login(&state.db, &bam_id).await {
+        Ok(true) => {}
+        Ok(false) => return error(StatusCode::NOT_FOUND, "POP holds no login for that camera"),
+        Err(e) => return error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
+    }
+    state.decided.notify_one();
+    let name = name_of(&state, &bam_id)
+        .await
+        .unwrap_or_else(|| bam_id.clone());
+    let summary = format!("{} removed the login for {name}'s camera", admin.name);
+    recorded(
+        &state,
+        &admin,
+        AuditKind::CameraLoginCleared,
+        &bam_id,
+        summary,
+    )
+    .await
 }
 
 /// BAM! answers, takes POP's token, and has the printer category.
@@ -270,6 +453,7 @@ async fn current(
             .map(|p| PrinterProblem {
                 field: p.field,
                 problem: p.problem,
+                in_pop: p.in_pop,
             })
             .collect(),
     };

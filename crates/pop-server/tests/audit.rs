@@ -118,6 +118,16 @@ const WRITE_ROUTES: &[(&str, &str, &str)] = &[
     ),
     (
         "PUT",
+        "/api/admin/printers/{bam_id}/camera-login",
+        "tests/printers.rs: a_camera_login_is_entered_kept_sealed_recorded_and_removed",
+    ),
+    (
+        "DELETE",
+        "/api/admin/printers/{bam_id}/camera-login",
+        "tests/printers.rs: a_camera_login_is_entered_kept_sealed_recorded_and_removed",
+    ),
+    (
+        "PUT",
         "/api/admin/error-guides/{key}",
         "tests/error_guides.rs: linking_and_unlinking_are_recorded",
     ),

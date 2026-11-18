@@ -151,7 +151,9 @@ notices go.
 | Bambu access codes | Database, `printer_secrets` | Sealed with the secrets key |
 | Discord webhook URL | Database, `sealed_settings` | Sealed with the secrets key |
 | go2rtc API password | `POP_GO2RTC_PASSWORD` (or `[go2rtc] password`) | Never in the database or a backup |
-| Camera addresses, which may hold a password | BAM!'s `camera` field, and go2rtc's configuration file | Plain text in both; never shown or logged by POP (gap 17) |
+| Camera logins (#150) | Database, `printer_secrets` | Sealed with the secrets key; given only to go2rtc, in the address of the camera they were entered for |
+| Camera addresses, without their password | BAM!'s `camera` field | Plain text; a password there is refused |
+| Camera addresses, with their login | go2rtc's configuration file | Plain text, readable by the go2rtc user only (gap 17) |
 | Passwords | Database | Argon2id hash only |
 | Session tokens | Database | SHA-256 hash only |
 
@@ -167,6 +169,28 @@ notices go.
   `crates/pop-server/tests/printers.rs::without_a_secrets_key_pop_refuses_to_keep_the_code`.
 - No API returns a code, and its audit entry does not hold it.
   `crates/pop-server/tests/printers.rs::entering_an_access_code_is_recorded_without_the_code`.
+
+**Camera logins (#150).**
+- Entered on the desk, from inside the space, and sealed like an access
+  code, bound to their printer and to being a camera login: one sealed as
+  a camera login does not open as an access code.
+  `crates/pop-server/tests/printers.rs::a_camera_login_is_entered_kept_sealed_recorded_and_removed`.
+- Bound to the camera address they were entered for (its scheme, host and
+  port). Anyone who can change the address in BAM! cannot send the
+  password to another machine, or to the camera without TLS: the login
+  goes only to the address it was entered for, and the desk asks for it
+  again.
+  `crates/pop-server/tests/cameras.rs::a_login_goes_only_to_the_scheme_host_and_port_it_was_entered_for`.
+- Given to go2rtc and nowhere else: not BAM!, not the desk, the audit log,
+  the camera list or `/healthz`.
+  `crates/pop-server/tests/cameras.rs::a_camera_login_entered_on_the_desk_reaches_go2rtc_and_nowhere_else`.
+- A password in BAM!'s camera field is a problem with that field, said
+  without repeating the password, and the printer does not run until it
+  is taken out.
+  `crates/pop-server/tests/printers.rs::a_password_in_bams_camera_address_is_a_problem_that_never_repeats_it`.
+- Refused without a secrets key, from outside the space, for a printer
+  with no camera address, and when it cannot be a login.
+  `crates/pop-server/tests/printers.rs::a_camera_login_is_refused_when_it_cannot_be_kept_rightly`.
 
 **The Discord webhook.**
 - Sealed the same way, and shown again only masked.
@@ -405,8 +429,11 @@ Each of these is true of POP today, or untested, and none is claimed above.
 **Cameras.**
 16. **Closed (#149).** POP checks that go2rtc asks for its password: see
     "Cameras and go2rtc".
-17. **Camera addresses are plain text in BAM! and in go2rtc's
-    configuration file**, and a camera's address can hold its password. A
-    Bambu X1's access code is among them: go2rtc's address for the relay
-    carries it, though the code itself never goes in BAM!.
-    POP does not set that file's permissions. Tracked in #150.
+17. **Camera logins are plain text in go2rtc's configuration file.**
+    go2rtc needs them to play the cameras, and keeps every stream POP gives
+    it in that file, with its login; a Bambu X1's access code is among them,
+    in go2rtc's address for POP's relay. The BAM! half is closed (#150):
+    logins are entered and sealed in POP, and BAM! holds addresses only.
+    POP does not set the file's permissions; docs/deployment.md installs
+    it `0600`, owned by the go2rtc user, and go2rtc's unit runs with
+    `UMask=0077`.

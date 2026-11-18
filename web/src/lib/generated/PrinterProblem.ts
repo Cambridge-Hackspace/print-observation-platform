@@ -4,4 +4,8 @@ export type PrinterProblem = {
 /**
  * The BAM! field, as BAM! labels it, with its key.
  */
-field: string, problem: string, };
+field: string, problem: string, 
+/**
+ * Fixed in POP, not BAM!: a secret POP keeps, entered on the desk.
+ */
+in_pop: boolean, };

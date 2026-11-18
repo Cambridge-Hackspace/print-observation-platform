@@ -26,7 +26,7 @@ never reach go2rtc directly; they watch through POP (#67).
    with "go2rtc answers without its password".
 3. Let go2rtc write its configuration file, and nobody else read it (mode
    `0600`, owned by go2rtc's user). go2rtc writes the streams POP adds into
-   that file, and a camera's address can hold the camera's password.
+   that file, with each camera's login in its address.
 4. Tell POP where go2rtc is:
 
    ```toml
@@ -38,9 +38,16 @@ never reach go2rtc directly; they watch through POP (#67).
    and give the password as `POP_GO2RTC_PASSWORD`. POP refuses a user name
    without a password, or a password without a user name, and warns at start
    when it has neither.
-5. In BAM!, give each printer's `camera` field the camera's address: `rtsp`,
-   `rtsps`, `http` or `https` (docs/integrations/bam.md). POP refuses any
-   other kind, and go2rtc refuses a source that runs a program.
+5. In BAM!, give each printer's `camera` field the camera's address, without
+   its user and password: `rtsp`, `rtsps`, `http` or `https`
+   (docs/integrations/bam.md). POP refuses any other kind, and an address
+   with a password in it; go2rtc refuses a source that runs a program.
+6. If the camera asks for a login, enter it on POP's admin desk, from inside
+   the space: the printer's **Kept in POP** column, **Enter** beside
+   "Camera login" (#150). POP keeps it sealed, and gives it only to go2rtc,
+   in the address of the camera it was entered for. If the camera's address
+   changes host, port or scheme in BAM!, POP stops giving it the login and
+   the desk asks for it again.
 
 ## What POP does
 

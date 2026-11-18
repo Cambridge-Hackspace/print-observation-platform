@@ -118,7 +118,8 @@ In BAM!, give POP a token whose role has only `assets.read` and
 `events.read`, and set each printer's fields (docs/integrations/bam.md). On
 the admin desk, from inside the space, each printer in the category is
 offered under **New in BAM!**: add the ones the tower runs. A Bambu printer
-also needs its LAN access code, entered on the desk (docs/printers/bambu.md).
+also needs its LAN access code, entered on the desk: **Enter its access code**
+on its banner, or **Enter** in its **Kept in POP** column (docs/printers/bambu.md).
 
 Check it: the tower (`/kiosk`) shows each added printer, live.
 
@@ -138,8 +139,10 @@ sudo systemctl enable --now go2rtc
 sudo systemctl restart pop
 ```
 
-Give each printer's `camera` field in BAM! its camera's address, or
-`built-in` for a Bambu printer's own. Check it: the admin desk's camera list
+Give each printer's `camera` field in BAM! its camera's address, without
+its password, or `built-in` for a Bambu printer's own. A camera that asks
+for a login gets it on the admin desk: **Kept in POP**, then **Enter** beside
+"Camera login". Check it: the admin desk's camera list
 (`/api/admin/cameras`) says `live` for each, and `/healthz`'s `go2rtc` check
 passes. It fails, by name, if go2rtc does not ask for its password (#149).
 

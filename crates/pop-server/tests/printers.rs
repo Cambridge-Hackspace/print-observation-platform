@@ -446,3 +446,229 @@ async fn healthz_says_when_bams_live_connection_is_down() {
         "{h}"
     );
 }
+
+// ---- a camera's login (#150) --------------------------------------------------------
+
+impl Pop {
+    async fn enter_login(&self, bam_id: &str, body: Value, from: &str) -> (StatusCode, Value) {
+        let (c, b, _) = self
+            .send(
+                Method::PUT,
+                &format!("/api/admin/printers/{bam_id}/camera-login"),
+                Some(&self.admin),
+                Some(body),
+                from,
+            )
+            .await;
+        (c, b)
+    }
+}
+
+const CAMERA: &str = "rtsp://10.0.0.40:554/stream1";
+
+/// A password in BAM!'s camera address is a problem with that field, and the
+/// problem never repeats it: BAM! holds the address, POP the login.
+#[tokio::test]
+async fn a_password_in_bams_camera_address_is_a_problem_that_never_repeats_it() {
+    let pop = pop().await;
+    let voron = pop.fake.id("voron").to_owned();
+    for with_password in [
+        "rtsp://admin:hunter2@10.0.0.40:554/stream1",
+        "http://:hunter2@10.0.0.40/mjpeg",
+    ] {
+        pop.fake.edit_without_event(&voron, "camera", with_password);
+        let all = pop.printers().await;
+        let v = named(&all, "Voron 2.4");
+        assert_eq!(v["ready"], false, "{with_password}");
+        assert_eq!(v["problems"][0]["in_pop"], false, "fixed in BAM!");
+        assert!(
+            v["problems"][0]["problem"]
+                .as_str()
+                .unwrap()
+                .contains("password"),
+            "{v}"
+        );
+        assert!(
+            !all.iter().any(|p| p.to_string().contains("hunter2")),
+            "{all:?}"
+        );
+    }
+    // A user without a password is an address like any other.
+    pop.fake
+        .edit_without_event(&voron, "camera", "rtsp://admin@10.0.0.40:554/stream1");
+    let all = pop.printers().await;
+    assert_eq!(named(&all, "Voron 2.4")["ready"], true);
+}
+
+/// Which problems are fixed in POP: only the access code POP keeps.
+#[tokio::test]
+async fn a_problem_says_whether_it_is_fixed_in_pop_or_in_bam() {
+    let pop = pop().await;
+    let all = pop.printers().await;
+    let x1 = named(&all, "X1 Carbon");
+    assert_eq!(x1["problems"][0]["field"], "LAN access code");
+    assert_eq!(x1["problems"][0]["in_pop"], true);
+    assert_eq!(x1["access_code"], false);
+    let ender = named(&all, "Ender 3");
+    assert_eq!(ender["problems"][0]["in_pop"], false);
+    pop.enter_code(pop.fake.id("x1"), "12345678", LOCAL).await;
+    assert_eq!(
+        named(&pop.printers().await, "X1 Carbon")["access_code"],
+        true
+    );
+}
+
+#[tokio::test]
+async fn a_camera_login_is_entered_kept_sealed_recorded_and_removed() {
+    let pop = pop().await;
+    let voron = pop.fake.id("voron").to_owned();
+    pop.fake.edit_without_event(&voron, "camera", CAMERA);
+    let v = named(&pop.printers().await, "Voron 2.4").clone();
+    assert_eq!(v["camera_login_fits"], true);
+    assert_eq!(v["camera_login"], false);
+    // A Bambu printer's own camera signs in with its access code instead.
+    let x1 = named(&pop.printers().await, "X1 Carbon").clone();
+    assert_eq!(x1["camera_login_fits"], false, "{x1}");
+
+    let (code, body) = pop
+        .enter_login(
+            &voron,
+            json!({"username": "viewer", "password": "hunter2"}),
+            LOCAL,
+        )
+        .await;
+    assert_eq!(code, StatusCode::NO_CONTENT, "{body}");
+    assert_eq!(
+        named(&pop.printers().await, "Voron 2.4")["camera_login"],
+        true
+    );
+    let opened = Secrets::new(KEY)
+        .camera_login(&pop.db, &voron)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(opened.username, "viewer");
+    assert_eq!(opened.password, "hunter2");
+    assert_eq!(opened.origin, "rtsp://10.0.0.40:554");
+    assert!(
+        !format!("{opened:?}").contains("hunter2"),
+        "Debug shows the password"
+    );
+    let sealed: Vec<u8> = sqlx::query_scalar("SELECT sealed FROM printer_secrets")
+        .fetch_one(&pop.db)
+        .await
+        .unwrap();
+    assert!(!String::from_utf8_lossy(&sealed).contains("hunter2"));
+    // Moved to be an access code, it does not open as one.
+    sqlx::query("UPDATE printer_secrets SET kind = 'access_code'")
+        .execute(&pop.db)
+        .await
+        .unwrap();
+    assert_eq!(
+        Secrets::new(KEY).access_code(&pop.db, &voron).await,
+        Err(SecretError::WillNotOpen)
+    );
+    sqlx::query("UPDATE printer_secrets SET kind = 'camera_login'")
+        .execute(&pop.db)
+        .await
+        .unwrap();
+
+    let uri = format!("/api/admin/printers/{voron}/camera-login");
+    let (code, _, _) = pop
+        .send(Method::DELETE, &uri, Some(&pop.admin), None, LOCAL)
+        .await;
+    assert_eq!(code, StatusCode::NO_CONTENT);
+    assert_eq!(
+        named(&pop.printers().await, "Voron 2.4")["camera_login"],
+        false
+    );
+    let (code, _, _) = pop
+        .send(Method::DELETE, &uri, Some(&pop.admin), None, LOCAL)
+        .await;
+    assert_eq!(code, StatusCode::NOT_FOUND, "nothing left to remove");
+
+    let (_, log, _) = pop
+        .send(
+            Method::GET,
+            "/api/admin/audit",
+            Some(&pop.admin),
+            None,
+            LOCAL,
+        )
+        .await;
+    let said: Vec<_> = log
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["kind"].as_str().unwrap().starts_with("camera_login"))
+        .map(|e| (e["kind"].as_str().unwrap(), e["summary"].as_str().unwrap()))
+        .collect();
+    assert!(
+        said.contains(&(
+            "camera_login_set",
+            "Ada entered the login for Voron 2.4's camera"
+        )),
+        "{said:?}"
+    );
+    assert!(
+        said.contains(&(
+            "camera_login_cleared",
+            "Ada removed the login for Voron 2.4's camera"
+        )),
+        "{said:?}"
+    );
+    assert!(
+        !log.to_string().contains("hunter2"),
+        "the password reached the audit log"
+    );
+}
+
+#[tokio::test]
+async fn a_camera_login_is_refused_when_it_cannot_be_kept_rightly() {
+    let pop = pop().await;
+    let voron = pop.fake.id("voron").to_owned();
+    pop.fake.edit_without_event(&voron, "camera", CAMERA);
+    let good = json!({"username": "viewer", "password": "hunter2"});
+    // From outside the space.
+    let (code, _) = pop.enter_login(&voron, good.clone(), REMOTE).await;
+    assert_eq!(code, StatusCode::FORBIDDEN);
+    // What cannot be a login.
+    for bad in [
+        json!({"username": "viewer", "password": ""}),
+        json!({"username": "viewer", "password": "a".repeat(129)}),
+        json!({"username": "viewer", "password": "line\nbreak"}),
+        json!({"username": "u".repeat(65), "password": "hunter2"}),
+        json!({"password": "hunter2"}),
+    ] {
+        let (code, body) = pop.enter_login(&voron, bad.clone(), LOCAL).await;
+        assert_eq!(code, StatusCode::BAD_REQUEST, "{bad} {body}");
+    }
+    // A printer BAM! does not have; one with no camera address.
+    let (code, _) = pop
+        .enter_login("00000000-0000-4000-8000-000000000000", good.clone(), LOCAL)
+        .await;
+    assert_eq!(code, StatusCode::NOT_FOUND);
+    let (code, body) = pop
+        .enter_login(pop.fake.id("mk4"), good.clone(), LOCAL)
+        .await;
+    assert_eq!(code, StatusCode::CONFLICT, "{body}");
+    assert!(
+        body["error"].as_str().unwrap().contains("camera field"),
+        "{body}"
+    );
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM printer_secrets")
+        .fetch_one(&pop.db)
+        .await
+        .unwrap();
+    assert_eq!(n, 0, "kept one it refused");
+    // Without a secrets key: refused, never kept in plain text.
+    let pop = pop_with(TOKEN, "", true).await;
+    pop.fake
+        .edit_without_event(pop.fake.id("voron"), "camera", CAMERA);
+    let (code, body) = pop.enter_login(pop.fake.id("voron"), good, LOCAL).await;
+    assert_eq!(code, StatusCode::CONFLICT);
+    assert!(
+        body["error"].as_str().unwrap().contains("POP_SECRETS_KEY"),
+        "{body}"
+    );
+}

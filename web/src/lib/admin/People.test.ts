@@ -17,6 +17,9 @@ const VORON: AdminPrinter = {
   categories: [],
   training: 'advanced',
   camera: false,
+  access_code: false,
+  camera_login_fits: false,
+  camera_login: false,
 };
 
 interface Call {

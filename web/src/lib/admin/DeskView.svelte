@@ -8,7 +8,8 @@
   import type { TowerPrinter } from '../generated/TowerPrinter';
   import type { User } from '../generated/User';
   import People from './People.svelte';
-  import { connectsBy, fieldsSay, needsYou, now, offered, training, type Now } from './desk';
+  import SecretForm from './SecretForm.svelte';
+  import { connectsBy, fieldsSay, needsAccessCode, needsYou, now, offered, training, whatItNeeds, type Now } from './desk';
 
   let {
     me,
@@ -20,6 +21,9 @@
     onadd = () => {},
     ondecline = () => {},
     onsignout = () => {},
+    onaccesscode = async () => false,
+    oncameralogin = async () => false,
+    onclearlogin = () => {},
   }: {
     me: User;
     /** Every printer in BAM!'s category; null while loading. */
@@ -35,7 +39,27 @@
     onadd?: (id: string) => void;
     ondecline?: (id: string) => void;
     onsignout?: () => void;
+    /** Enter a printer's LAN access code; true once POP has it. */
+    onaccesscode?: (id: string, code: string) => Promise<boolean>;
+    /** Enter the login for a printer's camera (#150); true once POP has it. */
+    oncameralogin?: (id: string, username: string, password: string) => Promise<boolean>;
+    /** Remove the login POP holds for a printer's camera. */
+    onclearlogin?: (id: string) => void;
   } = $props();
+
+  /** The secret being entered, and for which printer. */
+  let entering: { id: string; kind: 'access_code' | 'camera_login' } | null = $state(null);
+  const enteringFor = $derived(entering ? printers?.find((p) => p.bam_id === entering!.id) : undefined);
+
+  async function save(secret: { access_code: string } | { username: string; password: string }) {
+    if (!entering) return false;
+    const ok =
+      'access_code' in secret
+        ? await onaccesscode(entering.id, secret.access_code)
+        : await oncameralogin(entering.id, secret.username, secret.password);
+    if (ok) entering = null;
+    return ok;
+  }
 
   const TONE: Record<Now['tone'], string> = {
     needs_hand: 'var(--pop-coral)',
@@ -71,9 +95,12 @@
         {#if p.ready}
           <span class="muted">{fieldsSay(p)}</span>
         {:else}
-          <span class="muted">Fix it in BAM! before it can be added: {p.problems.map((x) => `${x.field}: ${x.problem}`).join('; ')}</span>
+          <span class="muted">{whatItNeeds(p)}</span>
         {/if}
       </div>
+      {#if needsAccessCode(p) && !p.access_code}
+        <Button size="sm" onclick={() => (entering = { id: p.bam_id, kind: 'access_code' })}>Enter its access code</Button>
+      {/if}
       <Button variant="primary" size="sm" disabled={!p.ready || busy !== null} onclick={() => onadd(p.bam_id)}>Add to the tower</Button>
       <Button size="sm" disabled={busy !== null} onclick={() => ondecline(p.bam_id)}>Not this one</Button>
     </section>
@@ -90,7 +117,7 @@
       <div class="scroll">
         <table>
           <thead>
-            <tr><th>Printer</th><th>BAM! category</th><th>Connects by</th><th>Training</th><th>Camera</th><th>Now</th></tr>
+            <tr><th>Printer</th><th>BAM! category</th><th>Connects by</th><th>Training</th><th>Camera</th><th>Kept in POP</th><th>Now</th></tr>
           </thead>
           <tbody>
             {#each printers as p (p.bam_id)}
@@ -101,6 +128,32 @@
                 <td>{connectsBy(p)}</td>
                 <td>{training(p)}</td>
                 <td>{p.camera ? 'Yes' : 'No'}</td>
+                <td class="kept" data-testid="kept">
+                  {#if needsAccessCode(p)}
+                    <span>Access code: {p.access_code ? 'entered' : 'needed'}</span>
+                    <button
+                      type="button"
+                      class="link"
+                      aria-label="{p.access_code ? 'Change' : 'Enter'} {p.name}’s access code"
+                      onclick={() => (entering = { id: p.bam_id, kind: 'access_code' })}>{p.access_code ? 'Change' : 'Enter'}</button
+                    >
+                  {/if}
+                  {#if p.camera_login_fits}
+                    <span>Camera login: {p.camera_login ? 'entered' : 'none'}</span>
+                    <button
+                      type="button"
+                      class="link"
+                      aria-label="{p.camera_login ? 'Change' : 'Enter'} the login for {p.name}’s camera"
+                      onclick={() => (entering = { id: p.bam_id, kind: 'camera_login' })}>{p.camera_login ? 'Change' : 'Enter'}</button
+                    >
+                    {#if p.camera_login}
+                      <button type="button" class="link" aria-label="Remove the login for {p.name}’s camera" onclick={() => onclearlogin(p.bam_id)}
+                        >Remove</button
+                      >
+                    {/if}
+                  {/if}
+                  {#if !needsAccessCode(p) && !p.camera_login_fits}<span class="muted">—</span>{/if}
+                </td>
                 <td><span style:color={TONE[n.tone]}><StatusSquare color={TONE[n.tone]} label={n.text} /></span></td>
               </tr>
             {/each}
@@ -108,7 +161,12 @@
         </table>
       </div>
     {/if}
-    <span class="muted foot">Change a printer’s category or fields in BAM! and POP follows.</span>
+    {#if entering && enteringFor}
+      {#key `${entering.id}:${entering.kind}`}
+        <SecretForm name={enteringFor.name} kind={entering.kind} onsubmit={save} oncancel={() => (entering = null)} />
+      {/key}
+    {/if}
+    <span class="muted foot">Change a printer’s category or fields in BAM! and POP follows. Access codes and camera logins live in POP only.</span>
   </section>
 
   <aside class="needs" aria-labelledby="needs-you">
@@ -269,4 +327,25 @@
   .foot {
     font-size: 13.5px;
   }
+  .kept {
+    font-size: 14px;
+  }
+  .kept > span {
+    display: block;
+  }
+  .link {
+    font: inherit;
+    padding: 0;
+    margin-right: 10px;
+    background: none;
+    border: 0;
+    color: var(--pop-text);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .link:focus-visible {
+    outline: 3px solid var(--pop-cream);
+    outline-offset: 2px;
+  }
+
 </style>

@@ -33,4 +33,17 @@ training: string | null,
 /**
  * Whether BAM! gives it a camera.
  */
-camera: boolean, };
+camera: boolean, 
+/**
+ * Whether POP holds its LAN access code (a Bambu printer's).
+ */
+access_code: boolean, 
+/**
+ * Whether its camera is an address a login can go with (#150): set
+ * in BAM!, and not a Bambu printer's own.
+ */
+camera_login_fits: boolean, 
+/**
+ * Whether POP holds a login for its camera (#150).
+ */
+camera_login: boolean, };

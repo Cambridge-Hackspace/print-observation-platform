@@ -122,7 +122,13 @@ pub struct Problem {
     /// The field as BAM! labels it, with its key: "Connection (connection)".
     pub field: String,
     pub problem: String,
+    /// Fixed in POP, not BAM!: a secret POP keeps (#150).
+    pub in_pop: bool,
 }
+
+/// What a missing access code is called: not a BAM! field, so the label is
+/// the name itself, and it is fixed in POP.
+pub const ACCESS_CODE: &str = "LAN access code";
 
 /// Whether POP holds a secret a printer needs, by its BAM! id.
 pub trait Secrets {
@@ -161,6 +167,7 @@ pub fn printer_from(
         problems.push(Problem {
             field: label(key),
             problem: p,
+            in_pop: key == ACCESS_CODE,
         })
     };
 
@@ -235,7 +242,7 @@ pub fn printer_from(
                     if !secrets.has_access_code(&asset.asset.id) {
                         // Not a BAM! field: the label is the name itself.
                         problem(
-                            "LAN access code",
+                            ACCESS_CODE,
                             "not entered in POP yet: it lives in POP, never in BAM!".into(),
                         );
                     }
@@ -304,6 +311,14 @@ pub fn printer_from(
                 }
             },
         },
+        // A camera's password is kept sealed in POP (#150), never in BAM!.
+        Some(c) if url_password(c) => {
+            problem(
+                &map.camera,
+                "holds the camera's password: give the address without it here, and enter the camera's login in POP".to_owned(),
+            );
+            None
+        }
         // A Bambu printer's own RTSPS camera, by its address: POP signs in
         // to it with the access code, and checks its certificate.
         Some(c)
@@ -349,6 +364,15 @@ pub fn printer_from(
             .unwrap_or_default(),
         training: value(&map.training).map(str::to_owned),
     })
+}
+
+/// Whether `url` carries a password: `scheme://user:password@host/...`.
+fn url_password(url: &str) -> bool {
+    let rest = url.split_once("://").map_or(url, |(_, r)| r);
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    authority
+        .rsplit_once('@')
+        .is_some_and(|(user, _)| user.contains(':'))
 }
 
 /// The host of `url`, without its user, port or path.

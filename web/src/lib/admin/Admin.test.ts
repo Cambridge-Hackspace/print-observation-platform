@@ -2,6 +2,7 @@
 // The admin desk (#86), against a stand-in for POP's API: signing in, who
 // may see it, the printers table, and adding or declining a new printer.
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { tick } from 'svelte';
 import { cleanup, fireEvent, render, waitFor, within } from '@testing-library/svelte';
 import Admin from './Admin.svelte';
 import type { AdminPrinter } from '../generated/AdminPrinter';
@@ -21,6 +22,9 @@ const printer = (name: string, more: Partial<AdminPrinter> = {}): AdminPrinter =
   categories: ['Printers'],
   training: null,
   camera: false,
+  access_code: false,
+  camera_login_fits: false,
+  camera_login: false,
   ...more,
 });
 
@@ -81,6 +85,16 @@ function pop(start: { me: User | null; printers: AdminPrinter[]; refuse?: string
       if (me?.role !== 'admin') return json({ error: 'admins only' }, 403);
       if (url === '/api/admin/printers') return json(printers);
       if (url === '/api/admin/users' && method === 'GET') return json([]);
+      const kept = /^\/api\/admin\/printers\/([^/]+)\/(access-code|camera-login)$/.exec(url);
+      if (kept) {
+        if (start.refuse) return json({ error: start.refuse }, 403);
+        const id = decodeURIComponent(kept[1]!);
+        const field = kept[2] === 'access-code' ? 'access_code' : 'camera_login';
+        printers = printers.map((p) =>
+          p.bam_id === id ? { ...p, [field]: method === 'PUT', ready: field === 'access_code' ? true : p.ready, problems: [] } : p,
+        );
+        return new Response(null, { status: 204 });
+      }
       const act = /^\/api\/admin\/printers\/([^/]+)\/(add|decline)$/.exec(url);
       if (act && method === 'POST') {
         if (start.refuse) return json({ error: start.refuse }, 403);
@@ -137,8 +151,8 @@ describe('the admin desk', () => {
     const r = render(Admin);
     await waitFor(() => expect(r.getAllByTestId('row')).toHaveLength(2));
     const cells = (i: number) => [...r.getAllByTestId('row')[i]!.querySelectorAll('td')].map((td) => td.textContent?.trim());
-    expect(cells(0)).toEqual(['Voron 2.4', 'Printers, Enclosed', 'Klipper', 'Advanced', 'Yes', 'Added: its BAM! fields need fixing']);
-    expect(cells(1)).toEqual(['MK4', 'Printers', 'PrusaLink', 'None', 'No', 'Not for the tower']);
+    expect(cells(0)).toEqual(['Voron 2.4', 'Printers, Enclosed', 'Klipper', 'Advanced', 'Yes', '—', 'Added: its BAM! fields need fixing']);
+    expect(cells(1)).toEqual(['MK4', 'Printers', 'PrusaLink', 'None', 'No', '—', 'Not for the tower']);
   });
 
   it('says what each printer on the tower is doing now, from the live stream', async () => {
@@ -210,7 +224,7 @@ describe('the admin desk', () => {
   it('cannot add one whose BAM! fields are wrong, and says what is wrong', async () => {
     pop({
       me: ASH,
-      printers: [printer('Ender 3', { tower: 'offered', ready: false, connection: null, problems: [{ field: 'Connection (connection)', problem: 'missing' }] })],
+      printers: [printer('Ender 3', { tower: 'offered', ready: false, connection: null, problems: [{ field: 'Connection (connection)', problem: 'missing', in_pop: false }] })],
     });
     const r = render(Admin);
     const banner = await waitFor(() => r.getByTestId('new'));
@@ -234,5 +248,81 @@ describe('the admin desk', () => {
     await fireEvent.click(r.getByRole('button', { name: 'Sign out' }));
     await waitFor(() => r.getByTestId('signin'));
     expect(calls.some((c) => c.url === '/api/session' && c.method === 'DELETE')).toBe(true);
+  });
+
+  it('takes a Bambu printer’s access code on the desk, not in BAM!', async () => {
+    const calls = pop({
+      me: ASH,
+      printers: [
+        printer('X1 Carbon', {
+          tower: 'offered',
+          ready: false,
+          connection: 'bambu',
+          problems: [{ field: 'LAN access code', problem: 'not entered in POP yet', in_pop: true }],
+        }),
+      ],
+    });
+    const r = render(Admin);
+    const banner = await waitFor(() => r.getByTestId('new'));
+    // Not sent to BAM! for a fix BAM! cannot make.
+    expect(banner.textContent).not.toContain('Fix it in BAM!');
+    expect(banner.textContent).toContain('Enter its LAN access code here.');
+    expect(r.getByTestId('kept').textContent).toContain('Access code: needed');
+    await fireEvent.click(r.getByRole('button', { name: 'Enter its access code' }));
+    const form = r.getByTestId('secret-form');
+    expect(form.getAttribute('data-kind')).toBe('access_code');
+    await fireEvent.input(r.getByLabelText('Access code'), { target: { value: ' 12345678 ' } });
+    await fireEvent.submit(form);
+    await waitFor(() => expect(r.queryByTestId('secret-form')).toBeNull());
+    const sent = calls.find((c) => c.method === 'PUT');
+    expect(sent).toMatchObject({ url: '/api/admin/printers/id-X1%20Carbon/access-code', body: { access_code: '12345678' }, type: 'application/json' });
+    await waitFor(() => expect(r.getByTestId('kept').textContent).toContain('Access code: entered'));
+  });
+
+  it('takes, changes and removes the login for a camera at an address, and only there', async () => {
+    const calls = pop({
+      me: ASH,
+      printers: [
+        printer('Voron 2.4', { camera: true, camera_login_fits: true }),
+        printer('MK4', { camera: true }),
+      ],
+    });
+    const r = render(Admin);
+    await waitFor(() => expect(r.getAllByTestId('row')).toHaveLength(2));
+    const [voron, mk4] = r.getAllByTestId('kept');
+    expect(mk4!.textContent?.trim()).toBe('—');
+    expect(voron!.textContent).toContain('Camera login: none');
+    expect(r.queryByRole('button', { name: /Remove/ })).toBeNull();
+    await fireEvent.click(r.getByRole('button', { name: 'Enter the login for Voron 2.4’s camera' }));
+    await fireEvent.input(r.getByLabelText(/Username/), { target: { value: 'viewer' } });
+    await fireEvent.input(r.getByLabelText('Password'), { target: { value: 'hunter2' } });
+    await fireEvent.submit(r.getByTestId('secret-form'));
+    await waitFor(() => expect(r.getAllByTestId('kept')[0]!.textContent).toContain('Camera login: entered'));
+    expect(calls.find((c) => c.method === 'PUT')).toMatchObject({
+      url: '/api/admin/printers/id-Voron%202.4/camera-login',
+      body: { username: 'viewer', password: 'hunter2' },
+    });
+    await fireEvent.click(r.getByRole('button', { name: 'Remove the login for Voron 2.4’s camera' }));
+    await waitFor(() => expect(r.getAllByTestId('kept')[0]!.textContent).toContain('Camera login: none'));
+    expect(calls.filter((c) => c.method === 'DELETE').map((c) => c.url)).toContain('/api/admin/printers/id-Voron%202.4/camera-login');
+  });
+
+  it('keeps the form open and says why when POP refuses a secret', async () => {
+    const calls = pop({
+      me: ASH,
+      refuse: 'only from inside the space',
+      printers: [printer('Voron 2.4', { camera: true, camera_login_fits: true })],
+    });
+    const r = render(Admin);
+    await waitFor(() => expect(r.getAllByTestId('row')).toHaveLength(1));
+    await fireEvent.click(r.getByRole('button', { name: 'Enter the login for Voron 2.4’s camera' }));
+    await fireEvent.input(r.getByLabelText('Password'), { target: { value: 'hunter2' } });
+    await fireEvent.submit(r.getByTestId('secret-form'));
+    await waitFor(() => expect(r.getByRole('alert').textContent).toBe('only from inside the space'));
+    // Once the desk has read the printers again, the save is over: still open.
+    await waitFor(() => expect(calls.filter((c) => c.url === '/api/admin/printers')).toHaveLength(2));
+    await new Promise((done) => setTimeout(done, 50));
+    await tick();
+    expect(r.getByTestId('secret-form')).toBeTruthy();
   });
 });

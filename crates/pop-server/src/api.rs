@@ -287,6 +287,10 @@ pub enum AuditKind {
     RoleChanged,
     /// A printer's LAN access code was entered in POP (never the code).
     AccessCodeSet,
+    /// A camera's login was entered in POP (never the password) (#150).
+    CameraLoginSet,
+    /// A camera's login was removed from POP.
+    CameraLoginCleared,
     /// A printer from BAM! was added to the tower.
     PrinterAdded,
     /// An admin said a printer in BAM! is not one for the tower.
@@ -365,6 +369,13 @@ pub struct AdminPrinter {
     pub training: Option<String>,
     /// Whether BAM! gives it a camera.
     pub camera: bool,
+    /// Whether POP holds its LAN access code (a Bambu printer's).
+    pub access_code: bool,
+    /// Whether its camera is an address a login can go with (#150): set
+    /// in BAM!, and not a Bambu printer's own.
+    pub camera_login_fits: bool,
+    /// Whether POP holds a login for its camera (#150).
+    pub camera_login: bool,
 }
 
 /// Whether a printer's camera works, as go2rtc last showed it (#66).
@@ -412,12 +423,23 @@ pub struct PrinterProblem {
     /// The BAM! field, as BAM! labels it, with its key.
     pub field: String,
     pub problem: String,
+    /// Fixed in POP, not BAM!: a secret POP keeps, entered on the desk.
+    pub in_pop: bool,
 }
 
 /// `PUT /api/admin/printers/{bam_id}/access-code`.
 #[derive(Debug, Clone, Deserialize, TS)]
 pub struct AccessCode {
     pub access_code: String,
+}
+
+/// `PUT /api/admin/printers/{bam_id}/camera-login` (#150). No Debug: it
+/// carries a password.
+#[derive(Clone, Deserialize, TS)]
+pub struct CameraLoginBody {
+    /// Empty for a camera that asks for a password only.
+    pub username: String,
+    pub password: String,
 }
 
 /// The body of every API error.
