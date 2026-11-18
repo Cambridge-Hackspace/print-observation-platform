@@ -85,6 +85,7 @@ function pop(start: { me: User | null; printers: AdminPrinter[]; refuse?: string
       if (me?.role !== 'admin') return json({ error: 'admins only' }, 403);
       if (url === '/api/admin/printers') return json(printers);
       if (url === '/api/admin/users' && method === 'GET') return json([]);
+      if (url === '/api/admin/kiosks' && method === 'GET') return json([]);
       if (url === '/api/admin/updater') return json({ running: '0.2.0', last: { at: 1, kind: 'rolled_back', version: 'v0.3.0', summary: 'v0.3.0 failed its health check: back to v0.2.0' } });
       const kept = /^\/api\/admin\/printers\/([^/]+)\/(access-code|camera-login)$/.exec(url);
       if (kept) {

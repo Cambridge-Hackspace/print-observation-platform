@@ -324,6 +324,11 @@ async fn signed_in_or_at_the_space_names_are_seen_either_way() {
     for owner_names in [false, true] {
         let pop = pop(owner_names).await;
         let member = pop.member.clone();
+        // The space's network before a kiosk has vouched for it is the
+        // public (#12); after, it is the space.
+        let (before, _) = pop.watch(LOCAL, None).await;
+        assert!(!before.contains("Sam Lee"), "{before}");
+        pop.state.kiosks.saw(1, "192.168.1.5".parse().unwrap());
         for (who, from, cookie) in [
             ("a member from anywhere", REMOTE, Some(member.as_str())),
             ("the space's own network", LOCAL, None),

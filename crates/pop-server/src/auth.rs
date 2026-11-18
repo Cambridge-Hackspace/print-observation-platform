@@ -69,9 +69,13 @@ fn session_cookie(token: &str, max_age: i64) -> HeaderValue {
     .expect("a cookie of base64url and fixed text is a valid header")
 }
 
-/// `POST /api/session`: sign in.
+/// `POST /api/session`: sign in. One from outside the space says so in the
+/// audit log, and an admin's is told to the group chat as well (#12): an admin
+/// online holds every class, so the group should know when one arrives.
 pub async fn sign_in(
     State(state): State<AppState>,
+    connect: Option<Extension<axum::extract::ConnectInfo<std::net::SocketAddr>>>,
+    headers: HeaderMap,
     b: Result<Json<SignIn>, JsonRejection>,
 ) -> Response {
     let b = match body(b) {
@@ -89,8 +93,19 @@ pub async fn sign_in(
         }
         Err(e) => return e.into_response(),
     };
-    match users::start_session(&state.db, &user).await {
+    let peer = connect.map(|Extension(c)| c.0.ip());
+    let outside = !crate::access::is_local(&state, peer, &headers);
+    match users::start_session(&state.db, &user, outside).await {
         Ok(token) => {
+            if outside
+                && user.role == crate::api::Role::Admin
+                && let Some(n) = &state.notifier
+            {
+                n.post(format!(
+                    "{} signed in to POP as an admin from outside the space.",
+                    user.name
+                ));
+            }
             let mut res = Json(user).into_response();
             res.headers_mut()
                 .insert(header::SET_COOKIE, session_cookie(&token, SESSION_SECS));

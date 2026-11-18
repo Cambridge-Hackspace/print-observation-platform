@@ -207,9 +207,9 @@ pub struct Log {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct Access {
-    /// The space's own networks. A request from one of these (or from a kiosk
-    /// session) is local, and may control printers (ADR 0001, "Control is
-    /// local"). Empty means only loopback is local.
+    /// The space's own networks. A request from one of these is local while
+    /// an enrolled kiosk has checked in from that same network lately (#12,
+    /// crate::access). Empty means nothing is local.
     pub local_networks: Vec<IpNet>,
     /// Reverse proxies whose forwarding headers are believed. A request that
     /// carries `Forwarded` or `X-Forwarded-For` from any other peer is remote,

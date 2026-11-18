@@ -73,6 +73,8 @@ struct Pop {
     admin: String,
     /// The tower's printers, as every screen is sent them.
     printers: watch::Receiver<Vec<pop_server::api::TowerPrinter>>,
+    /// Where kiosks last checked in from (#12).
+    kiosks: pop_server::kiosks::Sightings,
 }
 
 async fn decide(db: &SqlitePool, id: &str, to: TowerState) {
@@ -180,6 +182,7 @@ async fn pop_with(setup: impl FnOnce(&FakeGo2rtc)) -> Pop {
     });
     let printers = tower.clone();
     let state = state.with_tower(tower).with_cameras(kept, client);
+    let kiosks = state.kiosks.clone();
     let mut pop = Pop {
         _dir: dir,
         db,
@@ -190,6 +193,7 @@ async fn pop_with(setup: impl FnOnce(&FakeGo2rtc)) -> Pop {
         decided,
         admin: String::new(),
         printers,
+        kiosks,
     };
     let (_, _, set, _) = pop
         .send(
@@ -877,6 +881,10 @@ async fn the_space_watches_without_signing_in_and_outside_does_not() {
         }
         r.send()
     };
+    // The space's network before any kiosk has vouched for it: not the
+    // space (#12).
+    assert_eq!(mjpeg(Some("192.168.1.20")).await.unwrap().status(), 401);
+    pop.kiosks.saw(1, "192.168.1.5".parse().unwrap());
     // At the space, signed out: watched, both ways.
     let mut res = mjpeg(Some("192.168.1.20")).await.unwrap();
     assert_eq!(res.status(), 200);

@@ -127,6 +127,22 @@ const WRITE_ROUTES: &[(&str, &str, &str)] = &[
         "tests/printers.rs: a_camera_login_is_entered_kept_sealed_recorded_and_removed",
     ),
     (
+        "POST",
+        "/api/admin/kiosks",
+        "tests/kiosks.rs: an_admin_enrolls_a_kiosk_whose_credential_pop_keeps_only_as_a_hash",
+    ),
+    (
+        "DELETE",
+        "/api/admin/kiosks/{id}",
+        "tests/kiosks.rs: a_revoked_kiosk_vouches_for_nothing_at_once",
+    ),
+    // A check-in every half minute is deliberately NOT an audit entry.
+    (
+        "POST",
+        "/api/kiosk/checkin",
+        "tests/kiosks.rs: a_checkin_is_not_an_audit_entry",
+    ),
+    (
         "PUT",
         "/api/admin/error-guides/{key}",
         "tests/error_guides.rs: linking_and_unlinking_are_recorded",
@@ -274,7 +290,9 @@ async fn signing_in_is_recorded() {
     let e = pop.newest("signed_in").await;
     assert_eq!(e["actor_id"], pop.grace);
     assert_eq!(e["actor_name"], "Grace");
-    assert_eq!(e["summary"], "Grace signed in");
+    // No kiosk here, so this harness is outside the space (#12); a sign-in
+    // at the space is tests/kiosks.rs: a_kiosks_checkin_makes_its_own_network_local.
+    assert_eq!(e["summary"], "Grace signed in from outside the space");
 }
 
 #[tokio::test]

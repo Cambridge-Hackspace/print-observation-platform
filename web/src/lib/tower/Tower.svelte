@@ -7,6 +7,7 @@
   import HandView from './HandView.svelte';
   import { toldAbout } from './hand';
   import KioskCamera from './KioskCamera.svelte';
+  import { startCheckins } from './checkin';
 
   let connection: Connection = $state('connecting');
   let screen = $state(empty());
@@ -21,9 +22,12 @@
     event: (e) => (screen = reduce(screen, e)),
   });
   const tick = setInterval(() => (now = new Date()), 15_000);
+  // This screen vouches for the space's network, if it is an enrolled kiosk (#12).
+  const stopCheckins = startCheckins();
   onDestroy(() => {
     stop();
     clearInterval(tick);
+    stopCheckins();
   });
 </script>
 

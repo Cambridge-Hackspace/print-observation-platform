@@ -8,7 +8,7 @@ personal messages to one member go through CS:S instead (#70).
 
 1. In Discord, open the channel's settings, then **Integrations → Webhooks →
    New Webhook**, name it POP, and **Copy Webhook URL**.
-2. Give POP that URL, from inside the space, as an admin:
+2. Give POP that URL, as an admin:
    `PUT /api/admin/notify/discord` with `{"webhook_url": "<the URL>"}`. (The
    admin desk's settings page will do this, with a **Send a test message**
    button: `POST /api/admin/notify/discord/test`.)

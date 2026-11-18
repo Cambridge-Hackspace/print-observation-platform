@@ -117,7 +117,7 @@ else there, under **People** (README.md, "Accounts").
 
 In BAM!, give POP a token whose role has only `assets.read` and
 `events.read`, and set each printer's fields (docs/integrations/bam.md). On
-the admin desk, from inside the space, each printer in the category is
+the admin desk, signed in as an admin, each printer in the category is
 offered under **New in BAM!**: add the ones the tower runs. A Bambu printer
 also needs its LAN access code, entered on the desk: **Enter its access code**
 on its banner, or **Enter** in its **Kept in POP** column (docs/printers/bambu.md).
@@ -150,7 +150,7 @@ passes. It fails, by name, if go2rtc does not ask for its password (#149).
 ## 8. The group chat (optional)
 
 Make a Discord webhook for the channel, and give it to POP on the admin
-desk, from inside the space (docs/integrations/discord.md). Check it with
+desk, as an admin (docs/integrations/discord.md). Check it with
 the desk's **Send a test message**.
 
 ## 9. Feedback (optional)
@@ -221,4 +221,6 @@ rolling back a release that does not come up healthy: docs/upgrades.md.
 ## The kiosk
 
 The tower's own screen opens `/kiosk` full screen, from boot: docs/kiosk.md
-sets the box up to do it (`packaging/kiosk/setup.sh`).
+sets the box up to do it (`packaging/kiosk/setup.sh`). Then make it the kiosk, once, from its own
+screen (docs/kiosk.md, "Making it the kiosk"): until a kiosk checks in, the
+space's network counts as anywhere else (#12).

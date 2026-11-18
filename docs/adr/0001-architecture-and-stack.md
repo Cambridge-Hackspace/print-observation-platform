@@ -179,12 +179,24 @@ reference implementation.
 
 ### Local control, enforced by the server
 
-Routes that dispatch a print, confirm a cleared bed, or change anything about a
-printer accept requests only from a kiosk session on the local network. Routes
-reachable from outside the space, such as watching a print, following progress,
-reporting a problem or uploading a file, are read-only with respect to printers.
-"Control is local" is a property of the server, not of which buttons the UI
-happens to hide.
+*Amended 2026-11-18 (cal, on #12).* There are three classes of permission,
+each including the one before: **visibility** (see everything, names
+included), **printer** (control printers) and **admin** (configure the
+system). Locally, at the kiosk or on the space's network, a stranger has
+visibility, a member printer and an admin admin; online, a stranger has none,
+a member visibility and an admin admin. A request is local only when it began
+on a configured space network AND an enrolled kiosk has checked in from that
+same network lately: the kiosk confirms from its own side. Admins online hold
+every class, and each such sign-in is told to the group chat.
+
+The rule as first written, kept for the record: routes that dispatch a print,
+confirm a cleared bed, or change anything about a printer accept requests only
+from a kiosk session on the local network. Routes reachable from outside the
+space, such as watching a print, following progress, reporting a problem or
+uploading a file, are read-only with respect to printers.
+
+Either way, who may do what is a property of the server, not of which buttons
+the UI happens to hide.
 
 ### Integrations: interchangeable adapters
 

@@ -27,6 +27,28 @@ What it installs: `/etc/systemd/system/pop-kiosk@.service`
 (packaging/kiosk/pam-pop-kiosk), and `/etc/pop/kiosk.env`, which names the
 address the screen opens.
 
+## Making it the kiosk (once)
+
+POP counts the space's network as the space only while an enrolled kiosk
+checks in from it (#12). Until this is done, nobody signed out at the space
+sees names or cameras, and no member there can control a printer.
+
+1. Plug a keyboard into the kiosk box, and on its screen open POP's admin desk
+   (`/admin`). Sign in as an admin.
+2. Under **Kiosks**, name it ("The tower") and press **Make this screen a
+   kiosk**. That browser, and only it, now holds the kiosk's credential: a
+   cookie no page can read, kept by POP only as a hash.
+3. Go back to `/kiosk`, sign out of the desk, and unplug the keyboard.
+
+From then on the kiosk checks in every half minute; the desk's **Kiosks**
+list shows when and from where it last did, and **Revoke** ends its word at
+once. Check it: from a phone on the space's Wi-Fi, signed out, a printer's
+camera plays; off the Wi-Fi, it asks you to sign in.
+
+A kiosk vouches for its own network only, and for two minutes after its last
+check-in: switch it off, and within two minutes the space's network is like
+anywhere else.
+
 ## What the screen does
 
 - **Starts on boot** and lands on the tower's home screen.

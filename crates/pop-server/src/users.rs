@@ -580,7 +580,13 @@ fn token_hash(token: &str) -> String {
 }
 
 /// Start a session for `user`, returning the token for its cookie.
-pub async fn start_session(db: &SqlitePool, user: &User) -> Result<String, UserError> {
+/// `outside`: the sign-in came from outside the space, which the audit log
+/// says (#12).
+pub async fn start_session(
+    db: &SqlitePool,
+    user: &User,
+    outside: bool,
+) -> Result<String, UserError> {
     let mut b = [0u8; 32];
     rand::rngs::OsRng.fill_bytes(&mut b);
     let token = URL_SAFE_NO_PAD.encode(b);
@@ -602,7 +608,11 @@ pub async fn start_session(db: &SqlitePool, user: &User) -> Result<String, UserE
             kind: AuditKind::SignedIn,
             printer: None,
             subject: Some((user.id, &user.name)),
-            summary: format!("{} signed in", user.name),
+            summary: if outside {
+                format!("{} signed in from outside the space", user.name)
+            } else {
+                format!("{} signed in", user.name)
+            },
         },
     )
     .await?;
