@@ -1,0 +1,57 @@
+# POP as a systemd service (#9). Install the binary as /usr/local/bin/pop,
+# the configuration as /etc/pop/pop.toml, and its secrets (POP_BAM_TOKEN,
+# POP_SECRETS_KEY, POP_GO2RTC_PASSWORD) in /etc/pop/pop.env, mode 0600, owned
+# by root: systemd reads it before it drops to the pop user.
+#
+# The first admin: sudo -u pop POP_STORAGE_DATA_DIR=/var/lib/pop pop --config /etc/pop/pop.toml user create-admin <username>
+
+[Unit]
+Description=POP, the print observation platform
+Documentation=https://github.com/Cambridge-Hackspace/print-observation-platform
+After=network-online.target go2rtc.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pop
+Group=pop
+DynamicUser=no
+ExecStart=/usr/local/bin/pop --config /etc/pop/pop.toml
+EnvironmentFile=-/etc/pop/pop.env
+Environment=POP_STORAGE_DATA_DIR=/var/lib/pop
+StateDirectory=pop
+StateDirectoryMode=0700
+# What POP writes, only POP can read: its database, files and backups
+# (threat model, gap 9).
+UMask=0077
+Restart=on-failure
+RestartSec=2
+
+# Hardening: POP needs the network and its data directory, nothing else.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+# A printer on USB (usb_serial) needs its device: allow it here, for example
+# DeviceAllow=/dev/ttyACM0 rw, and set PrivateDevices=no.
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+
+[Install]
+WantedBy=multi-user.target
