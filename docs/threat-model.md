@@ -237,49 +237,49 @@ Each of these is true of POP today, or untested, and none is claimed above.
 **Reach.**
 1. **Kiosk sessions do not exist yet (#12).** "Local" means only the
    network. Anyone on the space's network, not just the kiosk, can use
-   local-only routes once signed in as an admin.
+   local-only routes once signed in as an admin. Tracked in #131.
 2. **Anything that reaches POP from its own machine is local.** That
    includes an SSH tunnel or a tunnel daemon that adds no forwarding header.
    For remote watching, use a proxy that sets one forwarding header, and
-   name it in `trusted_proxies`.
+   name it in `trusted_proxies`. Tracked in #132.
 3. **Three local-only routes have no test that fails if they are re-marked
    as reachable from anywhere:** reading the notification settings, clearing
    the webhook, and testing it. The enumeration test covers only routes that
-   control printers.
+   control printers. Tracked in #133.
 4. **The live stream is public and its fields are untested.** It carries
    printer names, job file names, error text and group notices. Once POP
    knows whose print is whose, it will carry owners' first names. No test
-   pins what it may carry.
+   pins what it may carry. Tracked in #134.
 
 **Signing in.**
 5. **There is no rate limit or lockout on signing in.** Every failed try
-   costs an Argon2 hash and adds an audit row.
+   costs an Argon2 hash and adds an audit row. Tracked in #135.
 6. **The session cookie is not `Secure` (#93), and lasts 30 days.** Expired
    sessions are never deleted. A sign-in at the kiosk's browser lasts until
-   someone signs out; there is no idle sign-out.
+   someone signs out; there is no idle sign-out. Tracked in #136.
 7. **The Argon2 parameters are the library's defaults**, and untested.
    **Equal timing** for unknown, deactivated and wrong-password sign-ins is
-   intended, and untested.
+   intended, and untested. Tracked in #137.
 8. **POP sends no `Content-Security-Policy`, frame or HSTS headers.** Guide
-   text is plain text that the screens escape, but no test says so.
+   text is plain text that the screens escape, but no test says so. Tracked in #138.
 
 **Secrets and data.**
 9. **The data directory, database and backups are written with default
-   file permissions.**
+   file permissions.** Tracked in #139.
 10. **POP's configuration derives `Debug` with the BAM! token and secrets
     key in it.** Nothing prints it today, but nothing stops it. No test
-    keeps the BAM! token, cookies or request headers out of the log.
+    keeps the BAM! token, cookies or request headers out of the log. Tracked in #140.
 11. **A sealed setting (the webhook) is not tested against being moved to
-    another setting's row**, as access codes are.
+    another setting's row**, as access codes are. Tracked in #141.
 
 **Printers, the audit log and uploads.**
 12. **There is no way yet to accept a Bambu printer's legitimately changed
-    certificate.** `docs/printers/bambu.md` says an admin confirms it.
+    certificate.** `docs/printers/bambu.md` says an admin confirms it. Tracked in #142.
 13. **TLS verification to BAM! and Discord is the library default, and
     untested.** BAM! may be configured over plain `http`. Moonraker defaults
-    to plain `ws`.
+    to plain `ws`. Tracked in #143.
 14. **Some changes are not recorded in the same transaction as their audit
     entry:** access codes, the webhook, guides and error-guide links. If
-    the audit write fails, the change stands without its entry.
+    the audit write fails, the change stands without its entry. Tracked in #144.
 15. **A guide image's 5 MB limit is likely unreachable**, because the
-    server's default request size is 2 MB.
+    server's default request size is 2 MB. Tracked in #145.
