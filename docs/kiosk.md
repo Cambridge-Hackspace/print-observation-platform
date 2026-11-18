@@ -50,6 +50,10 @@ tap (#12): plug one in to sign in as an admin there.
 - A console instead: switch to another terminal (Ctrl+Alt+F2) and sign in as
   an administrator there.
 
+Debian 12 installs cage 0.1.4. What this page says cage does (no blanking,
+no cursor without a mouse, `-d`) was read in cage's source at 0.1.4 and at
+0.3.1, and holds for both.
+
 ## What is not tested
 
 CI installs the packages in the Debian the box runs, checks that the

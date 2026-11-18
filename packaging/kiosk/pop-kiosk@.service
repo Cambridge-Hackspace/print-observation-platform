@@ -2,9 +2,12 @@
 # compositor that runs one application and nothing else, started on boot on
 # a virtual terminal and logged in as the kiosk user.
 #
-# From cage's own boot unit (cage wiki, "Starting Cage on boot with systemd",
-# cage 0.3.1), with POP's kiosk page as the application. Installed by
+# From cage's own boot unit (cage wiki, "Starting Cage on boot with systemd"),
+# with POP's kiosk page as the application. Installed by
 # packaging/kiosk/setup.sh; enabled as pop-kiosk@tty1.service.
+#
+# Debian 12 installs cage 0.1.4 (CI's kiosk check prints it); what is said
+# of cage below was read in its source at both 0.1.4 and 0.3.1.
 #
 # What it does for the tower:
 # - Starts on boot, and comes back if Chromium crashes or quits: cage exits
