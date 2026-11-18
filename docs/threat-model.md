@@ -283,6 +283,18 @@ Each route has its own test that it is recorded, for example:
 - `crates/pop-server/tests/tower.rs::adding_and_declining_are_recorded`
 - `crates/pop-server/tests/guides.rs::writing_editing_publishing_and_renaming_are_recorded`
 
+## Remote access
+
+docs/remote-access.md puts POP behind a proxy for watching from outside
+(#93). Its example, docs/remote/nginx.conf, forwards every route POP allows
+from anywhere and no route kept to the space, refuses API paths POP does not
+have, and sets the forwarding header rather than adding to one a client
+sent. `crates/pop-server/tests/remote_access.rs::the_example_forwards_what_pop_allows_from_anywhere_and_nothing_else`,
+`crates/pop-server/tests/remote_access.rs::the_check_fails_an_example_that_forwards_too_much_or_forges_nothing`.
+The test reads the file as nginx chooses locations; nginx itself is not run
+in POP's tests. POP's own refusal of local-only routes from outside does not
+depend on the proxy.
+
 ## Flagging a problem
 
 A member watching can flag that something looks wrong (#63), and POP tells
