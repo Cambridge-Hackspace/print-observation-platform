@@ -30,6 +30,7 @@ pub struct Config {
     pub secrets: Secrets,
     pub guides: Guides,
     pub public: Public,
+    pub kiosk: Kiosk,
     pub feedback: Feedback,
 }
 
@@ -80,6 +81,21 @@ pub struct Public {
     /// printer's job or a notice. Signed-in screens and the space's own
     /// network always see names.
     pub owner_names: bool,
+}
+
+/// Sessions at the kiosk (#12).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct Kiosk {
+    /// How long a session started at a kiosk lasts with the screen left
+    /// alone, in seconds: the countdown the screen shows. 15 to 3600.
+    pub idle_secs: u32,
+}
+
+impl Default for Kiosk {
+    fn default() -> Self {
+        Self { idle_secs: 90 }
+    }
 }
 
 /// The go2rtc that serves the printers' cameras (#66), as its own service.
@@ -361,6 +377,14 @@ impl Config {
                 }
             };
         }
+        if let Some(v) = env("POP_KIOSK_IDLE_SECS") {
+            self.kiosk.idle_secs = v.parse().map_err(|_| {
+                err(
+                    "POP_KIOSK_IDLE_SECS",
+                    format!("{v:?}: expected a number of seconds"),
+                )
+            })?;
+        }
         if let Some(v) = env("POP_GUIDES_INDEXABLE") {
             self.guides.indexable = match v.as_str() {
                 "true" => true,
@@ -535,6 +559,15 @@ impl Config {
 
     /// Checks no type can express.
     fn validate(&self) -> Result<(), ConfigError> {
+        if !(15..=3600).contains(&self.kiosk.idle_secs) {
+            return Err(err(
+                "kiosk.idle_secs",
+                format!(
+                    "{}: a kiosk session lasts 15 to 3600 seconds left alone",
+                    self.kiosk.idle_secs
+                ),
+            ));
+        }
         if self.storage.data_dir.as_os_str().is_empty() {
             return Err(err(
                 "storage.data_dir",
@@ -857,6 +890,24 @@ mod tests {
         )
         .unwrap();
         assert_eq!(c.feedback.roles, ["admin", "member"]);
+    }
+
+    #[test]
+    fn a_kiosk_session_lasts_ninety_seconds_unless_set_and_within_bounds() {
+        assert_eq!(Config::default().kiosk.idle_secs, 90);
+        assert_eq!(
+            Config::parse("[kiosk]\nidle_secs = 45\n")
+                .unwrap()
+                .kiosk
+                .idle_secs,
+            45
+        );
+        for bad in ["14", "3601", "0"] {
+            let e = parse_err(&format!("[kiosk]\nidle_secs = {bad}\n"));
+            assert_eq!(e.key, "kiosk.idle_secs", "{bad}");
+        }
+        let e = env_err(&[("POP_KIOSK_IDLE_SECS", "a minute")]);
+        assert_eq!(e.key, "POP_KIOSK_IDLE_SECS");
     }
 
     #[test]

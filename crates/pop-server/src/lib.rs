@@ -91,6 +91,8 @@ pub struct AppState {
     pub jpegs: cameras::Jpegs,
     /// What the public live stream carries (#134).
     pub public: config::Public,
+    /// How kiosk sessions behave (#12).
+    pub kiosk: config::Kiosk,
     /// Feedback, filed as GitHub issues, when configured (#96).
     pub feedback: Option<Arc<feedback::Feedback>>,
 }
@@ -120,6 +122,7 @@ impl AppState {
             viewers: Arc::new(tokio::sync::Semaphore::new(cameras::MAX_VIEWERS)),
             jpegs: cameras::Jpegs::default(),
             public: config::Public::default(),
+            kiosk: config::Kiosk::default(),
             feedback: None,
         }
     }
@@ -144,6 +147,12 @@ impl AppState {
     }
 
     /// Carry the public live stream under these settings (#134).
+    /// Kiosk sessions as configured (#12).
+    pub fn with_kiosk(mut self, kiosk: config::Kiosk) -> Self {
+        self.kiosk = kiosk;
+        self
+    }
+
     pub fn with_public(mut self, public: config::Public) -> Self {
         self.public = public;
         self
@@ -284,6 +293,14 @@ pub fn routes() -> Vec<Route> {
             need: Need::Account,
             reach: Reach::Anywhere,
             handler: delete(auth::sign_out),
+        },
+        Route {
+            method: Method::GET,
+            path: "/api/session",
+            effect: Effect::Read,
+            need: Need::Account,
+            reach: Reach::Anywhere,
+            handler: get(auth::session),
         },
         Route {
             method: Method::GET,

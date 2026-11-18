@@ -66,8 +66,15 @@ full screen, through POP, and the tower comes back after five minutes or a
 tap on Back (#58). The space's own network may watch without signing in, so
 the kiosk needs no session for it.
 
-Signing in at the kiosk needs a keyboard until kiosk sessions start by a card
-tap (#12): plug one in to sign in as an admin there.
+**Signing in at the kiosk** (#12): **Sign in**, top right, opens an on-screen
+keyboard for a username and password; a card tap will do the same once the
+reader is wired (#19). At an enrolled kiosk every sign-in is a kiosk session:
+the bar across the top says who, counts down ("Signs you out in 0:45 if the
+screen is left alone"), and offers **Tag out**. Touching the screen keeps it
+going; left alone, it signs out by itself after `[kiosk] idle_secs` (90
+seconds unless set, 15 to 3600), and POP ends it on its side too, so a session
+left at the kiosk is over whatever the screen does. An admin signing in at the
+kiosk to enrol it, or to fix something, gets the same.
 
 ## Looking after it
 

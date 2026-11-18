@@ -259,7 +259,8 @@ async fn an_admin_enrolls_a_kiosk_whose_credential_pop_keeps_only_as_a_hash() {
         .await;
     assert_eq!(r.code, StatusCode::CREATED, "{}", r.body);
     let raw = r.headers[header::SET_COOKIE].to_str().unwrap().to_owned();
-    for part in ["HttpOnly", "SameSite=Strict", "Path=/api/kiosk"] {
+    // Path=/api: the check-in reads it, and so does signing in (#12).
+    for part in ["HttpOnly", "SameSite=Strict", "Path=/api;"] {
         assert!(raw.contains(part), "{raw}");
     }
     let token = set_cookie(&r.headers, "pop_kiosk")["pop_kiosk=".len()..].to_owned();
@@ -512,4 +513,138 @@ async fn an_admin_signing_in_from_outside_is_told_to_the_group() {
         "{:?}",
         pop.chat.0.lock().unwrap()
     );
+}
+
+// ---- kiosk sessions: signed in at a kiosk, ended by being left alone (#12) ---------
+
+impl Pop {
+    /// Sign in as `username` from the browser holding `kiosk`'s credential.
+    async fn sign_in_at(&self, kiosk: &str, username: &str) -> String {
+        let r = self
+            .send(
+                Method::POST,
+                "/api/session",
+                Some(kiosk),
+                Some(json!({"username": username, "password": "a long enough password"})),
+                KIOSK_AT,
+                &[],
+            )
+            .await;
+        assert_eq!(r.code, StatusCode::OK, "{}", r.body);
+        set_cookie(&r.headers, "pop_session")
+    }
+
+    /// Make every kiosk session look last used `secs` ago.
+    async fn left_alone(&self, secs: i64) {
+        sqlx::query(
+            "UPDATE sessions SET last_used_at = last_used_at - ? WHERE idle_secs IS NOT NULL",
+        )
+        .bind(secs)
+        .execute(&self.db)
+        .await
+        .unwrap();
+    }
+
+    async fn me(&self, session: &str) -> StatusCode {
+        self.send(Method::GET, "/api/me", Some(session), None, IN_SHOP, &[])
+            .await
+            .code
+    }
+}
+
+/// Signing in at a kiosk starts a kiosk session: it says so, and it ends once
+/// the screen has been left alone for the configured time, told by the API
+/// and by the session lookup itself.
+#[tokio::test]
+async fn a_sign_in_at_a_kiosk_ends_when_the_screen_is_left_alone() {
+    let pop = pop().await;
+    let kiosk = pop.enroll("The tower", OUTSIDE).await;
+    let session = pop.sign_in_at(&kiosk, "grace").await;
+    let info = pop
+        .send(
+            Method::GET,
+            "/api/session",
+            Some(&session),
+            None,
+            KIOSK_AT,
+            &[],
+        )
+        .await;
+    assert_eq!(info.body["idle_secs"], 90, "{}", info.body);
+    assert_eq!(info.body["user"]["name"], "Grace");
+    assert_eq!(
+        pop.audit("signed_in").await.last().unwrap(),
+        "Grace signed in at the kiosk"
+    );
+    pop.left_alone(91).await;
+    assert_eq!(pop.me(&session).await, StatusCode::UNAUTHORIZED);
+    let token = &session["pop_session=".len()..];
+    assert_eq!(users::session_user(&pop.db, token).await.unwrap(), None);
+}
+
+/// Being used keeps it going: each request starts its idle time again.
+#[tokio::test]
+async fn using_a_kiosk_session_keeps_it_going() {
+    let pop = pop().await;
+    let kiosk = pop.enroll("The tower", OUTSIDE).await;
+    let session = pop.sign_in_at(&kiosk, "grace").await;
+    for _ in 0..3 {
+        pop.left_alone(80).await;
+        assert_eq!(
+            pop.me(&session).await,
+            StatusCode::OK,
+            "used within its time"
+        );
+    }
+    // Three times 80 is past 90 in all: only being left alone ends it.
+}
+
+/// An ordinary sign-in is not one: not limited by being left alone.
+#[tokio::test]
+async fn a_sign_in_elsewhere_is_not_a_kiosk_session() {
+    let pop = pop().await;
+    pop.enroll("The tower", OUTSIDE).await;
+    let session = pop.sign_in("grace", IN_SHOP).await;
+    let info = pop
+        .send(
+            Method::GET,
+            "/api/session",
+            Some(&session),
+            None,
+            IN_SHOP,
+            &[],
+        )
+        .await;
+    assert_eq!(info.body["idle_secs"], Value::Null);
+    sqlx::query("UPDATE sessions SET last_used_at = last_used_at - 100000")
+        .execute(&pop.db)
+        .await
+        .unwrap();
+    assert_eq!(pop.me(&session).await, StatusCode::OK);
+}
+
+/// The time is the configured one.
+#[tokio::test]
+async fn a_kiosk_session_lasts_as_configured() {
+    let mut pop = pop().await;
+    pop.state = pop
+        .state
+        .clone()
+        .with_kiosk(pop_server::config::Kiosk { idle_secs: 30 });
+    pop.app = router(pop.state.clone());
+    let kiosk = pop.enroll("The tower", OUTSIDE).await;
+    let session = pop.sign_in_at(&kiosk, "grace").await;
+    let info = pop
+        .send(
+            Method::GET,
+            "/api/session",
+            Some(&session),
+            None,
+            KIOSK_AT,
+            &[],
+        )
+        .await;
+    assert_eq!(info.body["idle_secs"], 30);
+    pop.left_alone(31).await;
+    assert_eq!(pop.me(&session).await, StatusCode::UNAUTHORIZED);
 }

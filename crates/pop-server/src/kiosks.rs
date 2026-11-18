@@ -93,11 +93,12 @@ fn kiosk_token(headers: &HeaderMap) -> Option<String> {
 }
 
 /// The cookie that makes a browser a kiosk. HttpOnly: no script reads it.
-/// SameSite=Strict, and sent only to the check-in: it is the kiosk's word and
-/// nothing else, so it travels nowhere else.
+/// SameSite=Strict, and sent only to the API: the check-in reads it, and so
+/// does signing in, which at a kiosk starts a kiosk session (#12). Nothing
+/// else gives it any weight.
 fn cookie(token: &str, max_age: i64) -> HeaderValue {
     HeaderValue::from_str(&format!(
-        "{KIOSK_COOKIE}={token}; Path=/api/kiosk; HttpOnly; SameSite=Strict; Max-Age={max_age}"
+        "{KIOSK_COOKIE}={token}; Path=/api; HttpOnly; SameSite=Strict; Max-Age={max_age}"
     ))
     .expect("a cookie of base64url and fixed text is a valid header")
 }
@@ -242,7 +243,7 @@ pub async fn revoke(
 }
 
 /// The enrolled, unrevoked kiosk `headers` carry the credential of.
-async fn kiosk_of(db: &SqlitePool, headers: &HeaderMap) -> Result<Option<i64>, sqlx::Error> {
+pub async fn kiosk_of(db: &SqlitePool, headers: &HeaderMap) -> Result<Option<i64>, sqlx::Error> {
     let Some(token) = kiosk_token(headers) else {
         return Ok(None);
     };

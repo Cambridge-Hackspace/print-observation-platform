@@ -95,7 +95,20 @@ pub async fn sign_in(
     };
     let peer = connect.map(|Extension(c)| c.0.ip());
     let outside = !crate::access::is_local(&state, peer, &headers);
-    match users::start_session(&state.db, &user, outside).await {
+    // At an enrolled kiosk, a kiosk session: it ends with the screen left
+    // alone (#12), so nobody walks away signed in.
+    let at_kiosk = match crate::kiosks::kiosk_of(&state.db, &headers).await {
+        Ok(k) => k.is_some(),
+        Err(e) => {
+            tracing::error!("kiosks: {e}");
+            return error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "sign-in is not working right now",
+            );
+        }
+    };
+    let idle = at_kiosk.then_some(state.kiosk.idle_secs);
+    match users::start_session_with(&state.db, &user, outside, idle).await {
         Ok(token) => {
             if outside
                 && user.role == crate::api::Role::Admin
@@ -130,6 +143,27 @@ pub async fn sign_out(
     res.headers_mut()
         .insert(header::SET_COOKIE, session_cookie("", 0));
     res
+}
+
+/// `GET /api/session`: who is signed in, and, at a kiosk, how long the
+/// session lasts left alone (#12). Using it, like any request, is activity.
+pub async fn session(
+    State(state): State<AppState>,
+    Extension(user): Extension<User>,
+    headers: HeaderMap,
+) -> Response {
+    let idle = match session_token(&headers) {
+        Some(t) => match users::session_idle_secs(&state.db, &t).await {
+            Ok(i) => i,
+            Err(e) => return e.into_response(),
+        },
+        None => None,
+    };
+    Json(crate::api::SessionInfo {
+        user,
+        idle_secs: idle,
+    })
+    .into_response()
 }
 
 /// `GET /api/me`: who is signed in.
