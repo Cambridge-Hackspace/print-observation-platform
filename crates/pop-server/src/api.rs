@@ -46,6 +46,11 @@ pub struct GroupNotice {
     /// When Discord took it, in seconds since 1970.
     #[ts(type = "number")]
     pub at: i64,
+    /// The same notice with no one named in it: what the public stream says
+    /// when owners' names are not to go out on it (#134). Never sent itself.
+    #[serde(skip)]
+    #[ts(skip)]
+    pub without_owner: String,
 }
 
 /// A printer the tower runs, as every screen shows it (#49).

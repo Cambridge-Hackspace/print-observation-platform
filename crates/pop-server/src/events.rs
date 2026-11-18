@@ -19,6 +19,13 @@
 //! before it subscribed from the buffer, those after from the stream. A
 //! snapshot carries the id it was taken at, and the subscription after it
 //! starts at the next one.
+//!
+//! The stream is public (#7), so what it names is decided per connection
+//! (#134): a screen signed in, or on the space's own network (the kiosk,
+//! until kiosk sessions, #12), sees whose print is whose. Anyone else sees
+//! owners' first names only when `[public] owner_names` is on, and otherwise
+//! nobody named at all, in a printer's job or in a notice.
+//! `tests/public_stream.rs` pins every field the stream carries.
 
 use std::{
     collections::{HashMap, VecDeque},
@@ -28,7 +35,8 @@ use std::{
 };
 
 use axum::{
-    extract::{Query, State},
+    Extension,
+    extract::{ConnectInfo, Query, State},
     http::HeaderMap,
     response::sse::{Event, KeepAlive, Sse},
 };
@@ -181,12 +189,88 @@ struct Join {
     replay: Option<Vec<(u64, ServerEvent)>>,
 }
 
+/// Whose names a connection to the stream sees.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Names {
+    /// Whole names: signed in, or at the space.
+    All,
+    /// Owners' first names: the public, with `[public] owner_names` on.
+    First,
+    /// Nobody's.
+    None,
+}
+
+/// Whose names this request may see.
+async fn names_for(state: &AppState, peer: Option<std::net::IpAddr>, headers: &HeaderMap) -> Names {
+    if crate::access::is_local(&state.access, peer, headers) {
+        return Names::All;
+    }
+    if let Some(token) = crate::access::session_token(headers)
+        && let Ok(Some(_)) = crate::users::session_user(&state.db, &token).await
+    {
+        return Names::All;
+    }
+    if state.public.owner_names {
+        Names::First
+    } else {
+        Names::None
+    }
+}
+
+/// An event as a connection that sees `names` is sent it.
+pub fn named(event: &ServerEvent, names: Names) -> ServerEvent {
+    let printers = |ps: &[crate::api::TowerPrinter]| -> Vec<crate::api::TowerPrinter> {
+        ps.iter()
+            .cloned()
+            .map(|mut p| {
+                if let Some(j) = p.state.job.as_mut() {
+                    j.owner = match names {
+                        Names::All => j.owner.take(),
+                        Names::First => j
+                            .owner
+                            .as_deref()
+                            .and_then(crate::notices::first_name)
+                            .map(str::to_owned),
+                        Names::None => None,
+                    };
+                }
+                p
+            })
+            .collect()
+    };
+    let told = |ts: &[crate::api::GroupNotice]| -> Vec<crate::api::GroupNotice> {
+        ts.iter()
+            .cloned()
+            .map(|mut t| {
+                // What was posted names the owner by first name only.
+                if names == Names::None {
+                    t.text = t.without_owner.clone();
+                }
+                t
+            })
+            .collect()
+    };
+    match event {
+        ServerEvent::Snapshot(s) => ServerEvent::Snapshot(Snapshot {
+            status: s.status.clone(),
+            printers: printers(&s.printers),
+            told: told(&s.told),
+        }),
+        ServerEvent::Printers(ps) => ServerEvent::Printers(printers(ps)),
+        ServerEvent::Told(ts) => ServerEvent::Told(told(ts)),
+        ServerEvent::Status(_) => event.clone(),
+    }
+}
+
 /// `GET /api/events`.
 pub async fn stream(
     State(state): State<AppState>,
+    connected: Option<Extension<ConnectInfo<std::net::SocketAddr>>>,
     headers: HeaderMap,
     Query(query): Query<HashMap<String, String>>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let peer = connected.map(|Extension(ConnectInfo(a))| a.ip());
+    let names = names_for(&state, peer, &headers).await;
     let last = headers
         .get("last-event-id")
         .and_then(|v| v.to_str().ok())
@@ -207,21 +291,21 @@ pub async fn stream(
     let first = match replay {
         Some(missed) => missed
             .iter()
-            .map(|(n, e)| frame(&state.events, *n, e))
+            .map(|(n, e)| frame(&state.events, *n, &named(e, names)))
             .collect::<Vec<_>>(),
-        None => vec![snapshot(&state, current).await],
+        None => vec![snapshot(&state, current, names).await],
     };
 
     let rest = stream::unfold(
         (BroadcastStream::new(rx), state),
-        |(mut rx, state)| async move {
+        move |(mut rx, state)| async move {
             match rx.next().await? {
-                Ok((n, e)) => Some((frame(&state.events, n, &e), (rx, state))),
+                Ok((n, e)) => Some((frame(&state.events, n, &named(&e, names)), (rx, state))),
                 Err(BroadcastStreamRecvError::Lagged(_)) => {
                     // Its backlog is older than the snapshot it is about to
                     // be sent: drop it with the old subscription.
                     let (fresh, at) = state.events.rejoin();
-                    let s = snapshot(&state, at).await;
+                    let s = snapshot(&state, at, names).await;
                     Some((s, (BroadcastStream::new(fresh), state)))
                 }
             }
@@ -233,13 +317,13 @@ pub async fn stream(
 
 /// Everything a screen shows, as of event `at`. Taken after `at` was read, so
 /// it includes at least everything up to it.
-async fn snapshot(state: &AppState, at: u64) -> Result<Event, Infallible> {
+async fn snapshot(state: &AppState, at: u64, names: Names) -> Result<Event, Infallible> {
     let snap = ServerEvent::Snapshot(Snapshot {
         status: state.status().await,
         printers: state.tower.borrow().clone(),
         told: state.told.borrow().clone(),
     });
-    frame(&state.events, at, &snap)
+    frame(&state.events, at, &named(&snap, names))
 }
 
 fn frame(events: &Events, n: u64, event: &ServerEvent) -> Result<Event, Infallible> {

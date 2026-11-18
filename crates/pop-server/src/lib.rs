@@ -82,6 +82,8 @@ pub struct AppState {
     pub viewers: Arc<tokio::sync::Semaphore>,
     /// The cameras POP reads itself (#33).
     pub jpegs: cameras::Jpegs,
+    /// What the public live stream carries (#134).
+    pub public: config::Public,
 }
 
 impl AppState {
@@ -107,6 +109,7 @@ impl AppState {
             go2rtc: None,
             viewers: Arc::new(tokio::sync::Semaphore::new(cameras::MAX_VIEWERS)),
             jpegs: cameras::Jpegs::default(),
+            public: config::Public::default(),
         }
     }
 
@@ -121,6 +124,12 @@ impl AppState {
         self.jpegs = kept.jpegs;
         self.go2rtc = Some(go2rtc.clone());
         self.with_check(cameras::Go2rtcHealth(go2rtc))
+    }
+
+    /// Carry the public live stream under these settings (#134).
+    pub fn with_public(mut self, public: config::Public) -> Self {
+        self.public = public;
+        self
     }
 
     /// Offer published guides under these settings (#94).
