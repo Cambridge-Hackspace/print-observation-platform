@@ -48,3 +48,9 @@ jobs:
           CONTAINER: docker
         run: tools/package-test.sh kiosk
 
+      - name: The release signing script signs, and refuses what it should (#148)
+        run: |
+          . tools/images.sh
+          docker run --rm -v "$PWD:/w:ro" -w /w "$SIGN_IMAGE" sh -c \
+            'apt-get update -qq && apt-get install -qq -y --no-install-recommends openssl >/dev/null && openssl version && sh tools/sign-release-check.sh'
+

@@ -9,6 +9,11 @@ RUST_IMAGE="docker.io/library/rust@sha256:0e2bcaef56d041a486784e54104a81aebe0da4
 # so an ARM64 machine gets its own image (#9). Its amd64 image is the one this
 # file pinned before, sha256:2c752226d477b4a8...
 NODE_IMAGE="docker.io/library/node@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402"
+# debian:trixie-20261027-slim, by its multi-arch index: OpenSSL 3.5, which
+# signs with ML-DSA, for signing a release (tools/sign-release.sh, #148).
+# Used by CI only: the reaper battery signs nothing, so .reaper.toml does not
+# list it.
+SIGN_IMAGE="docker.io/library/debian@sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4"
 # playwright:v1.64.0-noble, matching @playwright/test in web/package.json.
 PLAYWRIGHT_IMAGE="mcr.microsoft.com/playwright@sha256:bc72a8df40831ded821e3cbc79c318c21b44d6e51dff9fd89ace7a8249c5b462"
 
@@ -19,5 +24,5 @@ CARGO_CACHE="${POP_CARGO_HOME:-pop-cargo-home}"
 TARGET_CACHE="${POP_TARGET:-pop-target}"
 NPM_CACHE="${POP_NPM_CACHE:-pop-npm-cache}"
 NODE_MODULES="${POP_NODE_MODULES:-pop-node-modules}"
-export CONTAINER MSYS_NO_PATHCONV=1 RUST_IMAGE NODE_IMAGE PLAYWRIGHT_IMAGE \
+export CONTAINER MSYS_NO_PATHCONV=1 RUST_IMAGE NODE_IMAGE PLAYWRIGHT_IMAGE SIGN_IMAGE \
   CARGO_CACHE TARGET_CACHE NPM_CACHE NODE_MODULES

@@ -2,7 +2,8 @@
 # image (packaging/Containerfile) built natively on a runner of that
 # architecture, pushed to GitHub's container registry, and the `pop` binary
 # taken from it; then one multi-architecture image, and a GitHub release
-# holding both binaries and their SHA-256 sums.
+# holding both binaries and their SHA-256 sums, signed with both release
+# keys (docs/releases.md, #148).
 #
 # Runs only on a tag like v0.1.0. The same build runs on every push in
 # ci.yml's package job, so a release builds what CI built.
@@ -81,13 +82,41 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: The release
+      - name: The sums
         run: |
           cd dist
           chmod +x pop-*
           sha256sum pop-* > SHA256SUMS
           cat SHA256SUMS
+
+      # Both signatures, made with OpenSSL 3.5 (ML-DSA) in SIGN_IMAGE, and
+      # each checked against the public key committed in
+      # packaging/release-keys before anything is published. The keys are
+      # written where only this job reads them, and removed after. The slim
+      # image has no openssl command: it comes from Debian's signed archive,
+      # at trixie's current version rather than one pinned with the image.
+      - name: Sign them
+        env:
+          ML_DSA_KEY: ${{ secrets.POP_RELEASE_ML_DSA_KEY }}
+          ED25519_KEY: ${{ secrets.POP_RELEASE_ED25519_KEY }}
+        run: |
+          [ -n "$ML_DSA_KEY" ] && [ -n "$ED25519_KEY" ] || {
+            echo "::error::the release keys are not in the repository's secrets (docs/releases.md)"
+            exit 1
+          }
+          keys="$RUNNER_TEMP/release-keys"
+          (umask 077 && mkdir "$keys" && printf '%s\n' "$ML_DSA_KEY" > "$keys/ml-dsa-65.key" && printf '%s\n' "$ED25519_KEY" > "$keys/ed25519.key")
+          . tools/images.sh
+          status=0
+          docker run --rm -v "$PWD:/w" -v "$keys:/keys:ro" -w /w "$SIGN_IMAGE" sh -c \
+            'apt-get update -qq && apt-get install -qq -y --no-install-recommends openssl >/dev/null && tools/sign-release.sh dist /keys/ml-dsa-65.key /keys/ed25519.key' || status=$?
+          rm -rf "$keys"
+          exit "$status"
+
+      - name: The release
+        run: |
+          cd dist
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
             --title "POP $GITHUB_REF_NAME" --verify-tag \
-            --notes "Binaries for Linux on x86-64 and ARM64, and the image $IMAGE:$GITHUB_REF_NAME. Installing and upgrading: docs/deployment.md." \
-            pop-* SHA256SUMS
+            --notes "Binaries for Linux on x86-64 and ARM64, their SHA256SUMS signed with ML-DSA-65 and Ed25519, and the image $IMAGE:$GITHUB_REF_NAME. Installing and upgrading: docs/deployment.md." \
+            pop-* SHA256SUMS SHA256SUMS.ml-dsa-65.sig SHA256SUMS.ed25519.sig
