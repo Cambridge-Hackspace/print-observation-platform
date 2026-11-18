@@ -57,6 +57,38 @@ never reach go2rtc directly; they watch through POP (#67).
 - `/healthz` has a `go2rtc` check: whether go2rtc answers, and lets POP in. A
   single camera that does not work does not fail it.
 
+## Watching
+
+Members watch a tower printer's camera through POP, signed in, from inside
+the space or out (#67). Two ways, because cameras send two kinds of video:
+
+- **MSE**, for cameras that send H.264 or H.265 (most RTSP cameras):
+  a WebSocket at `/api/printers/<BAM! id>/camera/mse`. The browser sends
+  `{"type":"mse","value":"<the codecs it can play>"}`; POP answers
+  `{"type":"mse","value":"<MIME type>"}` and then the video as MP4
+  fragments, for a `MediaSource`. Or it answers `{"type":"error","value":...}`:
+  `unsupported` (the camera sends JPEG: watch it as MJPEG), `no_picture`, or
+  `bad_request`.
+- **MJPEG**, for cameras that send JPEG pictures:
+  `/api/printers/<BAM! id>/camera/mjpeg`, which an `<img>` can show.
+
+Read-only by construction:
+
+- A viewer names a tower printer, never a go2rtc stream. A printer that is
+  not on the tower, or has no camera, is a 404, whatever the name.
+- Nothing a viewer sends reaches go2rtc but the list of codecs, and only
+  once POP has checked it is one (letters, digits, `.` and `,`). Every later
+  message from the viewer is dropped.
+- What go2rtc says went wrong can name the camera's address; a viewer hears
+  only `no_picture`.
+- At most 16 viewers watch at once, across every camera, since the tower's
+  connection carries each one's video. The next is told to try again.
+
+Not done: **WebRTC.** Its video travels from go2rtc to the viewer directly,
+on go2rtc's own port, not through POP, so watching from outside the space
+that way would mean opening go2rtc to the internet. MSE carries the same
+H.264 through POP instead, with a few seconds more delay.
+
 ## What POP was tested against
 
 `crates/pop-integrations/tests/recordings/go2rtc-1.9.15` holds a real go2rtc
@@ -77,14 +109,21 @@ recording against it. What the recording shows:
 - A picture from a camera that does not answer is a 200 with an empty body.
   The status alone does not say whether a camera works; POP checks for a JPEG.
 - With `local_auth` on, a request with no password or a wrong one is a 401.
+- MSE: go2rtc answers the codec list with the MIME type, then `ftyp`, then
+  `moof` after `moof`. A JPEG camera's answer is `codecs not matched`; a dead
+  camera's error names the address it dialled.
+- MJPEG: a JPEG camera's pictures as `multipart/x-mixed-replace`; an H.264
+  camera, or a dead one, is a 200 with nothing.
 
-What needs a real camera: that a stream plays. The recording's working
-camera was a still picture served as MJPEG (`tools/go2rtc/mjpeg.py`).
+What needs a real camera and a browser: that a stream plays. The recording's
+cameras were a still picture served as MJPEG (`tools/go2rtc/mjpeg.py`) and
+ffmpeg's H.264 test picture, published into go2rtc by the recorder.
 
 ### Recording again
 
 For a new go2rtc version, with go2rtc started from a fresh copy of
-`tools/go2rtc/go2rtc.yaml` (go2rtc writes into it) and a camera to record:
+`tools/go2rtc/go2rtc.yaml` (go2rtc writes into it), ffmpeg with libx264 on
+the path, and a camera to record:
 
 ```sh
 python3 tools/go2rtc/mjpeg.py 18985 picture.jpg &

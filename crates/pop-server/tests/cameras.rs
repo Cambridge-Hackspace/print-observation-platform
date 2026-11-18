@@ -397,3 +397,342 @@ async fn a_wrong_go2rtc_password_is_said_and_cameras_read_unknown() {
         "go2rtc refuses POP's user name and password"
     );
 }
+
+// ---- watching (#67) -----------------------------------------------------------
+
+use futures_util::{SinkExt, StreamExt};
+use tokio_tungstenite::tungstenite::{Message, client::IntoClientRequest};
+
+const CODECS: &str = "avc1.640029,avc1.64002A,mp4a.40.2";
+
+impl Pop {
+    /// Serve POP on a real port, as phones reach it: its address.
+    async fn serve(&self) -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let app = self.app.clone();
+        tokio::spawn(async move {
+            let _ = axum::serve(
+                listener,
+                app.into_make_service_with_connect_info::<SocketAddr>(),
+            )
+            .await;
+        });
+        format!("127.0.0.1:{}", addr.port())
+    }
+
+    /// The Voron's camera stream, once go2rtc serves it.
+    async fn voron_served(&self) {
+        let voron = self.voron();
+        self.streams_until("served the Voron", |s| s.contains_key(&voron))
+            .await;
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        while !self.health.borrow().iter().any(|c| c.name == "Voron 2.4") {
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "POP never listed the camera"
+            );
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }
+}
+
+type Socket =
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
+
+/// Open MSE on `bam_id`'s camera as `cookie`: the socket, or the refusal's status.
+async fn open_mse(addr: &str, bam_id: &str, cookie: Option<&str>) -> Result<Socket, u16> {
+    let mut req = format!("ws://{addr}/api/printers/{bam_id}/camera/mse")
+        .into_client_request()
+        .unwrap();
+    if let Some(c) = cookie {
+        req.headers_mut().insert("Cookie", c.parse().unwrap());
+    }
+    match tokio_tungstenite::connect_async(req).await {
+        Ok((ws, _)) => Ok(ws),
+        Err(tokio_tungstenite::tungstenite::Error::Http(r)) => Err(r.status().as_u16()),
+        Err(e) => panic!("{e}"),
+    }
+}
+
+async fn next(ws: &mut Socket) -> Message {
+    tokio::time::timeout(Duration::from_secs(5), ws.next())
+        .await
+        .expect("a message in time")
+        .expect("the socket open")
+        .unwrap()
+}
+
+fn text(m: &Message) -> Value {
+    match m {
+        Message::Text(t) => serde_json::from_str(t).unwrap(),
+        other => panic!("not text: {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn a_member_watches_an_h264_camera_and_nothing_else_they_send_reaches_go2rtc() {
+    let pop = pop().await;
+    pop.go2rtc.h264(VORON_CAMERA, true);
+    pop.voron_served().await;
+    let addr = pop.serve().await;
+    let mut ws = open_mse(&addr, pop.bam.id("voron"), Some(&pop.admin))
+        .await
+        .unwrap();
+    ws.send(Message::Text(
+        json!({"type": "mse", "value": CODECS}).to_string().into(),
+    ))
+    .await
+    .unwrap();
+    let first = text(&next(&mut ws).await);
+    assert_eq!(first["type"], "mse");
+    assert_eq!(first["value"], "video/mp4; codecs=\"avc1.420029\"");
+    for kind in [b"ftyp", b"moof"] {
+        match next(&mut ws).await {
+            Message::Binary(b) => assert_eq!(&b[4..8], kind),
+            other => panic!("not video: {other:?}"),
+        }
+    }
+    // What a viewer might try next: publish, or ask for another stream.
+    for attempt in [
+        json!({"type": "webrtc/offer", "value": "v=0"}),
+        json!({"type": "mse", "value": CODECS, "src": "front_door"}),
+    ] {
+        ws.send(Message::Text(attempt.to_string().into()))
+            .await
+            .unwrap();
+    }
+    // Still the video.
+    match next(&mut ws).await {
+        Message::Binary(b) => assert_eq!(&b[4..8], b"moof"),
+        other => panic!("not video: {other:?}"),
+    }
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert_eq!(
+        pop.go2rtc.sent(),
+        [json!({"type": "mse", "value": CODECS}).to_string()],
+        "go2rtc heard the codecs, once, and nothing else"
+    );
+    assert_eq!(pop.go2rtc.watching(), 1);
+    // The viewer leaves: so does POP's stream from go2rtc.
+    ws.close(None).await.unwrap();
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    while pop.go2rtc.watching() != 0 {
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "go2rtc's stream outlived its viewer"
+        );
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+}
+
+#[tokio::test]
+async fn a_codec_list_that_is_not_one_is_refused_before_go2rtc_hears_it() {
+    let pop = pop().await;
+    pop.go2rtc.h264(VORON_CAMERA, true);
+    pop.voron_served().await;
+    let addr = pop.serve().await;
+    for asked in [
+        json!({"type": "mse", "value": "avc1\",\"src\":\"front_door"}),
+        // Each character that may not be in a codec list, alone.
+        json!({"type": "mse", "value": "avc1.640029\""}),
+        json!({"type": "mse", "value": "avc1.640029 mp4a.40.2"}),
+        json!({"type": "mse", "value": "avc1.640029;mp4a.40.2"}),
+        json!({"type": "webrtc/offer", "value": "v=0"}),
+        json!({"type": "mse", "value": ""}),
+        json!({"type": "mse", "value": "a".repeat(513)}),
+    ] {
+        let mut ws = open_mse(&addr, pop.bam.id("voron"), Some(&pop.admin))
+            .await
+            .unwrap();
+        ws.send(Message::Text(asked.to_string().into()))
+            .await
+            .unwrap();
+        assert_eq!(
+            text(&next(&mut ws).await),
+            json!({"type": "error", "value": "bad_request"}),
+            "{asked}"
+        );
+    }
+    assert!(pop.go2rtc.sent().is_empty(), "{:?}", pop.go2rtc.sent());
+}
+
+/// A dead camera's error from go2rtc names its address; the viewer hears only
+/// that there is no picture.
+#[tokio::test]
+async fn what_go2rtc_says_about_a_camera_never_reaches_a_viewer() {
+    let pop = pop().await;
+    pop.voron_served().await;
+    // The precondition: go2rtc itself, asked directly, names the camera.
+    let mut req = format!(
+        "{}/api/ws?src={}",
+        pop.go2rtc.url().replace("http://", "ws://"),
+        pop.voron()
+    )
+    .into_client_request()
+    .unwrap();
+    use base64::Engine as _;
+    let basic = base64::engine::general_purpose::STANDARD.encode(format!(
+        "{}:{}",
+        fake_go2rtc::USER,
+        fake_go2rtc::PASSWORD
+    ));
+    req.headers_mut()
+        .insert("Authorization", format!("Basic {basic}").parse().unwrap());
+    let (mut direct, _) = tokio_tungstenite::connect_async(req).await.unwrap();
+    direct
+        .send(Message::Text(
+            json!({"type": "mse", "value": CODECS}).to_string().into(),
+        ))
+        .await
+        .unwrap();
+    let from_go2rtc = text(&next(&mut direct).await);
+    assert!(
+        from_go2rtc["value"]
+            .as_str()
+            .unwrap()
+            .contains("10.0.0.40:554"),
+        "{from_go2rtc}"
+    );
+    // Through POP.
+    let addr = pop.serve().await;
+    let mut ws = open_mse(&addr, pop.bam.id("voron"), Some(&pop.admin))
+        .await
+        .unwrap();
+    ws.send(Message::Text(
+        json!({"type": "mse", "value": CODECS}).to_string().into(),
+    ))
+    .await
+    .unwrap();
+    let said = next(&mut ws).await;
+    assert_eq!(text(&said), json!({"type": "error", "value": "no_picture"}));
+    let raw = format!("{said:?}");
+    assert!(!raw.contains("10.0.0.40"), "{raw}");
+}
+
+#[tokio::test]
+async fn a_jpeg_camera_is_watched_as_mjpeg_and_mse_says_so() {
+    let pop = pop().await;
+    pop.go2rtc.working(VORON_CAMERA, true);
+    pop.voron_served().await;
+    let addr = pop.serve().await;
+    let mut ws = open_mse(&addr, pop.bam.id("voron"), Some(&pop.admin))
+        .await
+        .unwrap();
+    ws.send(Message::Text(
+        json!({"type": "mse", "value": CODECS}).to_string().into(),
+    ))
+    .await
+    .unwrap();
+    assert_eq!(
+        text(&next(&mut ws).await),
+        json!({"type": "error", "value": "unsupported"})
+    );
+
+    let mut res = reqwest::Client::new()
+        .get(format!(
+            "http://{addr}/api/printers/{}/camera/mjpeg",
+            pop.bam.id("voron")
+        ))
+        .header("Cookie", &pop.admin)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), 200);
+    assert_eq!(
+        res.headers()["content-type"],
+        "multipart/x-mixed-replace; boundary=frame"
+    );
+    let first = res.chunk().await.unwrap().unwrap();
+    assert!(
+        first.starts_with(b"--frame\r\nContent-Type: image/jpeg"),
+        "{first:?}"
+    );
+}
+
+#[tokio::test]
+async fn only_members_watch_and_only_a_tower_printers_camera() {
+    let pop = pop_with(|g| g.add("front_door", "rtsp://10.0.0.2/door")).await;
+    pop.go2rtc.working(VORON_CAMERA, true);
+    pop.voron_served().await;
+    let addr = pop.serve().await;
+    let http = reqwest::Client::new();
+    let get = |path: String, cookie: Option<String>| {
+        let mut r = http.get(format!("http://{addr}{path}"));
+        if let Some(c) = cookie {
+            r = r.header("Cookie", c);
+        }
+        r.send()
+    };
+    let voron = pop.bam.id("voron").to_owned();
+    // Signed out: refused, on both ways of watching.
+    let r = get(format!("/api/printers/{voron}/camera/mjpeg"), None)
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 401);
+    assert_eq!(open_mse(&addr, &voron, None).await.err(), Some(401));
+    // Not a tower printer's camera: no such thing, however it is named.
+    let admin = Some(pop.admin.clone());
+    for id in [
+        "front_door",
+        "pop_front_door",
+        pop.bam.id("x1"),
+        "../front_door",
+    ] {
+        let r = get(format!("/api/printers/{id}/camera/mjpeg"), admin.clone())
+            .await
+            .unwrap();
+        assert!(r.status() == 404, "{id}: {}", r.status());
+    }
+    assert_eq!(pop.go2rtc.watching(), 0, "nothing was watched");
+}
+
+#[tokio::test]
+async fn no_more_than_the_limit_watch_at_once() {
+    let pop = pop().await;
+    pop.go2rtc.working(VORON_CAMERA, true);
+    pop.voron_served().await;
+    let addr = pop.serve().await;
+    let url = format!(
+        "http://{addr}/api/printers/{}/camera/mjpeg",
+        pop.bam.id("voron")
+    );
+    let http = reqwest::Client::new();
+    let mut watching = Vec::new();
+    for _ in 0..cameras::MAX_VIEWERS {
+        let r = http
+            .get(&url)
+            .header("Cookie", &pop.admin)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(r.status(), 200);
+        watching.push(r);
+    }
+    let r = http
+        .get(&url)
+        .header("Cookie", &pop.admin)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 503, "one past the limit");
+    // One leaves: there is room again.
+    drop(watching.pop());
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        let r = http
+            .get(&url)
+            .header("Cookie", &pop.admin)
+            .send()
+            .await
+            .unwrap();
+        if r.status() == 200 {
+            break;
+        }
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "the place was never given back"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+}

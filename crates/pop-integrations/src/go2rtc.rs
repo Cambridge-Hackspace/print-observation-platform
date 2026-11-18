@@ -19,13 +19,31 @@
 //!   works, 200 with *nothing* when it does not, and 404 when there is no
 //!   such stream. The status alone does not say whether the camera works.
 //!
+//! Watching (#67), recorded the same way:
+//!
+//! - MSE is a WebSocket, `/api/ws?src=<name>`: the client sends
+//!   `{"type":"mse","value":"<codecs it can play>"}`, and go2rtc answers
+//!   `{"type":"mse","value":"<MIME type>"}`, then the video as binary MP4
+//!   fragments (`ftyp`, then `moof` after `moof`). Or it answers
+//!   `{"type":"error","value":...}`: a camera that sends JPEG cannot be played
+//!   this way ("codecs not matched"), and the other errors can hold the
+//!   camera's address.
+//! - `/api/stream.mjpeg?src=<name>` is the MJPEG stream: a JPEG camera's
+//!   pictures, `multipart/x-mixed-replace`. A camera that sends H.264, or none
+//!   at all, is a 200 with nothing; no such stream is a 404.
+//!
 //! A camera's address may carry its password, so no error this client makes
-//! includes a request's address.
+//! includes a request's address, or what go2rtc said went wrong in a stream.
 
 use std::{collections::BTreeMap, time::Duration};
 
+use futures_util::{SinkExt, StreamExt};
 use reqwest::{Method, StatusCode, header};
 use serde::Deserialize;
+use tokio_tungstenite::{
+    MaybeTlsStream, WebSocketStream,
+    tungstenite::{Message, client::IntoClientRequest, http::HeaderValue},
+};
 
 /// Why a request to go2rtc failed, in words that say what to do about it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -84,12 +102,69 @@ struct Producer {
     url: Option<String>,
 }
 
+/// How an MSE stream began.
+pub enum Mse {
+    /// The video, in this MIME type, follows.
+    Playing { mime: String, media: Media },
+    /// The camera sends what MSE cannot carry (JPEG): watch it as MJPEG.
+    Unsupported,
+    /// go2rtc could not get a picture from the camera, or has no such stream.
+    NoPicture,
+}
+
+/// An MSE stream's video: binary MP4 fragments, as go2rtc sends them.
+pub struct Media {
+    ws: Box<WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>>,
+}
+
+impl Media {
+    /// The next fragment; `None` when go2rtc ends the stream.
+    pub async fn next(&mut self) -> Option<Vec<u8>> {
+        while let Some(m) = self.ws.next().await {
+            match m.ok()? {
+                Message::Binary(b) => return Some(b.to_vec()),
+                Message::Close(_) => return None,
+                // A later error from go2rtc ends the video; what it says may
+                // hold the camera's address, so it goes no further.
+                Message::Text(_) => return None,
+                _ => {}
+            }
+        }
+        None
+    }
+}
+
+/// How an MJPEG stream began.
+pub enum Mjpeg {
+    /// The pictures follow: a `multipart/x-mixed-replace` body of this type.
+    Playing {
+        content_type: String,
+        body: reqwest::Response,
+    },
+    /// go2rtc has the stream, but no JPEG pictures from it.
+    NoPicture,
+    /// go2rtc has no such stream.
+    NoStream,
+}
+
+impl Mjpeg {
+    /// The next piece of a playing stream's body.
+    pub async fn chunk(body: &mut reqwest::Response) -> Option<Vec<u8>> {
+        body.chunk().await.ok().flatten().map(|b| b.to_vec())
+    }
+}
+
+/// The longest go2rtc may be silent in a stream before POP gives up on it.
+const STREAM_SILENCE: Duration = Duration::from_secs(20);
+
 /// A client for one go2rtc.
 #[derive(Clone)]
 pub struct Go2rtc {
     base: String,
     auth: Option<(String, String)>,
     http: reqwest::Client,
+    /// For streams, which have no end: only a connect and a silence limit.
+    streams: reqwest::Client,
 }
 
 impl Go2rtc {
@@ -105,10 +180,17 @@ impl Go2rtc {
             .user_agent(concat!("POP/", env!("CARGO_PKG_VERSION")))
             .build()
             .map_err(|e| Go2rtcError::Unexpected(format!("cannot make an HTTP client: {e}")))?;
+        let streams = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(5))
+            .read_timeout(STREAM_SILENCE)
+            .user_agent(concat!("POP/", env!("CARGO_PKG_VERSION")))
+            .build()
+            .map_err(|e| Go2rtcError::Unexpected(format!("cannot make an HTTP client: {e}")))?;
         Ok(Self {
             base: base.into().trim_end_matches('/').to_owned(),
             auth,
             http,
+            streams,
         })
     }
 
@@ -245,6 +327,124 @@ impl Go2rtc {
             }
             s => Err(Go2rtcError::Unexpected(format!(
                 "a picture from {name}: HTTP {s}"
+            ))),
+        }
+    }
+
+    /// Watch the stream `name` as MSE, offering the codecs the viewer can play.
+    pub async fn mse(&self, name: &str, codecs: &str) -> Result<Mse, Go2rtcError> {
+        let mut url = reqwest::Url::parse(&format!("{}/api/ws", self.base)).map_err(|e| {
+            Go2rtcError::Unreachable(format!("{} is not an address: {e}", self.base))
+        })?;
+        let scheme = if url.scheme() == "https" { "wss" } else { "ws" };
+        url.set_scheme(scheme)
+            .map_err(|()| Go2rtcError::Unexpected("cannot make a WebSocket address".into()))?;
+        url.query_pairs_mut().append_pair("src", name);
+        let mut req = url
+            .as_str()
+            .into_client_request()
+            .map_err(|e| Go2rtcError::Unexpected(format!("the WebSocket request: {e}")))?;
+        if let Some((user, password)) = &self.auth {
+            use base64::Engine as _;
+            let token =
+                base64::engine::general_purpose::STANDARD.encode(format!("{user}:{password}"));
+            req.headers_mut().insert(
+                "Authorization",
+                HeaderValue::from_str(&format!("Basic {token}")).map_err(|_| {
+                    Go2rtcError::Unexpected("the password is not a valid header".into())
+                })?,
+            );
+        }
+        let connect = tokio_tungstenite::connect_async_tls_with_config(
+            req,
+            None,
+            false,
+            Some(crate::sync::connector()),
+        );
+        let (mut ws, _) = tokio::time::timeout(Duration::from_secs(10), connect)
+            .await
+            .map_err(|_| Go2rtcError::Unreachable(format!("{}: no answer", self.base)))?
+            .map_err(|e| match e {
+                tokio_tungstenite::tungstenite::Error::Http(r) if r.status() == 401 => {
+                    Go2rtcError::Auth
+                }
+                tokio_tungstenite::tungstenite::Error::Http(r) => {
+                    Go2rtcError::Unexpected(format!("watching {name}: HTTP {}", r.status()))
+                }
+                _ => Go2rtcError::Unreachable(format!("{}: the WebSocket did not open", self.base)),
+            })?;
+        let ask = serde_json::json!({"type": "mse", "value": codecs}).to_string();
+        ws.send(Message::Text(ask.into()))
+            .await
+            .map_err(|_| Go2rtcError::Unreachable("go2rtc closed the WebSocket".into()))?;
+        let first = tokio::time::timeout(STREAM_SILENCE, async {
+            while let Some(m) = ws.next().await {
+                match m {
+                    Ok(Message::Text(t)) => return Some(t.to_string()),
+                    Ok(Message::Close(_)) | Err(_) => return None,
+                    Ok(_) => {}
+                }
+            }
+            None
+        })
+        .await
+        .ok()
+        .flatten();
+        let Some(first) = first else {
+            return Ok(Mse::NoPicture);
+        };
+        let v: serde_json::Value = serde_json::from_str(&first).map_err(|_| {
+            Go2rtcError::Unexpected(format!("watching {name}: not the JSON POP expects"))
+        })?;
+        match (v["type"].as_str(), v["value"].as_str()) {
+            (Some("mse"), Some(mime)) => Ok(Mse::Playing {
+                mime: mime.to_owned(),
+                media: Media { ws: Box::new(ws) },
+            }),
+            (Some("error"), Some(why)) if why.contains("codecs not matched") => {
+                Ok(Mse::Unsupported)
+            }
+            (Some("error"), _) => Ok(Mse::NoPicture),
+            _ => Err(Go2rtcError::Unexpected(format!(
+                "watching {name}: go2rtc began with {:?}",
+                v["type"]
+            ))),
+        }
+    }
+
+    /// Watch the stream `name` as MJPEG.
+    pub async fn mjpeg(&self, name: &str) -> Result<Mjpeg, Go2rtcError> {
+        let mut url =
+            reqwest::Url::parse(&format!("{}/api/stream.mjpeg", self.base)).map_err(|e| {
+                Go2rtcError::Unreachable(format!("{} is not an address: {e}", self.base))
+            })?;
+        url.query_pairs_mut().append_pair("src", name);
+        let mut req = self.streams.get(url);
+        if let Some((user, password)) = &self.auth {
+            req = req.basic_auth(user, Some(password));
+        }
+        let res = req
+            .send()
+            .await
+            .map_err(|e| Go2rtcError::Unreachable(format!("{}: {}", self.base, e.without_url())))?;
+        let ctype = res
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_owned();
+        match res.status() {
+            StatusCode::UNAUTHORIZED => Err(Go2rtcError::Auth),
+            StatusCode::NOT_FOUND => Ok(Mjpeg::NoStream),
+            s if s.is_success() && ctype.starts_with("multipart/x-mixed-replace") => {
+                Ok(Mjpeg::Playing {
+                    content_type: ctype,
+                    body: res,
+                })
+            }
+            s if s.is_success() => Ok(Mjpeg::NoPicture),
+            s => Err(Go2rtcError::Unexpected(format!(
+                "watching {name}: HTTP {s}"
             ))),
         }
     }

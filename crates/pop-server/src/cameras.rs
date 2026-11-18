@@ -14,16 +14,27 @@
 //!
 //! A camera's address can hold its password, so it is never logged or shown;
 //! admins see each camera by its printer and stream.
+//!
+//! Watching (#67): members watch a tower printer's camera through POP, never
+//! go2rtc directly, as MSE over a WebSocket (H.264 cameras) or as MJPEG (JPEG
+//! cameras). Read-only by construction: a viewer names a tower printer, never
+//! a go2rtc stream, and the only thing a viewer's messages can carry to
+//! go2rtc is a list of codecs, checked first. go2rtc's own error text,
+//! which can name the camera's address, never reaches a viewer.
 
 use std::{collections::BTreeMap, time::Duration};
 
 use axum::{
     Json,
-    extract::State,
-    http::StatusCode,
+    body::Body,
+    extract::{
+        Path, State,
+        ws::{Message, WebSocket, WebSocketUpgrade},
+    },
+    http::{StatusCode, header},
     response::{IntoResponse, Response},
 };
-use pop_integrations::go2rtc::{Go2rtc, Go2rtcError, Picture};
+use pop_integrations::go2rtc::{Go2rtc, Go2rtcError, Mjpeg, Mse, Picture};
 use tokio::{sync::watch, task::JoinHandle};
 
 use crate::{
@@ -230,5 +241,186 @@ impl HealthCheck for Go2rtcHealth {
                 }
             })
         })
+    }
+}
+
+/// How many may watch at once, across every camera: the tower's connection
+/// carries each viewer's video separately.
+pub const MAX_VIEWERS: usize = 16;
+
+fn refuse(code: StatusCode, msg: &str) -> Response {
+    (
+        code,
+        Json(ApiError {
+            error: msg.to_owned(),
+        }),
+    )
+        .into_response()
+}
+
+/// The go2rtc stream of a tower printer's camera, if it has one.
+fn camera_stream(state: &AppState, bam_id: &str) -> Option<String> {
+    state
+        .cameras
+        .as_ref()?
+        .borrow()
+        .iter()
+        .find(|c| c.bam_id == bam_id)
+        .map(|c| c.stream.clone())
+}
+
+/// A viewer's place, if there is room.
+fn a_place(state: &AppState) -> Option<tokio::sync::OwnedSemaphorePermit> {
+    state.viewers.clone().try_acquire_owned().ok()
+}
+
+fn no_room() -> Response {
+    refuse(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "too many people are watching; try again in a while",
+    )
+}
+
+/// `GET /api/printers/{bam_id}/camera/mjpeg`: a JPEG camera's pictures.
+pub async fn watch_mjpeg(State(state): State<AppState>, Path(bam_id): Path<String>) -> Response {
+    let (Some(go2rtc), Some(stream)) = (state.go2rtc.clone(), camera_stream(&state, &bam_id))
+    else {
+        return refuse(
+            StatusCode::NOT_FOUND,
+            "that printer has no camera on the tower",
+        );
+    };
+    let Some(place) = a_place(&state) else {
+        return no_room();
+    };
+    match go2rtc.mjpeg(&stream).await {
+        Ok(Mjpeg::Playing { content_type, body }) => {
+            let pictures =
+                futures_util::stream::unfold((body, place), |(mut body, place)| async move {
+                    Mjpeg::chunk(&mut body)
+                        .await
+                        .map(|c| (Ok::<_, std::convert::Infallible>(c), (body, place)))
+                });
+            (
+                [
+                    (header::CONTENT_TYPE, content_type),
+                    (header::CACHE_CONTROL, "no-store".to_owned()),
+                ],
+                Body::from_stream(pictures),
+            )
+                .into_response()
+        }
+        Ok(Mjpeg::NoPicture | Mjpeg::NoStream) => refuse(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "the camera is not giving pictures as MJPEG; try the other way of watching, or check the camera",
+        ),
+        Err(e) => {
+            tracing::warn!("cameras: watching {stream}: {e}");
+            refuse(
+                StatusCode::BAD_GATEWAY,
+                "the camera cannot be reached through POP just now",
+            )
+        }
+    }
+}
+
+/// Whether `codecs` is a list of codec names, as a browser says them:
+/// `avc1.640029,mp4a.40.2`.
+fn is_codec_list(codecs: &str) -> bool {
+    !codecs.is_empty()
+        && codecs.len() <= 512
+        && codecs
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == ',')
+}
+
+/// `GET /api/printers/{bam_id}/camera/mse`: an H.264 camera, as MSE over a
+/// WebSocket. The viewer sends `{"type":"mse","value":"<codecs>"}`; POP
+/// answers `{"type":"mse","value":"<MIME type>"}` and the video, or
+/// `{"type":"error","value":"unsupported"}` (watch it as MJPEG instead),
+/// `"no_picture"` or `"bad_request"`.
+pub async fn watch_mse(
+    State(state): State<AppState>,
+    Path(bam_id): Path<String>,
+    ws: WebSocketUpgrade,
+) -> Response {
+    let (Some(go2rtc), Some(stream)) = (state.go2rtc.clone(), camera_stream(&state, &bam_id))
+    else {
+        return refuse(
+            StatusCode::NOT_FOUND,
+            "that printer has no camera on the tower",
+        );
+    };
+    let Some(place) = a_place(&state) else {
+        return no_room();
+    };
+    ws.on_upgrade(move |socket| relay(go2rtc, stream, socket, place))
+}
+
+async fn relay(
+    go2rtc: Go2rtc,
+    stream: String,
+    mut viewer: WebSocket,
+    _place: tokio::sync::OwnedSemaphorePermit,
+) {
+    let say = |kind: &str, value: &str| {
+        Message::Text(
+            serde_json::json!({"type": kind, "value": value})
+                .to_string()
+                .into(),
+        )
+    };
+    let asked = tokio::time::timeout(Duration::from_secs(10), viewer.recv()).await;
+    let codecs = match asked {
+        Ok(Some(Ok(Message::Text(t)))) => serde_json::from_str::<serde_json::Value>(&t)
+            .ok()
+            .filter(|v| v["type"] == "mse")
+            .and_then(|v| v["value"].as_str().map(str::to_owned))
+            .filter(|c| is_codec_list(c)),
+        _ => None,
+    };
+    let Some(codecs) = codecs else {
+        let _ = viewer.send(say("error", "bad_request")).await;
+        return;
+    };
+    let media = match go2rtc.mse(&stream, &codecs).await {
+        Ok(Mse::Playing { mime, media }) => {
+            if viewer.send(say("mse", &mime)).await.is_err() {
+                return;
+            }
+            media
+        }
+        Ok(Mse::Unsupported) => {
+            let _ = viewer.send(say("error", "unsupported")).await;
+            return;
+        }
+        Ok(Mse::NoPicture) => {
+            let _ = viewer.send(say("error", "no_picture")).await;
+            return;
+        }
+        Err(e) => {
+            tracing::warn!("cameras: watching {stream}: {e}");
+            let _ = viewer.send(say("error", "no_picture")).await;
+            return;
+        }
+    };
+    let mut media = media;
+    loop {
+        tokio::select! {
+            fragment = media.next() => match fragment {
+                Some(f) => if viewer.send(Message::Binary(f.into())).await.is_err() {
+                    return;
+                },
+                None => {
+                    let _ = viewer.send(say("error", "no_picture")).await;
+                    return;
+                }
+            },
+            // Nothing the viewer sends now goes anywhere; a close ends it.
+            m = viewer.recv() => match m {
+                Some(Ok(Message::Close(_)) | Err(_)) | None => return,
+                Some(Ok(_)) => {}
+            },
+        }
     }
 }
