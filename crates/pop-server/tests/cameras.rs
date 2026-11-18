@@ -27,7 +27,10 @@ use pop_integrations::{
     printers::FieldMap,
     sync,
 };
-use pop_printers::fleet::Backoff;
+use pop_printers::{
+    bambu::{MemoryPins, PinStore},
+    fleet::Backoff,
+};
 use pop_server::{
     AppState,
     api::{AdminCamera, CameraHealth, Role, TowerState},
@@ -116,13 +119,16 @@ async fn pop_with(setup: impl FnOnce(&FakeGo2rtc)) -> Pop {
     )
     .unwrap();
     let (wanted_tx, wanted) = watch::channel(cameras::Wanted::new());
-    let (health, _) = cameras::spawn(
+    let pins: Arc<dyn PinStore> = Arc::new(DbPins::load(db.clone()).await.unwrap());
+    let (kept, _) = cameras::spawn(
         client.clone(),
         wanted,
         cameras::Options {
             every: Duration::from_millis(100),
         },
+        pins.clone(),
     );
+    let health = kept.health.clone();
     let state = AppState::new(db.clone(), Arc::new(Embedded));
     let decided = state.decided.clone();
     let (tower, _) = run::spawn(run::Runner {
@@ -132,7 +138,7 @@ async fn pop_with(setup: impl FnOnce(&FakeGo2rtc)) -> Pop {
         view,
         events: state.events.clone(),
         decided: decided.clone(),
-        pins: Arc::new(DbPins::load(db.clone()).await.unwrap()),
+        pins,
         backoff: Backoff {
             first: Duration::from_millis(50),
             max: Duration::from_millis(200),
@@ -140,7 +146,7 @@ async fn pop_with(setup: impl FnOnce(&FakeGo2rtc)) -> Pop {
         },
         cameras: wanted_tx,
     });
-    let state = state.with_tower(tower).with_cameras(health.clone(), client);
+    let state = state.with_tower(tower).with_cameras(kept, client);
     let mut pop = Pop {
         _dir: dir,
         db,
@@ -321,7 +327,7 @@ async fn each_cameras_health_is_what_go2rtc_shows_and_admins_see_it() {
     pop.health_until(CameraHealth::NoPicture).await;
     pop.go2rtc.working(VORON_CAMERA, true);
     let c = pop.health_until(CameraHealth::Live).await;
-    assert_eq!(c.stream, pop.voron());
+    assert_eq!(c.stream, Some(pop.voron()));
     assert_eq!(c.bam_id, pop.bam.id("voron"));
 
     let (code, body, _, raw) = pop
@@ -367,11 +373,17 @@ async fn a_wrong_go2rtc_password_is_said_and_cameras_read_unknown() {
         "p1".into(),
         cameras::Camera {
             name: "A printer".into(),
-            source: VORON_CAMERA.into(),
+            source: cameras::Source::Address(VORON_CAMERA.into()),
         },
     );
     let (_tx, rx) = watch::channel(wanted);
-    let (mut health, _) = cameras::spawn(client.clone(), rx, cameras::Options::default());
+    let (kept, _) = cameras::spawn(
+        client.clone(),
+        rx,
+        cameras::Options::default(),
+        Arc::new(MemoryPins::default()),
+    );
+    let mut health = kept.health.clone();
     health.changed().await.unwrap();
     let c = health.borrow().clone();
     assert_eq!(c[0].health, CameraHealth::Unknown);
@@ -383,7 +395,7 @@ async fn a_wrong_go2rtc_password_is_said_and_cameras_read_unknown() {
         "{c:#?}"
     );
     assert!(go2rtc.streams().is_empty(), "nothing went in");
-    let state = AppState::new(db, Arc::new(Embedded)).with_cameras(health, client);
+    let state = AppState::new(db, Arc::new(Embedded)).with_cameras(kept, client);
     let app = router(state);
     let res = app
         .oneshot(Request::get("/healthz").body(Body::empty()).unwrap())

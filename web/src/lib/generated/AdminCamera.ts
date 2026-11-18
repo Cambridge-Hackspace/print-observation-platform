@@ -7,9 +7,9 @@ import type { CameraHealth } from "./CameraHealth";
  */
 export type AdminCamera = { bam_id: string, name: string, 
 /**
- * The stream's name in go2rtc.
+ * The stream's name in go2rtc; none for a camera POP reads itself (#33).
  */
-stream: string, health: CameraHealth, 
+stream: string | null, health: CameraHealth, 
 /**
  * What went wrong, when go2rtc could not be asked.
  */

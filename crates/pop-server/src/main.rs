@@ -239,6 +239,8 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
         let pins = pop_server::pins::DbPins::load(state.db.clone())
             .await
             .map_err(|e| format!("cannot read the Bambu certificate pins: {e}"))?;
+        // One store of pins, for the printers and their cameras alike.
+        let pins: Arc<dyn pop_printers::bambu::PinStore> = Arc::new(pins);
         let (cameras, wanted) = tokio::sync::watch::channel(pop_server::cameras::Wanted::new());
         if !config.go2rtc.url.is_empty() {
             let g = &config.go2rtc;
@@ -252,12 +254,13 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
                 .map_err(|e| format!("go2rtc: {e}"))?;
             // go2rtc serves the tower printers' cameras, kept as BAM! has
             // them (#66).
-            let (health, _keeper) = pop_server::cameras::spawn(
+            let (kept, _keeper) = pop_server::cameras::spawn(
                 client.clone(),
                 wanted,
                 pop_server::cameras::Options::default(),
+                pins.clone(),
             );
-            state = state.with_cameras(health, client);
+            state = state.with_cameras(kept, client);
         }
         let (tower, _runner) = pop_server::run::spawn(pop_server::run::Runner {
             db: state.db.clone(),
@@ -266,7 +269,7 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
             view,
             events: state.events.clone(),
             decided: state.decided.clone(),
-            pins: Arc::new(pins),
+            pins,
             backoff: pop_printers::fleet::Backoff::default(),
             cameras,
         });

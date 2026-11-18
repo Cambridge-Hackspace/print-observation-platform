@@ -23,6 +23,13 @@
 //! sends, so it is the part held to never panic and never hold more than
 //! [`MAX_PICTURE`] bytes, whatever arrives (tests/bambu_camera.rs).
 //!
+//! The X1, P2S and H2 series' RTSPS camera is played by go2rtc, but go2rtc
+//! checks no certificate for a camera addressed by IP (go2rtc 1.9.15,
+//! `pkg/tcp/dial.go`), as Bambu printers are, and would give the access code
+//! to anything posing as the printer. So POP relays it ([`Relay`]): go2rtc
+//! dials POP on the loopback address, and POP makes the TLS connection to the
+//! printer with the certificate pinned, then passes the bytes both ways.
+//!
 //! The certificate is pinned as the driver pins the printer's MQTT one, but
 //! under its own key (`<serial>#camera`): neither source says whether port
 //! 6000 presents the same certificate as port 8883.
@@ -32,7 +39,8 @@ use std::{collections::VecDeque, fmt, sync::Arc, time::Duration};
 use rustls::pki_types::ServerName;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
+    net::{TcpListener, TcpStream},
+    task::JoinHandle,
 };
 use tokio_rustls::{TlsConnector, client::TlsStream};
 
@@ -216,30 +224,7 @@ impl BambuCamera {
     /// Connect and sign in.
     pub async fn connect(&self) -> Result<Pictures, CameraError> {
         let hello = sign_in(&self.access_code)?;
-        let (tls, mismatch) = pinned_tls(&Self::pin_key(&self.serial), self.pins.clone())
-            .map_err(|e| CameraError::Unreachable(e.to_string()))?;
-        let tcp =
-            tokio::time::timeout(SILENCE, TcpStream::connect((self.host.as_str(), self.port)))
-                .await
-                .map_err(|_| CameraError::Unreachable(format!("{} did not answer", self.host)))?
-                .map_err(|e| CameraError::Unreachable(format!("{}: {e}", self.host)))?;
-        let name = ServerName::try_from(self.host.clone())
-            .map_err(|_| CameraError::Unreachable(format!("{} is not a host name", self.host)))?;
-        let mut tls = match tokio::time::timeout(
-            SILENCE,
-            TlsConnector::from(Arc::new(tls)).connect(name, tcp),
-        )
-        .await
-        {
-            Err(_) => {
-                return Err(CameraError::Unreachable(format!(
-                    "{} did not answer",
-                    self.host
-                )));
-            }
-            Ok(Err(e)) => return Err(refused_by_pin(&mismatch, e)),
-            Ok(Ok(t)) => t,
-        };
+        let mut tls = self.tls().await?;
         tls.write_all(&hello)
             .await
             .map_err(|e| CameraError::Unreachable(e.to_string()))?;
@@ -250,7 +235,94 @@ impl BambuCamera {
             got_any: false,
         })
     }
+
+    /// A TLS connection to the camera's port, its certificate pinned.
+    async fn tls(&self) -> Result<TlsStream<TcpStream>, CameraError> {
+        let (tls, mismatch) = pinned_tls(&Self::pin_key(&self.serial), self.pins.clone())
+            .map_err(|e| CameraError::Unreachable(e.to_string()))?;
+        let tcp =
+            tokio::time::timeout(SILENCE, TcpStream::connect((self.host.as_str(), self.port)))
+                .await
+                .map_err(|_| CameraError::Unreachable(format!("{} did not answer", self.host)))?
+                .map_err(|e| CameraError::Unreachable(format!("{}: {e}", self.host)))?;
+        let name = ServerName::try_from(self.host.clone())
+            .map_err(|_| CameraError::Unreachable(format!("{} is not a host name", self.host)))?;
+        match tokio::time::timeout(
+            SILENCE,
+            TlsConnector::from(Arc::new(tls)).connect(name, tcp),
+        )
+        .await
+        {
+            Err(_) => Err(CameraError::Unreachable(format!(
+                "{} did not answer",
+                self.host
+            ))),
+            Ok(Err(e)) => Err(refused_by_pin(&mismatch, e)),
+            Ok(Ok(t)) => Ok(t),
+        }
+    }
+
+    /// Relay this camera's TLS port to a port on the loopback address, with
+    /// the certificate pinned: for go2rtc, which would not check it.
+    pub async fn relay(&self) -> std::io::Result<Relay> {
+        let listener = TcpListener::bind("127.0.0.1:0").await?;
+        let port = listener.local_addr()?.port();
+        let last_error = Arc::new(std::sync::Mutex::new(None));
+        let camera = self.clone();
+        let errors = last_error.clone();
+        let task = tokio::spawn(async move {
+            while let Ok((mut local, _)) = listener.accept().await {
+                let camera = camera.clone();
+                let errors = errors.clone();
+                tokio::spawn(async move {
+                    match camera.tls().await {
+                        Ok(mut remote) => {
+                            *errors.lock().unwrap() = None;
+                            let _ = tokio::io::copy_bidirectional(&mut local, &mut remote).await;
+                        }
+                        Err(e) => {
+                            tracing::warn!("camera {}: {e}", camera.serial);
+                            *errors.lock().unwrap() = Some(e);
+                        }
+                    }
+                });
+            }
+        });
+        Ok(Relay {
+            port,
+            last_error,
+            task,
+        })
+    }
 }
+
+/// A camera's TLS port, relayed to the loopback address while this lives.
+pub struct Relay {
+    /// The loopback port that reaches the camera.
+    pub port: u16,
+    last_error: Arc<std::sync::Mutex<Option<CameraError>>>,
+    task: JoinHandle<()>,
+}
+
+impl Relay {
+    /// Why the last connection through the relay could not reach the camera,
+    /// if it could not.
+    pub fn last_error(&self) -> Option<CameraError> {
+        self.last_error.lock().unwrap().clone()
+    }
+}
+
+impl Drop for Relay {
+    fn drop(&mut self) {
+        self.task.abort();
+    }
+}
+
+/// The port the X1, P2S and H2 series serve RTSPS on.
+pub const RTSPS_PORT: u16 = 322;
+
+/// The path of their camera's stream (OpenBambuAPI `video.md`).
+pub const RTSPS_PATH: &str = "/streaming/live/1";
 
 fn refused_by_pin(mismatch: &Mismatches, e: std::io::Error) -> CameraError {
     match mismatch.lock().unwrap().take() {

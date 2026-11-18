@@ -50,6 +50,10 @@ never reach go2rtc directly; they watch through POP (#67).
   streams back at the next look.
 - Streams whose names do not start `pop_` are not POP's, and POP leaves them
   alone. Any `pop_` stream no printer wants is removed.
+- A Bambu printer's own RTSPS camera reaches go2rtc through POP's relay, as
+  `rtsp://bblp:<access code>@127.0.0.1:<port>/streaming/live/1`, so that its
+  certificate is checked (docs/printers/bambu.md). An A1's or P1's camera
+  never reaches go2rtc: POP reads it.
 - At each look POP asks go2rtc for a picture from every camera. Admins see
   each camera's health at `GET /api/admin/cameras`: `live`, `no_picture` (go2rtc
   has the stream but the camera gives nothing), `not_in_go2rtc`, or `unknown`

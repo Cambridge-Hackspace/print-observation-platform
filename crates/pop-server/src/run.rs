@@ -191,12 +191,12 @@ fn cameras(tx: &watch::Sender<crate::cameras::Wanted>, running: &BTreeMap<String
     let wanted: crate::cameras::Wanted = running
         .iter()
         .filter_map(|(id, r)| {
-            r.config.camera.as_ref().map(|source| {
+            crate::cameras::source_of(&r.config, r.access_code.as_deref()).map(|source| {
                 (
                     id.clone(),
                     crate::cameras::Camera {
                         name: r.config.name.clone(),
-                        source: source.clone(),
+                        source,
                     },
                 )
             })
