@@ -71,6 +71,9 @@ struct Shared {
     sent: Mutex<Vec<String>>,
     /// Media streams open now: MSE and MJPEG.
     watching: AtomicU32,
+    /// go2rtc's `local_auth`: off, it asks nothing of requests from its own
+    /// machine, as every request to the fake is.
+    local_auth: std::sync::atomic::AtomicBool,
 }
 
 /// Counts one open media stream while it lives.
@@ -176,6 +179,7 @@ impl FakeGo2rtc {
             requests: Mutex::new(Vec::new()),
             sent: Mutex::new(Vec::new()),
             watching: AtomicU32::new(0),
+            local_auth: std::sync::atomic::AtomicBool::new(true),
         });
         let listener = TcpListener::bind("127.0.0.1:0").await.expect("a free port");
         let addr = listener.local_addr().expect("its address");
@@ -253,6 +257,13 @@ impl FakeGo2rtc {
         self.shared.watching.load(Ordering::SeqCst)
     }
 
+    /// go2rtc with `local_auth` on (as POP's guide says) or off: off, it asks
+    /// requests from its own machine for nothing (internal/api/api.go,
+    /// middlewareAuth).
+    pub fn local_auth(&self, on: bool) {
+        self.shared.local_auth.store(on, Ordering::SeqCst);
+    }
+
     /// Every request so far, as "METHOD /path".
     pub fn requests(&self) -> Vec<String> {
         self.shared.requests.lock().unwrap().clone()
@@ -286,7 +297,7 @@ async fn answer(
 ) -> Response {
     let path = req.uri().path().to_owned();
     s.requests.lock().unwrap().push(format!("{method} {path}"));
-    if !authorized(&headers, &user, &password) {
+    if s.local_auth.load(Ordering::SeqCst) && !authorized(&headers, &user, &password) {
         let mut r = text(StatusCode::UNAUTHORIZED, &s.said.unauthorized);
         r.headers_mut().insert(
             header::WWW_AUTHENTICATE,
@@ -385,7 +396,7 @@ async fn mse(
     (user, password): (String, String),
 ) -> Response {
     s.requests.lock().unwrap().push("GET /api/ws".to_owned());
-    if !authorized(&headers, &user, &password) {
+    if s.local_auth.load(Ordering::SeqCst) && !authorized(&headers, &user, &password) {
         return text(StatusCode::UNAUTHORIZED, &s.said.unauthorized);
     }
     let name = q.get("src").cloned().unwrap_or_default();

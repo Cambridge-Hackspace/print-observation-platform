@@ -240,6 +240,27 @@ impl Go2rtc {
         String::from_utf8_lossy(body).trim().to_owned()
     }
 
+    /// Whether POP gives go2rtc a user name and password.
+    pub fn has_password(&self) -> bool {
+        self.auth.is_some()
+    }
+
+    /// Whether go2rtc answers a request with no password at all: as it does
+    /// for its own machine when `local_auth` is off, whatever password it has
+    /// (#149). Then anything on the box can change its streams.
+    pub async fn answers_without_password(&self) -> Result<bool, Go2rtcError> {
+        let bare = Self {
+            auth: None,
+            ..self.clone()
+        };
+        match bare.call(Method::GET, "/api", &[]).await {
+            Ok((s, _, _)) if s.is_success() => Ok(true),
+            Ok((s, _, _)) => Err(Go2rtcError::Unexpected(format!("/api: HTTP {s}"))),
+            Err(Go2rtcError::Auth) => Ok(false),
+            Err(e) => Err(e),
+        }
+    }
+
     /// go2rtc's version: whether it answers, and lets POP in.
     pub async fn version(&self) -> Result<String, Go2rtcError> {
         let (status, _, body) = self.call(Method::GET, "/api", &[]).await?;

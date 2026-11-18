@@ -394,3 +394,23 @@ async fn mjpeg_plays_a_jpeg_camera_only() {
         Mjpeg::NoStream
     ));
 }
+
+/// go2rtc asks nothing of requests from its own machine unless local_auth is
+/// on (#149): the client can tell.
+#[tokio::test]
+async fn whether_go2rtc_asks_for_its_password_is_seen() {
+    let go2rtc = FakeGo2rtc::start(RECORDING).await;
+    let c = client(&go2rtc);
+    assert!(
+        !c.answers_without_password().await.unwrap(),
+        "local_auth on"
+    );
+    go2rtc.local_auth(false);
+    assert!(
+        c.answers_without_password().await.unwrap(),
+        "local_auth off"
+    );
+    // Off, even a wrong password is let in: the password protects nothing.
+    let wrong = Go2rtc::new(go2rtc.url(), Some(("pop".into(), "wrong".into()))).unwrap();
+    assert_eq!(wrong.version().await.unwrap(), "1.9.15");
+}

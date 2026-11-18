@@ -199,6 +199,12 @@ on BAM! without naming its address.
   stream alone.
   `crates/pop-server/tests/cameras.rs::streams_that_are_not_pops_are_left_alone_and_stale_ones_of_pops_go`,
   `crates/pop-server/tests/cameras.rs::a_printer_that_leaves_the_tower_leaves_go2rtc`.
+- go2rtc asks nothing of requests from its own machine unless `local_auth`
+  is on, so POP checks: with a password set, it asks go2rtc once with none,
+  and if go2rtc answers, it says so in the log and fails the `go2rtc` health
+  check by name.
+  `crates/pop-server/tests/cameras.rs::health_says_when_go2rtc_asks_for_no_password`,
+  `crates/pop-integrations/tests/go2rtc.rs::whether_go2rtc_asks_for_its_password_is_seen`.
 - A wrong go2rtc password is said as such on `/healthz`, and nothing goes in.
   `crates/pop-server/tests/cameras.rs::a_wrong_go2rtc_password_is_said_and_cameras_read_unknown`.
 - Watching is for members, and only a tower printer's camera: no go2rtc
@@ -395,10 +401,8 @@ Each of these is true of POP today, or untested, and none is claimed above.
     server's default request size is 2 MB. Tracked in #145.
 
 **Cameras.**
-16. **POP does not check that go2rtc asks for its password.** go2rtc skips
-    it for requests from its own machine unless `local_auth` is on, so any
-    program on the box could change its streams. The guide says to turn it
-    on; nothing checks. Tracked in #149.
+16. **Closed (#149).** POP checks that go2rtc asks for its password: see
+    "Cameras and go2rtc".
 17. **Camera addresses are plain text in BAM! and in go2rtc's
     configuration file**, and a camera's address can hold its password. A
     Bambu X1's access code is among them: go2rtc's address for the relay
