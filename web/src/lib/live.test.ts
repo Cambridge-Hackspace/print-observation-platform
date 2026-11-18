@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { follow, parse, FIRST_RETRY_MS, MAX_RETRY_MS, type Connection, type Source } from './live';
+import {
+  follow,
+  parse,
+  resumeUrl,
+  FIRST_RETRY_MS,
+  MAX_RETRY_MS,
+  type Connection,
+  type Source,
+} from './live';
 import type { ServerEvent } from './generated/ServerEvent';
 
 /** Stands in for an EventSource; the test drives it. */
@@ -14,8 +22,8 @@ class FakeSource implements Source {
     this.readyState = 1;
     this.onopen?.(new Event('open'));
   }
-  message(data: string) {
-    this.onmessage?.({ data } as MessageEvent);
+  message(data: string, lastEventId = '') {
+    this.onmessage?.({ data, lastEventId } as MessageEvent);
   }
   /** The browser lost the connection and will retry it itself. */
   drop() {
@@ -51,11 +59,73 @@ function setup() {
   return { sources, events, states, invalid, stop, last };
 }
 
-const STATUS = '{"type":"status","data":{"version":"0.1.0","schema_version":1}}';
+const STATUS = '{"type":"status","data":{"version":"0.1.0","schema_version":1,"public_url":null}}';
 
 describe('parse', () => {
+  it('reads a snapshot', () => {
+    expect(
+      parse('{"type":"snapshot","data":{"status":{"version":"0.1.0","schema_version":1,"public_url":null},"printers":[]}}'),
+    ).toEqual({
+      type: 'snapshot',
+      data: { status: { version: '0.1.0', schema_version: 1, public_url: null }, printers: [], told: [] },
+    });
+  });
+  it('reads what the group chat was told, in a snapshot and on its own', () => {
+    const told = [{ printer: '642f57e2', text: 'Voron 2.4 needs a hand.', at: 1763300000 }];
+    const status = { version: '0.1.0', schema_version: 1, public_url: null };
+    expect(parse(JSON.stringify({ type: 'snapshot', data: { status, printers: [], told } }))).toEqual({
+      type: 'snapshot',
+      data: { status, printers: [], told },
+    });
+    expect(parse(JSON.stringify({ type: 'told', data: told }))).toEqual({ type: 'told', data: told });
+  });
+  it('reads a printer from a server that never said whether it holds the print as not holding it', () => {
+    const raw =
+      '{"type":"printers","data":[{"id":"a","name":"A","watched":true,"materials":[],"training":null,"state":{"status":"needs_hand","progress":null,"layer":null,"seconds_left":null,"job":null,"error":null}}]}';
+    const e = parse(raw);
+    expect(e?.type === 'printers' && e.data[0]?.state.held).toBe(false);
+  });
+  it('reads whether a printer has a camera, and none from a server that never said', () => {
+    const with_ = (camera: string) =>
+      `{"type":"printers","data":[{"id":"a","name":"A","watched":true,"materials":[],"training":null,${camera}"state":{"status":"idle","progress":null,"layer":null,"seconds_left":null,"job":null,"error":null,"held":false}}]}`;
+    const camera = (raw: string) => {
+      const e = parse(raw);
+      return e?.type === 'printers' ? e.data[0]?.camera : 'not read';
+    };
+    expect(camera(with_('"camera":true,'))).toBe(true);
+    expect(camera(with_('"camera":false,'))).toBe(false);
+    expect(camera(with_(''))).toBe(false);
+    expect(parse(with_('"camera":"yes",'))).toBeNull();
+  });
+  it('reads the printers, as the server sends them', () => {
+    // A frame as pop-server serializes it (tests/run.rs sees the same shape).
+    const voron = {
+      id: '642f57e2',
+      name: 'Voron 2.4',
+      state: {
+        status: 'needs_hand',
+        progress: 0.37,
+        layer: { current: 41, total: null },
+        seconds_left: 2280,
+        job: { name: 'phone_stand.gcode', owner: 'Sam Lee' },
+        error: { words: 'The filament ran out', raw: 'filament runout', known: true, key: 'klipper-runout' },
+        held: true,
+      },
+      watched: true,
+      materials: ['PLA', 'PETG'],
+      training: 'advanced', camera: false,
+    };
+    expect(parse(JSON.stringify({ type: 'printers', data: [voron] }))).toEqual({ type: 'printers', data: [voron] });
+  });
+  it('reads where phones reach POP, when it is set', () => {
+    const raw = '{"type":"status","data":{"version":"0.1.0","schema_version":1,"public_url":"https://pop.example.org"}}';
+    expect(parse(raw)).toEqual({
+      type: 'status',
+      data: { version: '0.1.0', schema_version: 1, public_url: 'https://pop.example.org' },
+    });
+  });
   it('reads a status event', () => {
-    expect(parse(STATUS)).toEqual({ type: 'status', data: { version: '0.1.0', schema_version: 1 } });
+    expect(parse(STATUS)).toEqual({ type: 'status', data: { version: '0.1.0', schema_version: 1, public_url: null } });
   });
   it('refuses what is not a ServerEvent', () => {
     for (const raw of [
@@ -65,7 +135,27 @@ describe('parse', () => {
       '{"type":"status"}',
       '{"type":"status","data":{"version":1,"schema_version":1}}',
       '{"type":"status","data":{"version":"0.1.0","schema_version":"1"}}',
+      '{"type":"status","data":{"version":"0.1.0","schema_version":1}}',
+      '{"type":"status","data":{"version":"0.1.0","schema_version":1,"public_url":7}}',
       '{"type":"printer","data":{}}',
+      '{"type":"snapshot","data":{}}',
+      '{"type":"snapshot","data":{"status":{"version":"0.1.0"}}}',
+      '{"type":"snapshot","data":{"status":{"version":"0.1.0","schema_version":1,"public_url":null}}}',
+      '{"type":"printers","data":{}}',
+      '{"type":"printers","data":[{"id":"a"}]}',
+      '{"type":"printers","data":[{"id":"a","name":"A","watched":true,"materials":[1],"training":null,"state":{"status":"idle","progress":null,"layer":null,"seconds_left":null,"job":null,"error":null}}]}',
+      '{"type":"printers","data":[{"id":"a","name":"A","watched":"yes","materials":[],"training":null,"state":{"status":"idle","progress":null,"layer":null,"seconds_left":null,"job":null,"error":null}}]}',
+      '{"type":"printers","data":[{"id":"a","name":"A","watched":true,"materials":[],"training":null,"state":{"status":"asleep","progress":null,"layer":null,"seconds_left":null,"job":null,"error":null}}]}',
+      '{"type":"printers","data":[{"id":"a","name":"A","watched":true,"materials":[],"training":null,"state":{"status":"idle","progress":"half","layer":null,"seconds_left":null,"job":null,"error":null}}]}',
+      '{"type":"printers","data":[{"id":"a","name":"A","watched":true,"materials":[],"training":null,"state":{"status":"idle","progress":null,"layer":{"total":3},"seconds_left":null,"job":null,"error":null}}]}',
+      '{"type":"printers","data":[{"id":"a","name":"A","watched":true,"materials":[],"training":null,"state":{"status":"idle","progress":null,"layer":null,"seconds_left":null,"job":{"owner":null},"error":null}}]}',
+      '{"type":"printers","data":[{"id":"a","name":"A","watched":true,"materials":[],"training":null,"state":{"status":"idle","progress":null,"layer":null,"seconds_left":null,"job":null,"error":{"words":"x","raw":"x"}}}]}',
+      '{"type":"printers","data":[{"id":"a","name":"A","watched":true,"materials":[],"training":null,"state":{"status":"idle","progress":null,"layer":null,"job":null,"error":null}}]}',
+      '{"type":"printers","data":[{"id":"a","name":"A","watched":true,"materials":[],"training":null,"state":{"status":"idle","progress":null,"layer":null,"seconds_left":null,"job":null,"error":null,"held":"yes"}}]}',
+      '{"type":"told","data":{}}',
+      '{"type":"told","data":[{"printer":"a","text":"A needs a hand."}]}',
+      '{"type":"told","data":[{"printer":"a","text":7,"at":1}]}',
+      '{"type":"snapshot","data":{"status":{"version":"0.1.0","schema_version":1,"public_url":null},"printers":[],"told":[{"printer":1,"text":"x","at":1}]}}',
     ]) {
       expect(parse(raw), raw).toBeNull();
     }
@@ -89,7 +179,7 @@ describe('follow', () => {
     t.last().open();
     t.last().message(STATUS);
     t.last().message('{"type":"status","data":{}}');
-    expect(t.events).toEqual([{ type: 'status', data: { version: '0.1.0', schema_version: 1 } }]);
+    expect(t.events).toEqual([{ type: 'status', data: { version: '0.1.0', schema_version: 1, public_url: null } }]);
     expect(t.invalid).toEqual(['{"type":"status","data":{}}']);
     expect(t.states.at(-1)).toBe('live');
   });
@@ -147,5 +237,33 @@ describe('follow', () => {
     t2.last().open();
     t2.stop();
     expect(t2.last().closed).toBe(true);
+  });
+});
+
+describe('resuming', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('builds the address with the last id, escaped', () => {
+    expect(resumeUrl('/api/events', '')).toBe('/api/events');
+    expect(resumeUrl('/api/events', 'a1b.42')).toBe('/api/events?last_event_id=a1b.42');
+    expect(resumeUrl('/api/events?x=1', 'e&v.1')).toBe('/api/events?x=1&last_event_id=e%26v.1');
+  });
+
+  it('reopens a connection it opens itself from the last id it saw', () => {
+    const t = setup();
+    t.last().open();
+    t.last().message(STATUS, 'ep.7');
+    t.last().message(STATUS, 'ep.8');
+    t.last().refuse();
+    vi.advanceTimersByTime(FIRST_RETRY_MS);
+    expect(t.last().url).toBe('/api/events?last_event_id=ep.8');
+  });
+
+  it('reopens plainly when it has seen nothing yet', () => {
+    const t = setup();
+    t.last().refuse();
+    vi.advanceTimersByTime(FIRST_RETRY_MS);
+    expect(t.last().url).toBe('/api/events');
   });
 });

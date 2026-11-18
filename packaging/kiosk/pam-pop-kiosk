@@ -1,0 +1,8 @@
+# The kiosk user's session (cage wiki, "Starting Cage on boot with systemd"):
+# logged in without a password on its own virtual terminal, and registered
+# with logind, which cage needs to take the screen and the touch panel.
+# Installed as /etc/pam.d/pop-kiosk by packaging/kiosk/setup.sh.
+auth           required        pam_unix.so nullok
+account        required        pam_unix.so
+session        required        pam_unix.so
+session        required        pam_systemd.so

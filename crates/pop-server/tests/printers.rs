@@ -1,0 +1,674 @@
+//! Printers from BAM!, as admins see them (#21), against a fake BAM! serving
+//! a real BAM!'s recorded answers.
+
+use std::{net::SocketAddr, sync::Arc};
+
+use axum::{
+    Router,
+    body::Body,
+    extract::ConnectInfo,
+    http::{Method, Request, StatusCode, header},
+};
+use http_body_util::BodyExt;
+use pop_integrations::{
+    bam::Bam,
+    fakes::bam::{FakeBam, TOKEN},
+    printers::FieldMap,
+};
+use pop_server::{
+    AppState,
+    api::Role,
+    assets::Embedded,
+    audit::Actor,
+    db,
+    printers::BamSource,
+    router,
+    secrets::{SecretError, Secrets},
+    users::{self, NewAccount},
+};
+use serde_json::{Value, json};
+use sqlx::SqlitePool;
+use tower::ServiceExt;
+
+const RECORDING: &str =
+    include_str!("../../pop-integrations/tests/recordings/v0.20.0/recordings.json");
+const KEY: &str = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=";
+
+struct Pop {
+    _dir: tempfile::TempDir,
+    db: SqlitePool,
+    app: Router,
+    fake: FakeBam,
+    admin: String,
+}
+
+async fn pop_with(token: &str, key: &str, bam: bool) -> Pop {
+    let dir = tempfile::tempdir().unwrap();
+    let db = db::open(&dir.path().join("pop.db")).await.unwrap();
+    users::create(
+        &db,
+        NewAccount {
+            username: "ada",
+            name: "Ada",
+            role: Role::Admin,
+            password: "ada's password",
+        },
+        &Actor::command_line(),
+    )
+    .await
+    .unwrap();
+    let fake = FakeBam::start(RECORDING).await;
+    let mut state = AppState::new(db.clone(), Arc::new(Embedded)).with_secrets(Secrets::new(key));
+    if bam {
+        state = state.with_bam(BamSource {
+            client: Bam::new(fake.url(), token).unwrap(),
+            category: fake.id("printers").to_owned(),
+            fields: FieldMap::default(),
+        });
+    }
+    let mut pop = Pop {
+        _dir: dir,
+        db,
+        app: router(state),
+        fake,
+        admin: String::new(),
+    };
+    let (_, _, set) = pop
+        .send(
+            Method::POST,
+            "/api/session",
+            None,
+            Some(json!({"username": "ada", "password": "ada's password"})),
+            LOCAL,
+        )
+        .await;
+    pop.admin = set.unwrap();
+    pop
+}
+
+async fn pop() -> Pop {
+    pop_with(TOKEN, KEY, true).await
+}
+
+const LOCAL: &str = "127.0.0.1:4000";
+const REMOTE: &str = "203.0.113.9:4000";
+
+impl Pop {
+    async fn send(
+        &self,
+        method: Method,
+        uri: &str,
+        cookie: Option<&str>,
+        body: Option<Value>,
+        from: &str,
+    ) -> (StatusCode, Value, Option<String>) {
+        let mut req = Request::builder().method(method).uri(uri);
+        if let Some(c) = cookie {
+            req = req.header(header::COOKIE, c);
+        }
+        let mut req = match body {
+            Some(b) => req
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(b.to_string())),
+            None => req.body(Body::empty()),
+        }
+        .unwrap();
+        req.extensions_mut()
+            .insert(ConnectInfo(from.parse::<SocketAddr>().unwrap()));
+        let res = self.app.clone().oneshot(req).await.unwrap();
+        let code = res.status();
+        let set = res
+            .headers()
+            .get(header::SET_COOKIE)
+            .map(|v| v.to_str().unwrap().split(';').next().unwrap().to_owned());
+        let bytes = res.into_body().collect().await.unwrap().to_bytes();
+        (
+            code,
+            serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+            set,
+        )
+    }
+
+    async fn printers(&self) -> Vec<Value> {
+        let (code, body, _) = self
+            .send(
+                Method::GET,
+                "/api/admin/printers",
+                Some(&self.admin),
+                None,
+                LOCAL,
+            )
+            .await;
+        assert_eq!(code, StatusCode::OK, "{body}");
+        body.as_array().unwrap().clone()
+    }
+
+    async fn enter_code(&self, bam_id: &str, code: &str, from: &str) -> (StatusCode, Value) {
+        let (c, b, _) = self
+            .send(
+                Method::PUT,
+                &format!("/api/admin/printers/{bam_id}/access-code"),
+                Some(&self.admin),
+                Some(json!({ "access_code": code })),
+                from,
+            )
+            .await;
+        (c, b)
+    }
+}
+
+fn named<'a>(all: &'a [Value], name: &str) -> &'a Value {
+    all.iter()
+        .find(|p| p["name"] == name)
+        .unwrap_or_else(|| panic!("no {name}"))
+}
+
+/// The printers table (#86): each printer's categories, training and camera,
+/// whether POP can run it yet or not.
+#[tokio::test]
+async fn each_printer_says_its_category_training_and_camera() {
+    let pop = pop().await;
+    let all = pop.printers().await;
+    let voron = named(&all, "Voron 2.4");
+    assert_eq!(voron["ready"], true);
+    assert_eq!(voron["categories"], json!(["Printers"]));
+    assert_eq!(voron["training"], "advanced");
+    assert_eq!(voron["camera"], false);
+    // Not ready (no access code yet), and still said from BAM!'s fields.
+    let x1 = named(&all, "X1 Carbon");
+    assert_eq!(x1["ready"], false);
+    assert_eq!(x1["training"], "basic");
+    assert_eq!(x1["camera"], true);
+    let ender = named(&all, "Ender 3");
+    assert_eq!(ender["training"], Value::Null);
+    assert_eq!(ender["camera"], false);
+    // Ready, and the camera still said.
+    let (code, body) = pop.enter_code(pop.fake.id("x1"), "12345678", LOCAL).await;
+    assert_eq!(code, StatusCode::NO_CONTENT, "{body}");
+    let x1 = named(&pop.printers().await, "X1 Carbon").clone();
+    assert_eq!(x1["ready"], true);
+    assert_eq!(x1["camera"], true);
+    assert_eq!(x1["training"], "basic");
+    // A field left blank in BAM! is no training and no camera.
+    pop.fake
+        .edit_without_event(pop.fake.id("incomplete"), "training", "  ");
+    pop.fake
+        .edit_without_event(pop.fake.id("incomplete"), "camera", " ");
+    let ender = named(&pop.printers().await, "Ender 3").clone();
+    assert_eq!(ender["training"], Value::Null);
+    assert_eq!(ender["camera"], false);
+}
+
+/// The issue's "done when": a printer with a missing or invalid field is
+/// shown to admins with the field named, rather than half-added.
+#[tokio::test]
+async fn a_printer_with_a_missing_field_is_shown_with_the_field_named() {
+    let pop = pop().await;
+    let all = pop.printers().await;
+    let ender = named(&all, "Ender 3");
+    assert_eq!(ender["ready"], false);
+    assert_eq!(ender["connection"], Value::Null, "nothing guessed for it");
+    assert_eq!(ender["problems"][0]["field"], "Connection (connection)");
+    let x1 = named(&all, "X1 Carbon");
+    assert_eq!(x1["ready"], false);
+    assert_eq!(x1["problems"][0]["field"], "LAN access code");
+    for ready in ["Voron 2.4", "MK4"] {
+        let p = named(&all, ready);
+        assert_eq!(p["ready"], true, "{p}");
+        assert_eq!(p["problems"], json!([]));
+    }
+    let names: Vec<_> = all.iter().map(|p| p["name"].as_str().unwrap()).collect();
+    assert_eq!(
+        names,
+        ["Ender 3", "MK4", "Voron 2.4", "X1 Carbon"],
+        "only the category's own, by name"
+    );
+}
+
+#[tokio::test]
+async fn entering_the_access_code_makes_a_bambu_printer_ready() {
+    let pop = pop().await;
+    let (code, body) = pop.enter_code(pop.fake.id("x1"), "12345678", LOCAL).await;
+    assert_eq!(code, StatusCode::NO_CONTENT, "{body}");
+    assert_eq!(named(&pop.printers().await, "X1 Carbon")["ready"], true);
+}
+
+#[tokio::test]
+async fn entering_an_access_code_is_recorded_without_the_code() {
+    let pop = pop().await;
+    pop.enter_code(pop.fake.id("x1"), "87654321", LOCAL).await;
+    let (_, log, _) = pop
+        .send(
+            Method::GET,
+            "/api/admin/audit?kind=access_code_set",
+            Some(&pop.admin),
+            None,
+            LOCAL,
+        )
+        .await;
+    let e = &log[0];
+    assert_eq!(e["summary"], "Ada entered X1 Carbon's LAN access code");
+    assert_eq!(e["printer"], pop.fake.id("x1"));
+    assert!(
+        !log.to_string().contains("87654321"),
+        "the code reached the audit log"
+    );
+}
+
+#[tokio::test]
+async fn the_code_is_kept_sealed_and_opens_with_its_key_only() {
+    let pop = pop().await;
+    let x1 = pop.fake.id("x1").to_owned();
+    pop.enter_code(&x1, "24681357", LOCAL).await;
+    let (nonce, sealed): (Vec<u8>, Vec<u8>) =
+        sqlx::query_as("SELECT nonce, sealed FROM printer_secrets")
+            .fetch_one(&pop.db)
+            .await
+            .unwrap();
+    assert!(!String::from_utf8_lossy(&sealed).contains("24681357"));
+    assert_eq!(nonce.len(), 12);
+    assert_eq!(
+        Secrets::new(KEY)
+            .access_code(&pop.db, &x1)
+            .await
+            .unwrap()
+            .as_deref(),
+        Some("24681357")
+    );
+    let other = "ZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmY=";
+    assert_eq!(
+        Secrets::new(other).access_code(&pop.db, &x1).await,
+        Err(SecretError::WillNotOpen)
+    );
+    // Copied to another printer's row, it does not open as that printer's.
+    sqlx::query("UPDATE printer_secrets SET bam_id = ?")
+        .bind(pop.fake.id("voron"))
+        .execute(&pop.db)
+        .await
+        .unwrap();
+    assert_eq!(
+        Secrets::new(KEY)
+            .access_code(&pop.db, pop.fake.id("voron"))
+            .await,
+        Err(SecretError::WillNotOpen)
+    );
+}
+
+#[tokio::test]
+async fn a_code_is_entered_only_from_inside_the_space() {
+    let pop = pop().await;
+    let (code, _) = pop.enter_code(pop.fake.id("x1"), "12345678", REMOTE).await;
+    assert_eq!(code, StatusCode::FORBIDDEN);
+    assert_eq!(named(&pop.printers().await, "X1 Carbon")["ready"], false);
+}
+
+#[tokio::test]
+async fn without_a_secrets_key_pop_refuses_to_keep_the_code() {
+    let pop = pop_with(TOKEN, "", true).await;
+    let (code, body) = pop.enter_code(pop.fake.id("x1"), "12345678", LOCAL).await;
+    assert_eq!(code, StatusCode::CONFLICT);
+    assert!(
+        body["error"].as_str().unwrap().contains("POP_SECRETS_KEY"),
+        "{body}"
+    );
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM printer_secrets")
+        .fetch_one(&pop.db)
+        .await
+        .unwrap();
+    assert_eq!(n, 0, "kept in plain text instead");
+}
+
+#[tokio::test]
+async fn a_code_that_cannot_be_one_is_refused() {
+    let pop = pop().await;
+    for bad in ["", "12", "1234 5678", &"9".repeat(40)] {
+        let (code, body) = pop.enter_code(pop.fake.id("x1"), bad, LOCAL).await;
+        assert_eq!(code, StatusCode::BAD_REQUEST, "{bad:?}");
+        assert!(
+            body["error"].as_str().unwrap().starts_with("access_code"),
+            "{body}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_code_for_a_printer_bam_does_not_have_is_refused() {
+    let pop = pop().await;
+    let (code, _) = pop
+        .enter_code("00000000-0000-4000-8000-000000000000", "12345678", LOCAL)
+        .await;
+    assert_eq!(code, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn without_bam_the_printer_list_says_how_to_set_it_up() {
+    let pop = pop_with(TOKEN, KEY, false).await;
+    let (code, body, _) = pop
+        .send(
+            Method::GET,
+            "/api/admin/printers",
+            Some(&pop.admin),
+            None,
+            LOCAL,
+        )
+        .await;
+    assert_eq!(code, StatusCode::SERVICE_UNAVAILABLE);
+    assert!(
+        body["error"].as_str().unwrap().contains("[bam] url"),
+        "{body}"
+    );
+}
+
+#[tokio::test]
+async fn a_bam_that_refuses_the_token_is_said_plainly() {
+    let pop = pop_with("bam_wrong", KEY, true).await;
+    let (code, body, _) = pop
+        .send(
+            Method::GET,
+            "/api/admin/printers",
+            Some(&pop.admin),
+            None,
+            LOCAL,
+        )
+        .await;
+    assert_eq!(code, StatusCode::BAD_GATEWAY);
+    assert!(
+        body["error"]
+            .as_str()
+            .unwrap()
+            .contains("refused POP's token"),
+        "{body}"
+    );
+}
+
+#[tokio::test]
+async fn healthz_reports_bam_by_name_and_without_detail() {
+    let good = pop().await;
+    let (code, body, _) = good.send(Method::GET, "/healthz", None, None, REMOTE).await;
+    assert_eq!(code, StatusCode::OK, "{body}");
+    assert_eq!(body["checks"]["bam"], json!({"ok": true}));
+    let bad = pop_with("bam_wrong", KEY, true).await;
+    let (code, body, _) = bad.send(Method::GET, "/healthz", None, None, REMOTE).await;
+    assert_eq!(code, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body["checks"]["bam"]["error"], "BAM! refused POP's token");
+    assert!(
+        !body.to_string().contains("127.0.0.1"),
+        "an address reached a public answer: {body}"
+    );
+}
+
+#[tokio::test]
+async fn healthz_says_when_bams_live_connection_is_down() {
+    let fake = FakeBam::start(RECORDING).await;
+    let dir = tempfile::tempdir().unwrap();
+    let db = db::open(&dir.path().join("pop.db")).await.unwrap();
+    let opts = pop_integrations::sync::Options {
+        first_retry: std::time::Duration::from_millis(50),
+        max_retry: std::time::Duration::from_millis(100),
+        ..pop_integrations::sync::Options::default()
+    };
+    let (view, _sync) = pop_integrations::sync::spawn(
+        Bam::new(fake.url(), TOKEN).unwrap(),
+        fake.id("printers").to_owned(),
+        opts,
+    );
+    let app = router(AppState::new(db, Arc::new(Embedded)).with_bam_sync(view.clone()));
+    let health = |app: Router| async move {
+        let res = app
+            .oneshot(Request::get("/healthz").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        let bytes = res.into_body().collect().await.unwrap().to_bytes();
+        serde_json::from_slice::<Value>(&bytes).unwrap()
+    };
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(4);
+    while !view.borrow().live {
+        assert!(tokio::time::Instant::now() < deadline, "never live");
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    assert_eq!(
+        health(app.clone()).await["checks"]["bam_live"],
+        json!({"ok": true})
+    );
+    fake.refuse_live(true);
+    fake.drop_live();
+    while view.borrow().live {
+        assert!(tokio::time::Instant::now() < deadline, "never down");
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    let h = health(app).await;
+    assert_eq!(h["checks"]["bam_live"]["ok"], false);
+    assert!(
+        h["checks"]["bam_live"]["error"]
+            .as_str()
+            .unwrap()
+            .contains("last said"),
+        "{h}"
+    );
+}
+
+// ---- a camera's login (#150) --------------------------------------------------------
+
+impl Pop {
+    async fn enter_login(&self, bam_id: &str, body: Value, from: &str) -> (StatusCode, Value) {
+        let (c, b, _) = self
+            .send(
+                Method::PUT,
+                &format!("/api/admin/printers/{bam_id}/camera-login"),
+                Some(&self.admin),
+                Some(body),
+                from,
+            )
+            .await;
+        (c, b)
+    }
+}
+
+const CAMERA: &str = "rtsp://10.0.0.40:554/stream1";
+
+/// A password in BAM!'s camera address is a problem with that field, and the
+/// problem never repeats it: BAM! holds the address, POP the login.
+#[tokio::test]
+async fn a_password_in_bams_camera_address_is_a_problem_that_never_repeats_it() {
+    let pop = pop().await;
+    let voron = pop.fake.id("voron").to_owned();
+    for with_password in [
+        "rtsp://admin:hunter2@10.0.0.40:554/stream1",
+        "http://:hunter2@10.0.0.40/mjpeg",
+    ] {
+        pop.fake.edit_without_event(&voron, "camera", with_password);
+        let all = pop.printers().await;
+        let v = named(&all, "Voron 2.4");
+        assert_eq!(v["ready"], false, "{with_password}");
+        assert_eq!(v["problems"][0]["in_pop"], false, "fixed in BAM!");
+        assert!(
+            v["problems"][0]["problem"]
+                .as_str()
+                .unwrap()
+                .contains("password"),
+            "{v}"
+        );
+        assert!(
+            !all.iter().any(|p| p.to_string().contains("hunter2")),
+            "{all:?}"
+        );
+    }
+    // A user without a password is an address like any other.
+    pop.fake
+        .edit_without_event(&voron, "camera", "rtsp://admin@10.0.0.40:554/stream1");
+    let all = pop.printers().await;
+    assert_eq!(named(&all, "Voron 2.4")["ready"], true);
+}
+
+/// Which problems are fixed in POP: only the access code POP keeps.
+#[tokio::test]
+async fn a_problem_says_whether_it_is_fixed_in_pop_or_in_bam() {
+    let pop = pop().await;
+    let all = pop.printers().await;
+    let x1 = named(&all, "X1 Carbon");
+    assert_eq!(x1["problems"][0]["field"], "LAN access code");
+    assert_eq!(x1["problems"][0]["in_pop"], true);
+    assert_eq!(x1["access_code"], false);
+    let ender = named(&all, "Ender 3");
+    assert_eq!(ender["problems"][0]["in_pop"], false);
+    pop.enter_code(pop.fake.id("x1"), "12345678", LOCAL).await;
+    assert_eq!(
+        named(&pop.printers().await, "X1 Carbon")["access_code"],
+        true
+    );
+}
+
+#[tokio::test]
+async fn a_camera_login_is_entered_kept_sealed_recorded_and_removed() {
+    let pop = pop().await;
+    let voron = pop.fake.id("voron").to_owned();
+    pop.fake.edit_without_event(&voron, "camera", CAMERA);
+    let v = named(&pop.printers().await, "Voron 2.4").clone();
+    assert_eq!(v["camera_login_fits"], true);
+    assert_eq!(v["camera_login"], false);
+    // A Bambu printer's own camera signs in with its access code instead.
+    let x1 = named(&pop.printers().await, "X1 Carbon").clone();
+    assert_eq!(x1["camera_login_fits"], false, "{x1}");
+
+    let (code, body) = pop
+        .enter_login(
+            &voron,
+            json!({"username": "viewer", "password": "hunter2"}),
+            LOCAL,
+        )
+        .await;
+    assert_eq!(code, StatusCode::NO_CONTENT, "{body}");
+    assert_eq!(
+        named(&pop.printers().await, "Voron 2.4")["camera_login"],
+        true
+    );
+    let opened = Secrets::new(KEY)
+        .camera_login(&pop.db, &voron)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(opened.username, "viewer");
+    assert_eq!(opened.password, "hunter2");
+    assert_eq!(opened.origin, "rtsp://10.0.0.40:554");
+    assert!(
+        !format!("{opened:?}").contains("hunter2"),
+        "Debug shows the password"
+    );
+    let sealed: Vec<u8> = sqlx::query_scalar("SELECT sealed FROM printer_secrets")
+        .fetch_one(&pop.db)
+        .await
+        .unwrap();
+    assert!(!String::from_utf8_lossy(&sealed).contains("hunter2"));
+    // Moved to be an access code, it does not open as one.
+    sqlx::query("UPDATE printer_secrets SET kind = 'access_code'")
+        .execute(&pop.db)
+        .await
+        .unwrap();
+    assert_eq!(
+        Secrets::new(KEY).access_code(&pop.db, &voron).await,
+        Err(SecretError::WillNotOpen)
+    );
+    sqlx::query("UPDATE printer_secrets SET kind = 'camera_login'")
+        .execute(&pop.db)
+        .await
+        .unwrap();
+
+    let uri = format!("/api/admin/printers/{voron}/camera-login");
+    let (code, _, _) = pop
+        .send(Method::DELETE, &uri, Some(&pop.admin), None, LOCAL)
+        .await;
+    assert_eq!(code, StatusCode::NO_CONTENT);
+    assert_eq!(
+        named(&pop.printers().await, "Voron 2.4")["camera_login"],
+        false
+    );
+    let (code, _, _) = pop
+        .send(Method::DELETE, &uri, Some(&pop.admin), None, LOCAL)
+        .await;
+    assert_eq!(code, StatusCode::NOT_FOUND, "nothing left to remove");
+
+    let (_, log, _) = pop
+        .send(
+            Method::GET,
+            "/api/admin/audit",
+            Some(&pop.admin),
+            None,
+            LOCAL,
+        )
+        .await;
+    let said: Vec<_> = log
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["kind"].as_str().unwrap().starts_with("camera_login"))
+        .map(|e| (e["kind"].as_str().unwrap(), e["summary"].as_str().unwrap()))
+        .collect();
+    assert!(
+        said.contains(&(
+            "camera_login_set",
+            "Ada entered the login for Voron 2.4's camera"
+        )),
+        "{said:?}"
+    );
+    assert!(
+        said.contains(&(
+            "camera_login_cleared",
+            "Ada removed the login for Voron 2.4's camera"
+        )),
+        "{said:?}"
+    );
+    assert!(
+        !log.to_string().contains("hunter2"),
+        "the password reached the audit log"
+    );
+}
+
+#[tokio::test]
+async fn a_camera_login_is_refused_when_it_cannot_be_kept_rightly() {
+    let pop = pop().await;
+    let voron = pop.fake.id("voron").to_owned();
+    pop.fake.edit_without_event(&voron, "camera", CAMERA);
+    let good = json!({"username": "viewer", "password": "hunter2"});
+    // From outside the space.
+    let (code, _) = pop.enter_login(&voron, good.clone(), REMOTE).await;
+    assert_eq!(code, StatusCode::FORBIDDEN);
+    // What cannot be a login.
+    for bad in [
+        json!({"username": "viewer", "password": ""}),
+        json!({"username": "viewer", "password": "a".repeat(129)}),
+        json!({"username": "viewer", "password": "line\nbreak"}),
+        json!({"username": "u".repeat(65), "password": "hunter2"}),
+        json!({"password": "hunter2"}),
+    ] {
+        let (code, body) = pop.enter_login(&voron, bad.clone(), LOCAL).await;
+        assert_eq!(code, StatusCode::BAD_REQUEST, "{bad} {body}");
+    }
+    // A printer BAM! does not have; one with no camera address.
+    let (code, _) = pop
+        .enter_login("00000000-0000-4000-8000-000000000000", good.clone(), LOCAL)
+        .await;
+    assert_eq!(code, StatusCode::NOT_FOUND);
+    let (code, body) = pop
+        .enter_login(pop.fake.id("mk4"), good.clone(), LOCAL)
+        .await;
+    assert_eq!(code, StatusCode::CONFLICT, "{body}");
+    assert!(
+        body["error"].as_str().unwrap().contains("camera field"),
+        "{body}"
+    );
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM printer_secrets")
+        .fetch_one(&pop.db)
+        .await
+        .unwrap();
+    assert_eq!(n, 0, "kept one it refused");
+    // Without a secrets key: refused, never kept in plain text.
+    let pop = pop_with(TOKEN, "", true).await;
+    pop.fake
+        .edit_without_event(pop.fake.id("voron"), "camera", CAMERA);
+    let (code, body) = pop.enter_login(pop.fake.id("voron"), good, LOCAL).await;
+    assert_eq!(code, StatusCode::CONFLICT);
+    assert!(
+        body["error"].as_str().unwrap().contains("POP_SECRETS_KEY"),
+        "{body}"
+    );
+}

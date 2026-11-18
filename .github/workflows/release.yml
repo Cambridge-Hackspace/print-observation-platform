@@ -1,0 +1,125 @@
+# A release, from a tag (#9): for each of x86-64 and ARM64, the container
+# image (packaging/Containerfile) built natively on a runner of that
+# architecture, pushed to GitHub's container registry, and the `pop` binary
+# taken from it; then one multi-architecture image, and a GitHub release
+# holding both binaries and their SHA-256 sums, signed with both release
+# keys (docs/releases.md, #148).
+#
+# Runs only on a tag like v0.1.0. The same build runs on every push in
+# ci.yml's package job, so a release builds what CI built.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/cambridge-hackspace/print-observation-platform
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build the image
+        run: |
+          . tools/images.sh
+          docker build -f packaging/Containerfile \
+            --build-arg RUST_IMAGE="$RUST_IMAGE" --build-arg NODE_IMAGE="$NODE_IMAGE" \
+            -t "$IMAGE:$GITHUB_REF_NAME-${{ matrix.arch }}" .
+
+      - name: Push it
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker push "$IMAGE:$GITHUB_REF_NAME-${{ matrix.arch }}"
+
+      - name: Take the binaries out
+        run: |
+          id=$(docker create "$IMAGE:$GITHUB_REF_NAME-${{ matrix.arch }}")
+          docker cp "$id:/usr/local/bin/pop" "pop-$GITHUB_REF_NAME-linux-${{ matrix.arch }}"
+          docker cp "$id:/usr/local/bin/pop-updater" "pop-updater-$GITHUB_REF_NAME-linux-${{ matrix.arch }}"
+          docker rm "$id"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pop-linux-${{ matrix.arch }}
+          path: |
+            pop-${{ github.ref_name }}-linux-${{ matrix.arch }}
+            pop-updater-${{ github.ref_name }}-linux-${{ matrix.arch }}
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      packages: write
+    env:
+      IMAGE: ghcr.io/cambridge-hackspace/print-observation-platform
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: One image for both architectures
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker manifest create "$IMAGE:$GITHUB_REF_NAME" \
+            "$IMAGE:$GITHUB_REF_NAME-x86_64" "$IMAGE:$GITHUB_REF_NAME-aarch64"
+          docker manifest push "$IMAGE:$GITHUB_REF_NAME"
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: The sums
+        run: |
+          cd dist
+          chmod +x pop-*
+          sha256sum pop-* > SHA256SUMS
+          cat SHA256SUMS
+
+      # Both signatures, made with OpenSSL 3.5 (ML-DSA) in SIGN_IMAGE, and
+      # each checked against the public key committed in
+      # packaging/release-keys before anything is published. The keys are
+      # written where only this job reads them, and removed after. The slim
+      # image has no openssl command: it comes from Debian's signed archive,
+      # at trixie's current version rather than one pinned with the image.
+      - name: Sign them
+        env:
+          ML_DSA_KEY: ${{ secrets.POP_RELEASE_ML_DSA_KEY }}
+          ED25519_KEY: ${{ secrets.POP_RELEASE_ED25519_KEY }}
+        run: |
+          [ -n "$ML_DSA_KEY" ] && [ -n "$ED25519_KEY" ] || {
+            echo "::error::the release keys are not in the repository's secrets (docs/releases.md)"
+            exit 1
+          }
+          keys="$RUNNER_TEMP/release-keys"
+          (umask 077 && mkdir "$keys" && printf '%s\n' "$ML_DSA_KEY" > "$keys/ml-dsa-65.key" && printf '%s\n' "$ED25519_KEY" > "$keys/ed25519.key")
+          . tools/images.sh
+          status=0
+          docker run --rm -v "$PWD:/w" -v "$keys:/keys:ro" -w /w "$SIGN_IMAGE" sh -c \
+            'apt-get update -qq && apt-get install -qq -y --no-install-recommends openssl >/dev/null && tools/sign-release.sh dist /keys/ml-dsa-65.key /keys/ed25519.key' || status=$?
+          rm -rf "$keys"
+          exit "$status"
+
+      - name: The release
+        run: |
+          cd dist
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --title "POP $GITHUB_REF_NAME" --verify-tag \
+            --notes "POP and its updater for Linux on x86-64 and ARM64, their SHA256SUMS signed with ML-DSA-65 and Ed25519, and the image $IMAGE:$GITHUB_REF_NAME. Installing and upgrading: docs/deployment.md." \
+            pop-* SHA256SUMS SHA256SUMS.ml-dsa-65.sig SHA256SUMS.ed25519.sig

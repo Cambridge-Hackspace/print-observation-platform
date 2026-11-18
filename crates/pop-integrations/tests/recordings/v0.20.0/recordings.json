@@ -1,0 +1,1903 @@
+{
+ "bam": "v0.20.0",
+ "ids": {
+  "filament": "126926e6-99d2-4960-9c59-977589de949f",
+  "incomplete": "796b699d-789e-4a4b-85dc-f7ff8988ce6e",
+  "mk4": "aaa16710-bdf5-449f-8838-3d828614e84f",
+  "old": "c70b535a-ed1a-46d9-b639-2fc8cc8fb404",
+  "printers": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
+  "resin": "4bf5faf5-35c3-46cd-97d7-a28ad264eebf",
+  "voron": "642f57e2-9fa1-4c13-8b7e-9258efb9c965",
+  "x1": "28c31053-26dc-4e28-af31-e4b4fdc5b9e0"
+ },
+ "recorded": {
+  "bad_token": {
+   "body": {
+    "error": "Invalid, expired or revoked API token"
+   },
+   "method": "GET",
+   "path": "/api/v1/assets?category_id=0ab0563e-e4c9-4f89-b2fe-1477df526279",
+   "status": 401
+  },
+  "categories": {
+   "body": {
+    "categories": [
+     {
+      "color_hex": "#3b82f6",
+      "created_at": "2026-11-16T11:37:52.030180815Z",
+      "effective_review": {
+       "enabled": false,
+       "months": 0,
+       "on_edit": "draft",
+       "self_verify": false
+      },
+      "id": "126926e6-99d2-4960-9c59-977589de949f",
+      "implies": [],
+      "included_by": [],
+      "is_consumable": false,
+      "is_lendable": false,
+      "is_running_low": false,
+      "label_template_id": null,
+      "label_template_ids": [],
+      "low_stock_threshold": null,
+      "name": "Filament",
+      "review": {
+       "enabled": null,
+       "months": null,
+       "on_edit": null,
+       "self_verify": null
+      },
+      "scan_template_id": null,
+      "unit": "",
+      "updated_at": "2026-11-16T11:37:52.030180815Z",
+      "vendor_ids": []
+     },
+     {
+      "color_hex": "#3b82f6",
+      "created_at": "2026-11-16T11:37:52.020766695Z",
+      "effective_review": {
+       "enabled": false,
+       "months": 0,
+       "on_edit": "draft",
+       "self_verify": false
+      },
+      "id": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
+      "implies": [],
+      "included_by": [],
+      "is_consumable": false,
+      "is_lendable": false,
+      "is_running_low": false,
+      "label_template_id": null,
+      "label_template_ids": [],
+      "low_stock_threshold": null,
+      "name": "Printers",
+      "review": {
+       "enabled": null,
+       "months": null,
+       "on_edit": null,
+       "self_verify": null
+      },
+      "scan_template_id": null,
+      "unit": "",
+      "updated_at": "2026-11-16T11:37:52.020766695Z",
+      "vendor_ids": []
+     },
+     {
+      "color_hex": "#3b82f6",
+      "created_at": "2026-11-16T11:37:52.025766915Z",
+      "effective_review": {
+       "enabled": false,
+       "months": 0,
+       "on_edit": "draft",
+       "self_verify": false
+      },
+      "id": "4bf5faf5-35c3-46cd-97d7-a28ad264eebf",
+      "implies": [],
+      "included_by": [],
+      "is_consumable": false,
+      "is_lendable": false,
+      "is_running_low": false,
+      "label_template_id": null,
+      "label_template_ids": [],
+      "low_stock_threshold": null,
+      "name": "Resin printers",
+      "parent_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
+      "review": {
+       "enabled": null,
+       "months": null,
+       "on_edit": null,
+       "self_verify": null
+      },
+      "scan_template_id": null,
+      "unit": "",
+      "updated_at": "2026-11-16T11:37:52.025766915Z",
+      "vendor_ids": []
+     }
+    ]
+   },
+   "method": "GET",
+   "path": "/api/v1/categories",
+   "status": 200
+  },
+  "events": {
+   "body": {
+    "events": [
+     {
+      "asset_id": "28c31053-26dc-4e28-af31-e4b4fdc5b9e0",
+      "created_at": "2026-11-16T11:37:52.07922Z",
+      "id": "38051457-5bdb-4cef-801e-7fa8e823b2aa",
+      "kind": "asset.created",
+      "payload": {
+       "asset": {
+        "id": "28c31053-26dc-4e28-af31-e4b4fdc5b9e0",
+        "name": "X1 Carbon"
+       },
+       "changes": [
+        {
+         "to": "X1 Carbon",
+         "what": "name"
+        },
+        {
+         "key": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
+         "to": "Printers",
+         "what": "category"
+        },
+        {
+         "key": "address",
+         "label": "Address",
+         "to": "192.168.1.50",
+         "what": "field"
+        },
+        {
+         "key": "camera",
+         "label": "Camera",
+         "to": "rtsps://192.168.1.50/streaming/live/1",
+         "what": "field"
+        },
+        {
+         "key": "connection",
+         "label": "Connection",
+         "to": "bambu",
+         "what": "field"
+        },
+        {
+         "key": "materials",
+         "label": "Materials",
+         "to": "PLA, PETG",
+         "what": "field"
+        },
+        {
+         "key": "model",
+         "label": "Model",
+         "to": "X1C",
+         "what": "field"
+        },
+        {
+         "key": "serial",
+         "label": "Serial number",
+         "to": "01S00C123456789",
+         "what": "field"
+        },
+        {
+         "key": "training",
+         "label": "Training",
+         "to": "basic",
+         "what": "field"
+        }
+       ],
+       "trigger": "manual"
+      }
+     },
+     {
+      "asset_id": "642f57e2-9fa1-4c13-8b7e-9258efb9c965",
+      "created_at": "2026-11-16T11:37:52.092467Z",
+      "id": "79e687bc-7c8a-47b6-917a-6c1cea279a41",
+      "kind": "asset.created",
+      "payload": {
+       "asset": {
+        "id": "642f57e2-9fa1-4c13-8b7e-9258efb9c965",
+        "name": "Voron 2.4"
+       },
+       "changes": [
+        {
+         "to": "Voron 2.4",
+         "what": "name"
+        },
+        {
+         "key": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
+         "to": "Printers",
+         "what": "category"
+        },
+        {
+         "key": "address",
+         "label": "Address",
+         "to": "ws://voron.local:7125/websocket",
+         "what": "field"
+        },
+        {
+         "key": "connection",
+         "label": "Connection",
+         "to": "moonraker",
+         "what": "field"
+        },
+        {
+         "key": "materials",
+         "label": "Materials",
+         "to": "PLA, PETG, ABS",
+         "what": "field"
+        },
+        {
+         "key": "model",
+         "label": "Model",
+         "to": "Voron 2.4 R2",
+         "what": "field"
+        },
+        {
+         "key": "training",
+         "label": "Training",
+         "to": "advanced",
+         "what": "field"
+        }
+       ],
+       "trigger": "manual"
+      }
+     },
+     {
+      "asset_id": "aaa16710-bdf5-449f-8838-3d828614e84f",
+      "created_at": "2026-11-16T11:37:52.105309Z",
+      "id": "a5434038-ccd1-4be9-85c2-9fe9c5eb3871",
+      "kind": "asset.created",
+      "payload": {
+       "asset": {
+        "id": "aaa16710-bdf5-449f-8838-3d828614e84f",
+        "name": "MK4"
+       },
+       "changes": [
+        {
+         "to": "MK4",
+         "what": "name"
+        },
+        {
+         "key": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
+         "to": "Printers",
+         "what": "category"
+        },
+        {
+         "key": "address",
+         "label": "Address",
+         "to": "http://192.168.1.52",
+         "what": "field"
+        },
+        {
+         "key": "connection",
+         "label": "Connection",
+         "to": "prusalink",
+         "what": "field"
+        },
+        {
+         "key": "model",
+         "label": "Model",
+         "to": "Original Prusa MK4",
+         "what": "field"
+        }
+       ],
+       "trigger": "manual"
+      }
+     },
+     {
+      "asset_id": "796b699d-789e-4a4b-85dc-f7ff8988ce6e",
+      "created_at": "2026-11-16T11:37:52.117952Z",
+      "id": "00f379af-3457-41c3-81b6-5a738604088d",
+      "kind": "asset.created",
+      "payload": {
+       "asset": {
+        "id": "796b699d-789e-4a4b-85dc-f7ff8988ce6e",
+        "name": "Ender 3"
+       },
+       "changes": [
+        {
+         "to": "Ender 3",
+         "what": "name"
+        },
+        {
+         "key": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
+         "to": "Printers",
+         "what": "category"
+        },
+        {
+         "key": "address",
+         "label": "Address",
+         "to": "192.168.1.53",
+         "what": "field"
+        }
+       ],
+       "trigger": "manual"
+      }
+     },
+     {
+      "asset_id": "c70b535a-ed1a-46d9-b639-2fc8cc8fb404",
+      "created_at": "2026-11-16T11:37:52.131338Z",
+      "id": "a64cf5cb-1e31-4265-b774-8673540a364a",
+      "kind": "asset.created",
+      "payload": {
+       "asset": {
+        "id": "c70b535a-ed1a-46d9-b639-2fc8cc8fb404",
+        "name": "Old Prusa"
+       },
+       "changes": [
+        {
+         "to": "Old Prusa",
+         "what": "name"
+        },
+        {
+         "key": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
+         "to": "Printers",
+         "what": "category"
+        },
+        {
+         "key": "address",
+         "label": "Address",
+         "to": "http://192.168.1.54",
+         "what": "field"
+        },
+        {
+         "key": "connection",
+         "label": "Connection",
+         "to": "octoprint",
+         "what": "field"
+        }
+       ],
+       "trigger": "manual"
+      }
+     },
+     {
+      "asset_id": "0b84852f-8970-4994-b02e-6e30ac975124",
+      "created_at": "2026-11-16T11:37:52.145099Z",
+      "id": "09b41eb1-806d-4f5b-9647-b0847f3651c8",
+      "kind": "asset.created",
+      "payload": {
+       "asset": {
+        "id": "0b84852f-8970-4994-b02e-6e30ac975124",
+        "name": "Form 3"
+       },
+       "changes": [
+        {
+         "to": "Form 3",
+         "what": "name"
+        },
+        {
+         "key": "4bf5faf5-35c3-46cd-97d7-a28ad264eebf",
+         "to": "Resin printers",
+         "what": "category"
+        },
+        {
+         "key": "model",
+         "label": "Model",
+         "to": "Form 3",
+         "what": "field"
+        }
+       ],
+       "trigger": "manual"
+      }
+     },
+     {
+      "asset_id": "642f57e2-9fa1-4c13-8b7e-9258efb9c965",
+      "created_at": "2026-11-16T11:37:52.190533Z",
+      "id": "143d20e9-4938-4c07-a5f3-e46012a4d9d9",
+      "kind": "asset.edited",
+      "payload": {
+       "asset": {
+        "id": "642f57e2-9fa1-4c13-8b7e-9258efb9c965",
+        "name": "Voron 2.4"
+       },
+       "changes": [
+        {
+         "from": "PLA, PETG, ABS",
+         "key": "materials",
+         "label": "Materials",
+         "to": "PLA, PETG, ABS, ASA",
+         "what": "field"
+        }
+       ],
+       "trigger": "manual"
+      }
+     },
+     {
+      "asset_id": "c70b535a-ed1a-46d9-b639-2fc8cc8fb404",
+      "created_at": "2026-11-16T11:37:52.205036Z",
+      "id": "74a9def0-f5fc-43fa-bce6-d32180de6ca7",
+      "kind": "asset.archived",
+      "payload": {
+       "asset": {
+        "id": "c70b535a-ed1a-46d9-b639-2fc8cc8fb404",
+        "name": "Old Prusa"
+       },
+       "trigger": "manual"
+      }
+     }
+    ],
+    "more": false
+   },
+   "method": "GET",
+   "path": "/api/v1/events?kinds=asset.created,asset.edited,asset.archived,asset.restored&categories=0ab0563e-e4c9-4f89-b2fe-1477df526279&limit=500",
+   "status": 200
+  },
+  "live": {
+   "body": {
+    "frames": [
+     {
+      "connection_id": "1a25e08f-7c59-4bb0-9cdf-d6170c2b6806",
+      "filter": {
+       "categories": [
+        "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       ],
+       "hooks": null,
+       "kinds": [
+        "asset.created",
+        "asset.edited",
+        "asset.archived",
+        "asset.restored"
+       ]
+      },
+      "type": "hello"
+     },
+     {
+      "event": {
+       "asset_id": "aaa16710-bdf5-449f-8838-3d828614e84f",
+       "created_at": "2026-11-16T11:37:52.274825Z",
+       "id": "3caa1140-04e5-42a5-8003-bce9e24de585",
+       "kind": "asset.edited",
+       "payload": {
+        "asset": {
+         "id": "aaa16710-bdf5-449f-8838-3d828614e84f",
+         "name": "MK4"
+        },
+        "changes": [
+         {
+          "from": "http://192.168.1.52",
+          "key": "address",
+          "label": "Address",
+          "to": "http://192.168.1.62",
+          "what": "field"
+         }
+        ],
+        "trigger": "manual"
+       }
+      },
+      "type": "event"
+     },
+     {
+      "event": {
+       "asset_id": "c70b535a-ed1a-46d9-b639-2fc8cc8fb404",
+       "created_at": "2026-11-16T11:37:52.287674Z",
+       "id": "d2a38875-2ea3-4270-b4cd-9d991cd0cadd",
+       "kind": "asset.restored",
+       "payload": {
+        "asset": {
+         "id": "c70b535a-ed1a-46d9-b639-2fc8cc8fb404",
+         "name": "Old Prusa"
+        },
+        "trigger": "manual"
+       }
+      },
+      "type": "event"
+     }
+    ]
+   },
+   "method": "GET",
+   "path": "/api/v1/events/live?kinds=asset.created,asset.edited,asset.archived,asset.restored&categories=0ab0563e-e4c9-4f89-b2fe-1477df526279",
+   "status": 101
+  },
+  "live_without_websocket": {
+   "body": {
+    "error": "Connect with a WebSocket (version 13) to receive events live"
+   },
+   "method": "GET",
+   "path": "/api/v1/events/live?kinds=asset.created,asset.edited,asset.archived,asset.restored&categories=0ab0563e-e4c9-4f89-b2fe-1477df526279",
+   "status": 426
+  },
+  "missing_asset": {
+   "body": {
+    "error": "Asset not found"
+   },
+   "method": "GET",
+   "path": "/api/v1/assets/00000000-0000-4000-8000-000000000000",
+   "status": 404
+  },
+  "no_token": {
+   "body": {
+    "error": "Authentication required"
+   },
+   "method": "GET",
+   "path": "/api/v1/assets?category_id=0ab0563e-e4c9-4f89-b2fe-1477df526279",
+   "status": 401
+  },
+  "printer_fields": {
+   "body": {
+    "category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
+    "fields": [
+     {
+      "field": {
+       "created_at": "2026-11-16T11:37:51.996523503Z",
+       "id": "9d437bfd-c590-46a8-a3af-5ac17747c77f",
+       "key": "address",
+       "label": "Address",
+       "updated_at": "2026-11-16T11:37:51.996523503Z",
+       "validation_type": "text"
+      },
+      "is_required": false,
+      "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+     },
+     {
+      "field": {
+       "created_at": "2026-11-16T11:37:52.001232176Z",
+       "id": "f9b40a11-e045-42ea-9180-38cebd2a9087",
+       "key": "camera",
+       "label": "Camera",
+       "updated_at": "2026-11-16T11:37:52.001232176Z",
+       "validation_type": "url"
+      },
+      "is_required": false,
+      "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+     },
+     {
+      "field": {
+       "created_at": "2026-11-16T11:37:51.991688074Z",
+       "id": "65776958-86d0-4eef-bc08-2c608f24b7b6",
+       "key": "connection",
+       "label": "Connection",
+       "options": {
+        "choices": [
+         {
+          "label": "Moonraker",
+          "value": "moonraker"
+         },
+         {
+          "label": "OctoPrint",
+          "value": "octoprint"
+         },
+         {
+          "label": "PrusaLink",
+          "value": "prusalink"
+         },
+         {
+          "label": "Bambu LAN",
+          "value": "bambu"
+         },
+         {
+          "label": "USB serial",
+          "value": "usb_serial"
+         }
+        ]
+       },
+       "updated_at": "2026-11-16T11:37:51.991688074Z",
+       "validation_type": "select"
+      },
+      "is_required": false,
+      "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+     },
+     {
+      "field": {
+       "created_at": "2026-11-16T11:37:52.008949872Z",
+       "id": "b2531cc7-33f5-4c5c-a79d-9d9ca956814d",
+       "key": "materials",
+       "label": "Materials",
+       "updated_at": "2026-11-16T11:37:52.008949872Z",
+       "validation_type": "text"
+      },
+      "is_required": false,
+      "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+     },
+     {
+      "field": {
+       "created_at": "2026-11-16T11:37:52.005165929Z",
+       "id": "0efad111-0f8d-4271-a6d1-ebc7d3bcd246",
+       "key": "model",
+       "label": "Model",
+       "updated_at": "2026-11-16T11:37:52.005165929Z",
+       "validation_type": "text"
+      },
+      "is_required": false,
+      "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+     },
+     {
+      "field": {
+       "created_at": "2026-11-16T11:37:52.016405015Z",
+       "id": "0348bdf1-5e97-4c8a-a7af-f4dfa72beeed",
+       "key": "serial",
+       "label": "Serial number",
+       "updated_at": "2026-11-16T11:37:52.016405015Z",
+       "validation_type": "text"
+      },
+      "is_required": false,
+      "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+     },
+     {
+      "field": {
+       "created_at": "2026-11-16T11:37:52.012518646Z",
+       "id": "42753882-34b4-4a75-8ab4-7d3f2e8577ee",
+       "key": "training",
+       "label": "Training",
+       "options": {
+        "choices": [
+         {
+          "label": "Basic",
+          "value": "basic"
+         },
+         {
+          "label": "Advanced",
+          "value": "advanced"
+         }
+        ]
+       },
+       "updated_at": "2026-11-16T11:37:52.012518646Z",
+       "validation_type": "select"
+      },
+      "is_required": false,
+      "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+     }
+    ]
+   },
+   "method": "GET",
+   "path": "/api/v1/categories/0ab0563e-e4c9-4f89-b2fe-1477df526279/fields",
+   "status": 200
+  },
+  "printers": {
+   "body": {
+    "assets": [
+     {
+      "asset": {
+       "condition": "ok",
+       "condition_note": "",
+       "created_at": "2026-11-16T11:37:52.116194981Z",
+       "icon_name": null,
+       "id": "796b699d-789e-4a4b-85dc-f7ff8988ce6e",
+       "label_icon_name": null,
+       "name": "Ender 3",
+       "stock": null,
+       "updated_at": "2026-11-16T11:37:52.116194981Z"
+      },
+      "categories": [
+       {
+        "color_hex": "#3b82f6",
+        "created_at": "2026-11-16T11:37:52.020766695Z",
+        "effective_review": {
+         "enabled": false,
+         "months": 0,
+         "on_edit": "",
+         "self_verify": false
+        },
+        "id": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
+        "implies": [],
+        "included_by": [],
+        "is_consumable": false,
+        "is_lendable": false,
+        "is_running_low": false,
+        "label_template_id": null,
+        "label_template_ids": [],
+        "low_stock_threshold": null,
+        "name": "Printers",
+        "review": {
+         "enabled": null,
+         "months": null,
+         "on_edit": null,
+         "self_verify": null
+        },
+        "scan_template_id": null,
+        "unit": "",
+        "updated_at": "2026-11-16T11:37:52.020766695Z",
+        "vendor_ids": []
+       }
+      ],
+      "contracts": [],
+      "counts_in": [],
+      "effective_fields": [
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:51.996523503Z",
+         "id": "9d437bfd-c590-46a8-a3af-5ac17747c77f",
+         "key": "address",
+         "label": "Address",
+         "updated_at": "2026-11-16T11:37:51.996523503Z",
+         "validation_type": "text"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.001232176Z",
+         "id": "f9b40a11-e045-42ea-9180-38cebd2a9087",
+         "key": "camera",
+         "label": "Camera",
+         "updated_at": "2026-11-16T11:37:52.001232176Z",
+         "validation_type": "url"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:51.991688074Z",
+         "id": "65776958-86d0-4eef-bc08-2c608f24b7b6",
+         "key": "connection",
+         "label": "Connection",
+         "options": {
+          "choices": [
+           {
+            "label": "Moonraker",
+            "value": "moonraker"
+           },
+           {
+            "label": "OctoPrint",
+            "value": "octoprint"
+           },
+           {
+            "label": "PrusaLink",
+            "value": "prusalink"
+           },
+           {
+            "label": "Bambu LAN",
+            "value": "bambu"
+           },
+           {
+            "label": "USB serial",
+            "value": "usb_serial"
+           }
+          ]
+         },
+         "updated_at": "2026-11-16T11:37:51.991688074Z",
+         "validation_type": "select"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.008949872Z",
+         "id": "b2531cc7-33f5-4c5c-a79d-9d9ca956814d",
+         "key": "materials",
+         "label": "Materials",
+         "updated_at": "2026-11-16T11:37:52.008949872Z",
+         "validation_type": "text"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.005165929Z",
+         "id": "0efad111-0f8d-4271-a6d1-ebc7d3bcd246",
+         "key": "model",
+         "label": "Model",
+         "updated_at": "2026-11-16T11:37:52.005165929Z",
+         "validation_type": "text"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.016405015Z",
+         "id": "0348bdf1-5e97-4c8a-a7af-f4dfa72beeed",
+         "key": "serial",
+         "label": "Serial number",
+         "updated_at": "2026-11-16T11:37:52.016405015Z",
+         "validation_type": "text"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.012518646Z",
+         "id": "42753882-34b4-4a75-8ab4-7d3f2e8577ee",
+         "key": "training",
+         "label": "Training",
+         "options": {
+          "choices": [
+           {
+            "label": "Basic",
+            "value": "basic"
+           },
+           {
+            "label": "Advanced",
+            "value": "advanced"
+           }
+          ]
+         },
+         "updated_at": "2026-11-16T11:37:52.012518646Z",
+         "validation_type": "select"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       }
+      ],
+      "field_values": {
+       "address": "192.168.1.53"
+      },
+      "generator_keys": [],
+      "holds": 0,
+      "hooks": [],
+      "label_template": {
+       "template_id": ""
+      },
+      "lendable": false,
+      "links": [],
+      "loan": null,
+      "location": [],
+      "photos": [],
+      "purchase": {
+       "order_date": "",
+       "prices_hidden": true,
+       "received_date": "",
+       "vendor_id": "",
+       "vendor_name": "",
+       "warranty_end": ""
+      },
+      "resolved_icon": null,
+      "resolved_icons": {},
+      "review": null,
+      "scan_template": {
+       "template_id": "bc4e2a6d-8f0b-4d5c-9e9a-d15c7d9f1a22"
+      },
+      "scopes": [
+       "default"
+      ],
+      "suggested_relation_type_ids": [],
+      "weighed": false
+     },
+     {
+      "asset": {
+       "condition": "ok",
+       "condition_note": "",
+       "created_at": "2026-11-16T11:37:52.104284739Z",
+       "icon_name": null,
+       "id": "aaa16710-bdf5-449f-8838-3d828614e84f",
+       "label_icon_name": null,
+       "name": "MK4",
+       "stock": null,
+       "updated_at": "2026-11-16T11:37:52.104284739Z"
+      },
+      "categories": [
+       {
+        "color_hex": "#3b82f6",
+        "created_at": "2026-11-16T11:37:52.020766695Z",
+        "effective_review": {
+         "enabled": false,
+         "months": 0,
+         "on_edit": "",
+         "self_verify": false
+        },
+        "id": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
+        "implies": [],
+        "included_by": [],
+        "is_consumable": false,
+        "is_lendable": false,
+        "is_running_low": false,
+        "label_template_id": null,
+        "label_template_ids": [],
+        "low_stock_threshold": null,
+        "name": "Printers",
+        "review": {
+         "enabled": null,
+         "months": null,
+         "on_edit": null,
+         "self_verify": null
+        },
+        "scan_template_id": null,
+        "unit": "",
+        "updated_at": "2026-11-16T11:37:52.020766695Z",
+        "vendor_ids": []
+       }
+      ],
+      "contracts": [],
+      "counts_in": [],
+      "effective_fields": [
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:51.996523503Z",
+         "id": "9d437bfd-c590-46a8-a3af-5ac17747c77f",
+         "key": "address",
+         "label": "Address",
+         "updated_at": "2026-11-16T11:37:51.996523503Z",
+         "validation_type": "text"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.001232176Z",
+         "id": "f9b40a11-e045-42ea-9180-38cebd2a9087",
+         "key": "camera",
+         "label": "Camera",
+         "updated_at": "2026-11-16T11:37:52.001232176Z",
+         "validation_type": "url"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:51.991688074Z",
+         "id": "65776958-86d0-4eef-bc08-2c608f24b7b6",
+         "key": "connection",
+         "label": "Connection",
+         "options": {
+          "choices": [
+           {
+            "label": "Moonraker",
+            "value": "moonraker"
+           },
+           {
+            "label": "OctoPrint",
+            "value": "octoprint"
+           },
+           {
+            "label": "PrusaLink",
+            "value": "prusalink"
+           },
+           {
+            "label": "Bambu LAN",
+            "value": "bambu"
+           },
+           {
+            "label": "USB serial",
+            "value": "usb_serial"
+           }
+          ]
+         },
+         "updated_at": "2026-11-16T11:37:51.991688074Z",
+         "validation_type": "select"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.008949872Z",
+         "id": "b2531cc7-33f5-4c5c-a79d-9d9ca956814d",
+         "key": "materials",
+         "label": "Materials",
+         "updated_at": "2026-11-16T11:37:52.008949872Z",
+         "validation_type": "text"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.005165929Z",
+         "id": "0efad111-0f8d-4271-a6d1-ebc7d3bcd246",
+         "key": "model",
+         "label": "Model",
+         "updated_at": "2026-11-16T11:37:52.005165929Z",
+         "validation_type": "text"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.016405015Z",
+         "id": "0348bdf1-5e97-4c8a-a7af-f4dfa72beeed",
+         "key": "serial",
+         "label": "Serial number",
+         "updated_at": "2026-11-16T11:37:52.016405015Z",
+         "validation_type": "text"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.012518646Z",
+         "id": "42753882-34b4-4a75-8ab4-7d3f2e8577ee",
+         "key": "training",
+         "label": "Training",
+         "options": {
+          "choices": [
+           {
+            "label": "Basic",
+            "value": "basic"
+           },
+           {
+            "label": "Advanced",
+            "value": "advanced"
+           }
+          ]
+         },
+         "updated_at": "2026-11-16T11:37:52.012518646Z",
+         "validation_type": "select"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       }
+      ],
+      "field_values": {
+       "address": "http://192.168.1.52",
+       "connection": "prusalink",
+       "model": "Original Prusa MK4"
+      },
+      "generator_keys": [],
+      "holds": 0,
+      "hooks": [],
+      "label_template": {
+       "template_id": ""
+      },
+      "lendable": false,
+      "links": [],
+      "loan": null,
+      "location": [],
+      "photos": [],
+      "purchase": {
+       "order_date": "",
+       "prices_hidden": true,
+       "received_date": "",
+       "vendor_id": "",
+       "vendor_name": "",
+       "warranty_end": ""
+      },
+      "resolved_icon": null,
+      "resolved_icons": {},
+      "review": null,
+      "scan_template": {
+       "template_id": "bc4e2a6d-8f0b-4d5c-9e9a-d15c7d9f1a22"
+      },
+      "scopes": [
+       "default"
+      ],
+      "suggested_relation_type_ids": [],
+      "weighed": false
+     },
+     {
+      "asset": {
+       "condition": "ok",
+       "condition_note": "",
+       "created_at": "2026-11-16T11:37:52.090405925Z",
+       "icon_name": null,
+       "id": "642f57e2-9fa1-4c13-8b7e-9258efb9c965",
+       "label_icon_name": null,
+       "name": "Voron 2.4",
+       "stock": null,
+       "updated_at": "2026-11-16T11:37:52.188482495Z"
+      },
+      "categories": [
+       {
+        "color_hex": "#3b82f6",
+        "created_at": "2026-11-16T11:37:52.020766695Z",
+        "effective_review": {
+         "enabled": false,
+         "months": 0,
+         "on_edit": "",
+         "self_verify": false
+        },
+        "id": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
+        "implies": [],
+        "included_by": [],
+        "is_consumable": false,
+        "is_lendable": false,
+        "is_running_low": false,
+        "label_template_id": null,
+        "label_template_ids": [],
+        "low_stock_threshold": null,
+        "name": "Printers",
+        "review": {
+         "enabled": null,
+         "months": null,
+         "on_edit": null,
+         "self_verify": null
+        },
+        "scan_template_id": null,
+        "unit": "",
+        "updated_at": "2026-11-16T11:37:52.020766695Z",
+        "vendor_ids": []
+       }
+      ],
+      "contracts": [],
+      "counts_in": [],
+      "effective_fields": [
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:51.996523503Z",
+         "id": "9d437bfd-c590-46a8-a3af-5ac17747c77f",
+         "key": "address",
+         "label": "Address",
+         "updated_at": "2026-11-16T11:37:51.996523503Z",
+         "validation_type": "text"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.001232176Z",
+         "id": "f9b40a11-e045-42ea-9180-38cebd2a9087",
+         "key": "camera",
+         "label": "Camera",
+         "updated_at": "2026-11-16T11:37:52.001232176Z",
+         "validation_type": "url"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:51.991688074Z",
+         "id": "65776958-86d0-4eef-bc08-2c608f24b7b6",
+         "key": "connection",
+         "label": "Connection",
+         "options": {
+          "choices": [
+           {
+            "label": "Moonraker",
+            "value": "moonraker"
+           },
+           {
+            "label": "OctoPrint",
+            "value": "octoprint"
+           },
+           {
+            "label": "PrusaLink",
+            "value": "prusalink"
+           },
+           {
+            "label": "Bambu LAN",
+            "value": "bambu"
+           },
+           {
+            "label": "USB serial",
+            "value": "usb_serial"
+           }
+          ]
+         },
+         "updated_at": "2026-11-16T11:37:51.991688074Z",
+         "validation_type": "select"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.008949872Z",
+         "id": "b2531cc7-33f5-4c5c-a79d-9d9ca956814d",
+         "key": "materials",
+         "label": "Materials",
+         "updated_at": "2026-11-16T11:37:52.008949872Z",
+         "validation_type": "text"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.005165929Z",
+         "id": "0efad111-0f8d-4271-a6d1-ebc7d3bcd246",
+         "key": "model",
+         "label": "Model",
+         "updated_at": "2026-11-16T11:37:52.005165929Z",
+         "validation_type": "text"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.016405015Z",
+         "id": "0348bdf1-5e97-4c8a-a7af-f4dfa72beeed",
+         "key": "serial",
+         "label": "Serial number",
+         "updated_at": "2026-11-16T11:37:52.016405015Z",
+         "validation_type": "text"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.012518646Z",
+         "id": "42753882-34b4-4a75-8ab4-7d3f2e8577ee",
+         "key": "training",
+         "label": "Training",
+         "options": {
+          "choices": [
+           {
+            "label": "Basic",
+            "value": "basic"
+           },
+           {
+            "label": "Advanced",
+            "value": "advanced"
+           }
+          ]
+         },
+         "updated_at": "2026-11-16T11:37:52.012518646Z",
+         "validation_type": "select"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       }
+      ],
+      "field_values": {
+       "address": "ws://voron.local:7125/websocket",
+       "connection": "moonraker",
+       "materials": "PLA, PETG, ABS, ASA",
+       "model": "Voron 2.4 R2",
+       "training": "advanced"
+      },
+      "generator_keys": [],
+      "holds": 0,
+      "hooks": [],
+      "label_template": {
+       "template_id": ""
+      },
+      "lendable": false,
+      "links": [],
+      "loan": null,
+      "location": [],
+      "photos": [],
+      "purchase": {
+       "order_date": "",
+       "prices_hidden": true,
+       "received_date": "",
+       "vendor_id": "",
+       "vendor_name": "",
+       "warranty_end": ""
+      },
+      "resolved_icon": null,
+      "resolved_icons": {},
+      "review": null,
+      "scan_template": {
+       "template_id": "bc4e2a6d-8f0b-4d5c-9e9a-d15c7d9f1a22"
+      },
+      "scopes": [
+       "default"
+      ],
+      "suggested_relation_type_ids": [],
+      "weighed": false
+     },
+     {
+      "asset": {
+       "condition": "ok",
+       "condition_note": "",
+       "created_at": "2026-11-16T11:37:52.077027801Z",
+       "icon_name": null,
+       "id": "28c31053-26dc-4e28-af31-e4b4fdc5b9e0",
+       "label_icon_name": null,
+       "name": "X1 Carbon",
+       "stock": null,
+       "updated_at": "2026-11-16T11:37:52.077027801Z"
+      },
+      "categories": [
+       {
+        "color_hex": "#3b82f6",
+        "created_at": "2026-11-16T11:37:52.020766695Z",
+        "effective_review": {
+         "enabled": false,
+         "months": 0,
+         "on_edit": "",
+         "self_verify": false
+        },
+        "id": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
+        "implies": [],
+        "included_by": [],
+        "is_consumable": false,
+        "is_lendable": false,
+        "is_running_low": false,
+        "label_template_id": null,
+        "label_template_ids": [],
+        "low_stock_threshold": null,
+        "name": "Printers",
+        "review": {
+         "enabled": null,
+         "months": null,
+         "on_edit": null,
+         "self_verify": null
+        },
+        "scan_template_id": null,
+        "unit": "",
+        "updated_at": "2026-11-16T11:37:52.020766695Z",
+        "vendor_ids": []
+       }
+      ],
+      "contracts": [],
+      "counts_in": [],
+      "effective_fields": [
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:51.996523503Z",
+         "id": "9d437bfd-c590-46a8-a3af-5ac17747c77f",
+         "key": "address",
+         "label": "Address",
+         "updated_at": "2026-11-16T11:37:51.996523503Z",
+         "validation_type": "text"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.001232176Z",
+         "id": "f9b40a11-e045-42ea-9180-38cebd2a9087",
+         "key": "camera",
+         "label": "Camera",
+         "updated_at": "2026-11-16T11:37:52.001232176Z",
+         "validation_type": "url"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:51.991688074Z",
+         "id": "65776958-86d0-4eef-bc08-2c608f24b7b6",
+         "key": "connection",
+         "label": "Connection",
+         "options": {
+          "choices": [
+           {
+            "label": "Moonraker",
+            "value": "moonraker"
+           },
+           {
+            "label": "OctoPrint",
+            "value": "octoprint"
+           },
+           {
+            "label": "PrusaLink",
+            "value": "prusalink"
+           },
+           {
+            "label": "Bambu LAN",
+            "value": "bambu"
+           },
+           {
+            "label": "USB serial",
+            "value": "usb_serial"
+           }
+          ]
+         },
+         "updated_at": "2026-11-16T11:37:51.991688074Z",
+         "validation_type": "select"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.008949872Z",
+         "id": "b2531cc7-33f5-4c5c-a79d-9d9ca956814d",
+         "key": "materials",
+         "label": "Materials",
+         "updated_at": "2026-11-16T11:37:52.008949872Z",
+         "validation_type": "text"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.005165929Z",
+         "id": "0efad111-0f8d-4271-a6d1-ebc7d3bcd246",
+         "key": "model",
+         "label": "Model",
+         "updated_at": "2026-11-16T11:37:52.005165929Z",
+         "validation_type": "text"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.016405015Z",
+         "id": "0348bdf1-5e97-4c8a-a7af-f4dfa72beeed",
+         "key": "serial",
+         "label": "Serial number",
+         "updated_at": "2026-11-16T11:37:52.016405015Z",
+         "validation_type": "text"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.012518646Z",
+         "id": "42753882-34b4-4a75-8ab4-7d3f2e8577ee",
+         "key": "training",
+         "label": "Training",
+         "options": {
+          "choices": [
+           {
+            "label": "Basic",
+            "value": "basic"
+           },
+           {
+            "label": "Advanced",
+            "value": "advanced"
+           }
+          ]
+         },
+         "updated_at": "2026-11-16T11:37:52.012518646Z",
+         "validation_type": "select"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       }
+      ],
+      "field_values": {
+       "address": "192.168.1.50",
+       "camera": "rtsps://192.168.1.50/streaming/live/1",
+       "connection": "bambu",
+       "materials": "PLA, PETG",
+       "model": "X1C",
+       "serial": "01S00C123456789",
+       "training": "basic"
+      },
+      "generator_keys": [],
+      "holds": 0,
+      "hooks": [],
+      "label_template": {
+       "template_id": ""
+      },
+      "lendable": false,
+      "links": [],
+      "loan": null,
+      "location": [],
+      "photos": [],
+      "purchase": {
+       "order_date": "",
+       "prices_hidden": true,
+       "received_date": "",
+       "vendor_id": "",
+       "vendor_name": "",
+       "warranty_end": ""
+      },
+      "resolved_icon": null,
+      "resolved_icons": {},
+      "review": null,
+      "scan_template": {
+       "template_id": "bc4e2a6d-8f0b-4d5c-9e9a-d15c7d9f1a22"
+      },
+      "scopes": [
+       "default"
+      ],
+      "suggested_relation_type_ids": [],
+      "weighed": false
+     }
+    ]
+   },
+   "method": "GET",
+   "path": "/api/v1/assets?category_id=0ab0563e-e4c9-4f89-b2fe-1477df526279",
+   "status": 200
+  },
+  "printers_archived": {
+   "body": {
+    "assets": [
+     {
+      "asset": {
+       "archived_at": "2026-11-16T11:37:52.204790214Z",
+       "condition": "ok",
+       "condition_note": "",
+       "created_at": "2026-11-16T11:37:52.128343987Z",
+       "icon_name": null,
+       "id": "c70b535a-ed1a-46d9-b639-2fc8cc8fb404",
+       "label_icon_name": null,
+       "name": "Old Prusa",
+       "stock": null,
+       "updated_at": "2026-11-16T11:37:52.204790214Z"
+      },
+      "categories": [
+       {
+        "color_hex": "#3b82f6",
+        "created_at": "2026-11-16T11:37:52.020766695Z",
+        "effective_review": {
+         "enabled": false,
+         "months": 0,
+         "on_edit": "",
+         "self_verify": false
+        },
+        "id": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
+        "implies": [],
+        "included_by": [],
+        "is_consumable": false,
+        "is_lendable": false,
+        "is_running_low": false,
+        "label_template_id": null,
+        "label_template_ids": [],
+        "low_stock_threshold": null,
+        "name": "Printers",
+        "review": {
+         "enabled": null,
+         "months": null,
+         "on_edit": null,
+         "self_verify": null
+        },
+        "scan_template_id": null,
+        "unit": "",
+        "updated_at": "2026-11-16T11:37:52.020766695Z",
+        "vendor_ids": []
+       }
+      ],
+      "contracts": [],
+      "counts_in": [],
+      "effective_fields": [
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:51.996523503Z",
+         "id": "9d437bfd-c590-46a8-a3af-5ac17747c77f",
+         "key": "address",
+         "label": "Address",
+         "updated_at": "2026-11-16T11:37:51.996523503Z",
+         "validation_type": "text"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.001232176Z",
+         "id": "f9b40a11-e045-42ea-9180-38cebd2a9087",
+         "key": "camera",
+         "label": "Camera",
+         "updated_at": "2026-11-16T11:37:52.001232176Z",
+         "validation_type": "url"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:51.991688074Z",
+         "id": "65776958-86d0-4eef-bc08-2c608f24b7b6",
+         "key": "connection",
+         "label": "Connection",
+         "options": {
+          "choices": [
+           {
+            "label": "Moonraker",
+            "value": "moonraker"
+           },
+           {
+            "label": "OctoPrint",
+            "value": "octoprint"
+           },
+           {
+            "label": "PrusaLink",
+            "value": "prusalink"
+           },
+           {
+            "label": "Bambu LAN",
+            "value": "bambu"
+           },
+           {
+            "label": "USB serial",
+            "value": "usb_serial"
+           }
+          ]
+         },
+         "updated_at": "2026-11-16T11:37:51.991688074Z",
+         "validation_type": "select"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.008949872Z",
+         "id": "b2531cc7-33f5-4c5c-a79d-9d9ca956814d",
+         "key": "materials",
+         "label": "Materials",
+         "updated_at": "2026-11-16T11:37:52.008949872Z",
+         "validation_type": "text"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.005165929Z",
+         "id": "0efad111-0f8d-4271-a6d1-ebc7d3bcd246",
+         "key": "model",
+         "label": "Model",
+         "updated_at": "2026-11-16T11:37:52.005165929Z",
+         "validation_type": "text"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.016405015Z",
+         "id": "0348bdf1-5e97-4c8a-a7af-f4dfa72beeed",
+         "key": "serial",
+         "label": "Serial number",
+         "updated_at": "2026-11-16T11:37:52.016405015Z",
+         "validation_type": "text"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       },
+       {
+        "field": {
+         "created_at": "2026-11-16T11:37:52.012518646Z",
+         "id": "42753882-34b4-4a75-8ab4-7d3f2e8577ee",
+         "key": "training",
+         "label": "Training",
+         "options": {
+          "choices": [
+           {
+            "label": "Basic",
+            "value": "basic"
+           },
+           {
+            "label": "Advanced",
+            "value": "advanced"
+           }
+          ]
+         },
+         "updated_at": "2026-11-16T11:37:52.012518646Z",
+         "validation_type": "select"
+        },
+        "is_required": false,
+        "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+       }
+      ],
+      "field_values": {
+       "address": "http://192.168.1.54",
+       "connection": "octoprint"
+      },
+      "generator_keys": [],
+      "holds": 0,
+      "hooks": [],
+      "label_template": {
+       "template_id": ""
+      },
+      "lendable": false,
+      "links": [],
+      "loan": null,
+      "location": [],
+      "photos": [],
+      "purchase": {
+       "order_date": "",
+       "prices_hidden": true,
+       "received_date": "",
+       "vendor_id": "",
+       "vendor_name": "",
+       "warranty_end": ""
+      },
+      "resolved_icon": null,
+      "resolved_icons": {},
+      "review": null,
+      "scan_template": {
+       "template_id": "bc4e2a6d-8f0b-4d5c-9e9a-d15c7d9f1a22"
+      },
+      "scopes": [
+       "default"
+      ],
+      "suggested_relation_type_ids": [],
+      "weighed": false
+     }
+    ]
+   },
+   "method": "GET",
+   "path": "/api/v1/assets?archived=true&category_id=0ab0563e-e4c9-4f89-b2fe-1477df526279",
+   "status": 200
+  },
+  "x1": {
+   "body": {
+    "asset": {
+     "asset": {
+      "condition": "ok",
+      "condition_note": "",
+      "created_at": "2026-11-16T11:37:52.077027801Z",
+      "icon_name": null,
+      "id": "28c31053-26dc-4e28-af31-e4b4fdc5b9e0",
+      "label_icon_name": null,
+      "name": "X1 Carbon",
+      "stock": null,
+      "updated_at": "2026-11-16T11:37:52.077027801Z"
+     },
+     "categories": [
+      {
+       "color_hex": "#3b82f6",
+       "created_at": "2026-11-16T11:37:52.020766695Z",
+       "effective_review": {
+        "enabled": false,
+        "months": 0,
+        "on_edit": "",
+        "self_verify": false
+       },
+       "id": "0ab0563e-e4c9-4f89-b2fe-1477df526279",
+       "implies": [],
+       "included_by": [],
+       "is_consumable": false,
+       "is_lendable": false,
+       "is_running_low": false,
+       "label_template_id": null,
+       "label_template_ids": [],
+       "low_stock_threshold": null,
+       "name": "Printers",
+       "review": {
+        "enabled": null,
+        "months": null,
+        "on_edit": null,
+        "self_verify": null
+       },
+       "scan_template_id": null,
+       "unit": "",
+       "updated_at": "2026-11-16T11:37:52.020766695Z",
+       "vendor_ids": []
+      }
+     ],
+     "contracts": [],
+     "counts_in": [],
+     "effective_fields": [
+      {
+       "field": {
+        "created_at": "2026-11-16T11:37:51.996523503Z",
+        "id": "9d437bfd-c590-46a8-a3af-5ac17747c77f",
+        "key": "address",
+        "label": "Address",
+        "updated_at": "2026-11-16T11:37:51.996523503Z",
+        "validation_type": "text"
+       },
+       "is_required": false,
+       "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+      },
+      {
+       "field": {
+        "created_at": "2026-11-16T11:37:52.001232176Z",
+        "id": "f9b40a11-e045-42ea-9180-38cebd2a9087",
+        "key": "camera",
+        "label": "Camera",
+        "updated_at": "2026-11-16T11:37:52.001232176Z",
+        "validation_type": "url"
+       },
+       "is_required": false,
+       "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+      },
+      {
+       "field": {
+        "created_at": "2026-11-16T11:37:51.991688074Z",
+        "id": "65776958-86d0-4eef-bc08-2c608f24b7b6",
+        "key": "connection",
+        "label": "Connection",
+        "options": {
+         "choices": [
+          {
+           "label": "Moonraker",
+           "value": "moonraker"
+          },
+          {
+           "label": "OctoPrint",
+           "value": "octoprint"
+          },
+          {
+           "label": "PrusaLink",
+           "value": "prusalink"
+          },
+          {
+           "label": "Bambu LAN",
+           "value": "bambu"
+          },
+          {
+           "label": "USB serial",
+           "value": "usb_serial"
+          }
+         ]
+        },
+        "updated_at": "2026-11-16T11:37:51.991688074Z",
+        "validation_type": "select"
+       },
+       "is_required": false,
+       "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+      },
+      {
+       "field": {
+        "created_at": "2026-11-16T11:37:52.008949872Z",
+        "id": "b2531cc7-33f5-4c5c-a79d-9d9ca956814d",
+        "key": "materials",
+        "label": "Materials",
+        "updated_at": "2026-11-16T11:37:52.008949872Z",
+        "validation_type": "text"
+       },
+       "is_required": false,
+       "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+      },
+      {
+       "field": {
+        "created_at": "2026-11-16T11:37:52.005165929Z",
+        "id": "0efad111-0f8d-4271-a6d1-ebc7d3bcd246",
+        "key": "model",
+        "label": "Model",
+        "updated_at": "2026-11-16T11:37:52.005165929Z",
+        "validation_type": "text"
+       },
+       "is_required": false,
+       "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+      },
+      {
+       "field": {
+        "created_at": "2026-11-16T11:37:52.016405015Z",
+        "id": "0348bdf1-5e97-4c8a-a7af-f4dfa72beeed",
+        "key": "serial",
+        "label": "Serial number",
+        "updated_at": "2026-11-16T11:37:52.016405015Z",
+        "validation_type": "text"
+       },
+       "is_required": false,
+       "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+      },
+      {
+       "field": {
+        "created_at": "2026-11-16T11:37:52.012518646Z",
+        "id": "42753882-34b4-4a75-8ab4-7d3f2e8577ee",
+        "key": "training",
+        "label": "Training",
+        "options": {
+         "choices": [
+          {
+           "label": "Basic",
+           "value": "basic"
+          },
+          {
+           "label": "Advanced",
+           "value": "advanced"
+          }
+         ]
+        },
+        "updated_at": "2026-11-16T11:37:52.012518646Z",
+        "validation_type": "select"
+       },
+       "is_required": false,
+       "source_category_id": "0ab0563e-e4c9-4f89-b2fe-1477df526279"
+      }
+     ],
+     "field_values": {
+      "address": "192.168.1.50",
+      "camera": "rtsps://192.168.1.50/streaming/live/1",
+      "connection": "bambu",
+      "materials": "PLA, PETG",
+      "model": "X1C",
+      "serial": "01S00C123456789",
+      "training": "basic"
+     },
+     "generator_keys": [],
+     "holds": 0,
+     "hooks": [],
+     "label_template": {
+      "template_id": ""
+     },
+     "lendable": false,
+     "links": [],
+     "loan": null,
+     "location": [],
+     "photos": [],
+     "purchase": {
+      "order_date": "",
+      "prices_hidden": true,
+      "received_date": "",
+      "vendor_id": "",
+      "vendor_name": "",
+      "warranty_end": ""
+     },
+     "resolved_icon": null,
+     "resolved_icons": {},
+     "review": null,
+     "scan_template": {
+      "template_id": "bc4e2a6d-8f0b-4d5c-9e9a-d15c7d9f1a22"
+     },
+     "scopes": [
+      "default"
+     ],
+     "suggested_relation_type_ids": [],
+     "weighed": false
+    }
+   },
+   "method": "GET",
+   "path": "/api/v1/assets/28c31053-26dc-4e28-af31-e4b4fdc5b9e0",
+   "status": 200
+  }
+ }
+}

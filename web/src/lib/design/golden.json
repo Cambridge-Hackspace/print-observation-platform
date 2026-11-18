@@ -1,0 +1,154 @@
+{
+ "palette": {
+  "ground": "#1c2620",
+  "panel": "#263328",
+  "panel2": "#2f3e31",
+  "text": "#f6f0de",
+  "muted": "#b9c4ae",
+  "sage": "#C3D7BB",
+  "butter": "#F1DB98",
+  "coral": "#F7B294",
+  "cream": "#FEF7E4",
+  "moss": "#9dbb8c",
+  "dusk": "#30364a",
+  "far": "#2a3a3a",
+  "mid": "#33483a",
+  "hill": "#2a3a2e",
+  "soil": "#202c23",
+  "line": "#56664f",
+  "dim": "#9aa892",
+  "ink": "#121a14"
+ },
+ "printer": [
+  {
+   "args": {
+    "kind": "e",
+    "body": "#F7B294",
+    "nozzle": "#F1DB98",
+    "part": true
+   },
+   "svg": "<svg width=\"120\" height=\"120\" viewBox=\"0 0 230 230\" role=\"img\" aria-label=\"X1\" style=\"flex:none\"><defs><pattern id=\"g\" width=\"4\" height=\"4\" patternUnits=\"userSpaceOnUse\"><rect width=\"4\" height=\"4\" fill=\"#C3D7BB\"></rect><rect y=\"3\" width=\"4\" height=\"1\" fill=\"#a3bd99\"></rect></pattern></defs><rect x=\"27\" y=\"23\" width=\"180\" height=\"191\" rx=\"4\" fill=\"#121a14\" opacity=\"0.6\"></rect>\n<rect x=\"20\" y=\"16\" width=\"180\" height=\"198\" rx=\"4\" fill=\"#F7B294\" stroke=\"#121a14\" stroke-width=\"4\"></rect>\n<rect x=\"38\" y=\"34\" width=\"144\" height=\"122\" rx=\"2\" fill=\"#26332a\" stroke=\"#121a14\" stroke-width=\"4\"></rect>\n<rect x=\"46\" y=\"50\" width=\"128\" height=\"9\" fill=\"#FEF7E4\" stroke=\"#121a14\" stroke-width=\"3\"></rect>\n<rect x=\"109\" y=\"59\" width=\"2\" height=\"12\" fill=\"#121a14\"></rect>\n<rect x=\"96\" y=\"70\" width=\"28\" height=\"22\" fill=\"#F1DB98\" stroke=\"#121a14\" stroke-width=\"3\"></rect>\n<path d=\"M104 92h12l-6 9z\" fill=\"#FEF7E4\" stroke=\"#121a14\" stroke-width=\"2.5\" stroke-linejoin=\"round\"></path>\n<rect x=\"86\" y=\"112\" width=\"48\" height=\"22\" fill=\"url(#g)\" stroke=\"#121a14\" stroke-width=\"3\"></rect><rect x=\"56\" y=\"134\" width=\"108\" height=\"8\" fill=\"#FEF7E4\" stroke=\"#121a14\" stroke-width=\"3\"></rect>\n<rect x=\"38\" y=\"170\" width=\"84\" height=\"28\" rx=\"2\" fill=\"#121a14\"></rect>\n<rect x=\"46\" y=\"180\" width=\"44\" height=\"6\" fill=\"#F1DB98\"></rect>\n<circle cx=\"170\" cy=\"184\" r=\"9\" fill=\"#FEF7E4\" stroke=\"#121a14\" stroke-width=\"3\"></circle></svg>"
+  },
+  {
+   "args": {
+    "kind": "e",
+    "body": "#7fb6d9",
+    "nozzle": "#FEF7E4",
+    "part": false
+   },
+   "svg": "<svg width=\"120\" height=\"120\" viewBox=\"0 0 230 230\" role=\"img\" aria-label=\"X1\" style=\"flex:none\"><defs><pattern id=\"g\" width=\"4\" height=\"4\" patternUnits=\"userSpaceOnUse\"><rect width=\"4\" height=\"4\" fill=\"#C3D7BB\"></rect><rect y=\"3\" width=\"4\" height=\"1\" fill=\"#a3bd99\"></rect></pattern></defs><rect x=\"27\" y=\"23\" width=\"180\" height=\"191\" rx=\"4\" fill=\"#121a14\" opacity=\"0.6\"></rect>\n<rect x=\"20\" y=\"16\" width=\"180\" height=\"198\" rx=\"4\" fill=\"#7fb6d9\" stroke=\"#121a14\" stroke-width=\"4\"></rect>\n<rect x=\"38\" y=\"34\" width=\"144\" height=\"122\" rx=\"2\" fill=\"#26332a\" stroke=\"#121a14\" stroke-width=\"4\"></rect>\n<rect x=\"46\" y=\"50\" width=\"128\" height=\"9\" fill=\"#FEF7E4\" stroke=\"#121a14\" stroke-width=\"3\"></rect>\n<rect x=\"109\" y=\"59\" width=\"2\" height=\"12\" fill=\"#121a14\"></rect>\n<rect x=\"96\" y=\"70\" width=\"28\" height=\"22\" fill=\"#FEF7E4\" stroke=\"#121a14\" stroke-width=\"3\"></rect>\n<path d=\"M104 92h12l-6 9z\" fill=\"#FEF7E4\" stroke=\"#121a14\" stroke-width=\"2.5\" stroke-linejoin=\"round\"></path>\n<rect x=\"56\" y=\"134\" width=\"108\" height=\"8\" fill=\"#FEF7E4\" stroke=\"#121a14\" stroke-width=\"3\"></rect>\n<rect x=\"38\" y=\"170\" width=\"84\" height=\"28\" rx=\"2\" fill=\"#121a14\"></rect>\n<rect x=\"46\" y=\"180\" width=\"44\" height=\"6\" fill=\"#F1DB98\"></rect>\n<circle cx=\"170\" cy=\"184\" r=\"9\" fill=\"#FEF7E4\" stroke=\"#121a14\" stroke-width=\"3\"></circle></svg>"
+  },
+  {
+   "args": {
+    "kind": "o",
+    "body": "#C3D7BB",
+    "nozzle": "#F7B294",
+    "part": true
+   },
+   "svg": "<svg width=\"120\" height=\"120\" viewBox=\"0 0 230 230\" role=\"img\" aria-label=\"X1\" style=\"flex:none\"><defs><pattern id=\"g\" width=\"4\" height=\"4\" patternUnits=\"userSpaceOnUse\"><rect width=\"4\" height=\"4\" fill=\"#C3D7BB\"></rect><rect y=\"3\" width=\"4\" height=\"1\" fill=\"#a3bd99\"></rect></pattern></defs><rect x=\"30\" y=\"20\" width=\"16\" height=\"174\" fill=\"#C3D7BB\" stroke=\"#121a14\" stroke-width=\"3\"></rect>\n<rect x=\"174\" y=\"20\" width=\"16\" height=\"174\" fill=\"#C3D7BB\" stroke=\"#121a14\" stroke-width=\"3\"></rect>\n<rect x=\"26\" y=\"10\" width=\"168\" height=\"16\" fill=\"#C3D7BB\" stroke=\"#121a14\" stroke-width=\"3\"></rect>\n<rect x=\"16\" y=\"190\" width=\"188\" height=\"24\" rx=\"3\" fill=\"#C3D7BB\" stroke=\"#121a14\" stroke-width=\"3\"></rect>\n<rect x=\"88\" y=\"150\" width=\"44\" height=\"26\" fill=\"url(#g)\" stroke=\"#121a14\" stroke-width=\"3\"></rect><rect x=\"52\" y=\"176\" width=\"116\" height=\"8\" fill=\"#FEF7E4\" stroke=\"#121a14\" stroke-width=\"3\"></rect>\n<rect x=\"44\" y=\"90\" width=\"132\" height=\"9\" fill=\"#FEF7E4\" stroke=\"#121a14\" stroke-width=\"3\"></rect>\n<rect x=\"96\" y=\"99\" width=\"28\" height=\"22\" fill=\"#F7B294\" stroke=\"#121a14\" stroke-width=\"3\"></rect>\n<path d=\"M104 121h12l-6 8z\" fill=\"#FEF7E4\" stroke=\"#121a14\" stroke-width=\"2.5\" stroke-linejoin=\"round\"></path></svg>"
+  },
+  {
+   "args": {
+    "kind": "o",
+    "body": "#c9a0dc",
+    "nozzle": "#F1DB98",
+    "part": false
+   },
+   "svg": "<svg width=\"120\" height=\"120\" viewBox=\"0 0 230 230\" role=\"img\" aria-label=\"X1\" style=\"flex:none\"><defs><pattern id=\"g\" width=\"4\" height=\"4\" patternUnits=\"userSpaceOnUse\"><rect width=\"4\" height=\"4\" fill=\"#C3D7BB\"></rect><rect y=\"3\" width=\"4\" height=\"1\" fill=\"#a3bd99\"></rect></pattern></defs><rect x=\"30\" y=\"20\" width=\"16\" height=\"174\" fill=\"#c9a0dc\" stroke=\"#121a14\" stroke-width=\"3\"></rect>\n<rect x=\"174\" y=\"20\" width=\"16\" height=\"174\" fill=\"#c9a0dc\" stroke=\"#121a14\" stroke-width=\"3\"></rect>\n<rect x=\"26\" y=\"10\" width=\"168\" height=\"16\" fill=\"#c9a0dc\" stroke=\"#121a14\" stroke-width=\"3\"></rect>\n<rect x=\"16\" y=\"190\" width=\"188\" height=\"24\" rx=\"3\" fill=\"#c9a0dc\" stroke=\"#121a14\" stroke-width=\"3\"></rect>\n<rect x=\"52\" y=\"176\" width=\"116\" height=\"8\" fill=\"#FEF7E4\" stroke=\"#121a14\" stroke-width=\"3\"></rect>\n<rect x=\"44\" y=\"90\" width=\"132\" height=\"9\" fill=\"#FEF7E4\" stroke=\"#121a14\" stroke-width=\"3\"></rect>\n<rect x=\"96\" y=\"99\" width=\"28\" height=\"22\" fill=\"#F1DB98\" stroke=\"#121a14\" stroke-width=\"3\"></rect>\n<path d=\"M104 121h12l-6 8z\" fill=\"#FEF7E4\" stroke=\"#121a14\" stroke-width=\"2.5\" stroke-linejoin=\"round\"></path></svg>"
+  }
+ ],
+ "spool": [
+  {
+   "args": {
+    "color": "#F7B294",
+    "frac": 1.0
+   },
+   "svg": "<svg width=\"56\" height=\"56\" viewBox=\"0 0 60 60\" role=\"img\" aria-label=\"PLA\" style=\"flex:none\"><circle cx=\"30\" cy=\"30\" r=\"27\" fill=\"#3c4a3e\" stroke=\"#121a14\" stroke-width=\"2.5\"></circle><circle cx=\"30\" cy=\"30\" r=\"27.0\" fill=\"#F7B294\" stroke=\"#121a14\" stroke-width=\"2\"></circle><circle cx=\"30\" cy=\"30\" r=\"11\" fill=\"#3c4a3e\" stroke=\"#121a14\" stroke-width=\"2\"></circle><circle cx=\"30\" cy=\"30\" r=\"5\" fill=\"#1c2620\" stroke=\"#121a14\" stroke-width=\"2\"></circle></svg>"
+  },
+  {
+   "args": {
+    "color": "#7fb6d9",
+    "frac": 0.25
+   },
+   "svg": "<svg width=\"56\" height=\"56\" viewBox=\"0 0 60 60\" role=\"img\" aria-label=\"PLA\" style=\"flex:none\"><circle cx=\"30\" cy=\"30\" r=\"27\" fill=\"#3c4a3e\" stroke=\"#121a14\" stroke-width=\"2.5\"></circle><circle cx=\"30\" cy=\"30\" r=\"15.8\" fill=\"#7fb6d9\" stroke=\"#121a14\" stroke-width=\"2\"></circle><circle cx=\"30\" cy=\"30\" r=\"11\" fill=\"#3c4a3e\" stroke=\"#121a14\" stroke-width=\"2\"></circle><circle cx=\"30\" cy=\"30\" r=\"5\" fill=\"#1c2620\" stroke=\"#121a14\" stroke-width=\"2\"></circle></svg>"
+  },
+  {
+   "args": {
+    "color": "#C3D7BB",
+    "frac": 0.0
+   },
+   "svg": "<svg width=\"56\" height=\"56\" viewBox=\"0 0 60 60\" role=\"img\" aria-label=\"PLA\" style=\"flex:none\"><circle cx=\"30\" cy=\"30\" r=\"27\" fill=\"#3c4a3e\" stroke=\"#121a14\" stroke-width=\"2.5\"></circle><circle cx=\"30\" cy=\"30\" r=\"12.0\" fill=\"#C3D7BB\" stroke=\"#121a14\" stroke-width=\"2\"></circle><circle cx=\"30\" cy=\"30\" r=\"11\" fill=\"#3c4a3e\" stroke=\"#121a14\" stroke-width=\"2\"></circle><circle cx=\"30\" cy=\"30\" r=\"5\" fill=\"#1c2620\" stroke=\"#121a14\" stroke-width=\"2\"></circle></svg>"
+  }
+ ],
+ "pine": [
+  {
+   "args": {
+    "x": 120,
+    "b": 230,
+    "h": 150,
+    "fill": "#2a3a3a",
+    "ink": false
+   },
+   "svg": "<svg viewBox=\"0 0 240 240\"><path d=\"M120.0 80.0 L145.2 131.0 L134.3 131.0 L155.3 173.0 L142.7 173.0 L162.0 212.0 L125.9 212.0 L125.9 230.0 L114.1 230.0 L114.1 212.0 L78.0 212.0 L97.3 173.0 L84.7 173.0 L105.7 131.0 L94.8 131.0Z\" fill=\"#2a3a3a\"></path></svg>"
+  },
+  {
+   "args": {
+    "x": 60,
+    "b": 200,
+    "h": 90,
+    "fill": "#C3D7BB",
+    "ink": true
+   },
+   "svg": "<svg viewBox=\"0 0 240 240\"><path d=\"M60.0 110.0 L75.1 140.6 L68.6 140.6 L81.2 165.8 L73.6 165.8 L85.2 189.2 L63.5 189.2 L63.5 200.0 L56.5 200.0 L56.5 189.2 L34.8 189.2 L46.4 165.8 L38.8 165.8 L51.4 140.6 L44.9 140.6Z\" fill=\"#C3D7BB\" stroke=\"#121a14\" stroke-width=\"3\"></path></svg>"
+  }
+ ],
+ "fern": [
+  {
+   "args": {
+    "x": 116,
+    "b": 230,
+    "h": 70,
+    "color": "#C3D7BB"
+   },
+   "svg": "<svg viewBox=\"0 0 240 240\"><path d=\"M116 230V160M116 222l-15 -8.2M116 222l15 -8.2M116 211l-13 -7.2M116 211l13 -7.2M116 200l-11 -6.1M116 200l11 -6.1M116 189l-9 -5.0M116 189l9 -5.0M116 178l-7 -3.9M116 178l7 -3.9M116 167l-5 -2.8M116 167l5 -2.8\" fill=\"none\" stroke=\"#C3D7BB\" stroke-width=\"3\" stroke-linecap=\"square\"></path></svg>"
+  },
+  {
+   "args": {
+    "x": 40,
+    "b": 200,
+    "h": 34,
+    "color": "#33483a"
+   },
+   "svg": "<svg viewBox=\"0 0 240 240\"><path d=\"M40 200V166M40 192l-15 -8.2M40 192l15 -8.2M40 181l-13 -7.2M40 181l13 -7.2M40 170l-11 -6.1M40 170l11 -6.1\" fill=\"none\" stroke=\"#33483a\" stroke-width=\"3\" stroke-linecap=\"square\"></path></svg>"
+  },
+  {
+   "args": {
+    "x": 180,
+    "b": 230,
+    "h": 120,
+    "color": "#9dbb8c"
+   },
+   "svg": "<svg viewBox=\"0 0 240 240\"><path d=\"M180 230V110M180 222l-15 -8.2M180 222l15 -8.2M180 211l-13 -7.2M180 211l13 -7.2M180 200l-11 -6.1M180 200l11 -6.1M180 189l-9 -5.0M180 189l9 -5.0M180 178l-7 -3.9M180 178l7 -3.9M180 167l-5 -2.8M180 167l5 -2.8M180 156l-5 -2.8M180 156l5 -2.8M180 145l-5 -2.8M180 145l5 -2.8M180 134l-5 -2.8M180 134l5 -2.8M180 123l-5 -2.8M180 123l5 -2.8\" fill=\"none\" stroke=\"#9dbb8c\" stroke-width=\"3\" stroke-linecap=\"square\"></path></svg>"
+  }
+ ],
+ "shroom": [
+  {
+   "args": {
+    "x": 120,
+    "b": 230,
+    "s": 22,
+    "cap": "#F7B294"
+   },
+   "svg": "<svg viewBox=\"0 0 240 240\"><rect x=\"113.8\" y=\"208.0\" width=\"12.3\" height=\"22.0\" fill=\"#FEF7E4\" stroke=\"#121a14\" stroke-width=\"3\"></rect><path d=\"M98.0 210.2a22.0 18.7 0 0 1 44.0 0z\" fill=\"#F7B294\" stroke=\"#121a14\" stroke-width=\"3\" stroke-linejoin=\"round\"></path><rect x=\"106.6\" y=\"201.2\" width=\"4.8\" height=\"4.8\" fill=\"#FEF7E4\"></rect><rect x=\"119.8\" y=\"194.1\" width=\"4.8\" height=\"4.8\" fill=\"#FEF7E4\"></rect><rect x=\"128.6\" y=\"201.6\" width=\"4.8\" height=\"4.8\" fill=\"#FEF7E4\"></rect></svg>"
+  },
+  {
+   "args": {
+    "x": 60,
+    "b": 200,
+    "s": 14,
+    "cap": "#F1DB98"
+   },
+   "svg": "<svg viewBox=\"0 0 240 240\"><rect x=\"56.1\" y=\"186.0\" width=\"7.8\" height=\"14.0\" fill=\"#FEF7E4\" stroke=\"#121a14\" stroke-width=\"3\"></rect><path d=\"M46.0 187.4a14.0 11.9 0 0 1 28.0 0z\" fill=\"#F1DB98\" stroke=\"#121a14\" stroke-width=\"3\" stroke-linejoin=\"round\"></path><rect x=\"51.5\" y=\"181.7\" width=\"3.1\" height=\"3.1\" fill=\"#FEF7E4\"></rect><rect x=\"59.9\" y=\"177.2\" width=\"3.1\" height=\"3.1\" fill=\"#FEF7E4\"></rect><rect x=\"65.5\" y=\"181.9\" width=\"3.1\" height=\"3.1\" fill=\"#FEF7E4\"></rect></svg>"
+  }
+ ]
+}

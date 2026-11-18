@@ -1,0 +1,49 @@
+# go2rtc, which serves the printers' cameras, as its own service beside POP
+# (#66, docs/integrations/go2rtc.md). Install go2rtc 1.9.15 or later as
+# /usr/local/bin/go2rtc, and copy packaging/go2rtc.yaml to
+# /var/lib/go2rtc/go2rtc.yaml with its password set: go2rtc writes the
+# streams POP adds into that file, so it lives in go2rtc's own writable
+# directory, readable by nobody else (it can hold camera passwords: threat
+# model, gap 17).
+
+[Unit]
+Description=go2rtc, serving POP's printer cameras
+Documentation=https://github.com/AlexxIT/go2rtc
+After=network-online.target
+Wants=network-online.target
+Before=pop.service
+
+[Service]
+Type=simple
+User=go2rtc
+Group=go2rtc
+ExecStart=/usr/local/bin/go2rtc -config /var/lib/go2rtc/go2rtc.yaml
+StateDirectory=go2rtc
+StateDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+RestartSec=2
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+
+[Install]
+WantedBy=multi-user.target

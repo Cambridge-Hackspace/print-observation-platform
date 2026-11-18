@@ -1,0 +1,119 @@
+# POP's configuration, with every key at its default.
+#
+# Copy this to pop.toml beside the binary, or name another file with
+# `pop --config <file>` or POP_CONFIG. Any key can be left out, and then has
+# the value shown here. `pop config check` validates a file without starting
+# the server.
+#
+# Every key can also be set from the environment, as POP_<SECTION>_<KEY> in
+# capitals, which wins over the file: POP_SERVER_LISTEN overrides
+# server.listen. Use that for secrets, and in containers.
+
+[server]
+# The address and port to listen on. 0.0.0.0:8080 listens on every network.
+listen = "127.0.0.1:8080"
+# The address phones reach POP at, shown on the tower as a QR code:
+# "https://pop.example.org". Empty: no QR code.
+public_url = ""
+
+[storage]
+# Where the database and the stored print files live. Back it up with
+# `pop backup`.
+data_dir = "data"
+
+[log]
+# error, warn, info, debug or trace.
+level = "info"
+# text, for a person reading a terminal, or json, one object per line, for a
+# log collector.
+format = "text"
+
+[access]
+# The space's own networks, in CIDR notation. Requests from these, or from a
+# kiosk session, may control printers; requests from anywhere else can watch,
+# report a problem and upload, but never touch a printer. Empty means only
+# this machine is local.
+#
+# local_networks = ["192.168.1.0/24"]
+local_networks = []
+# Reverse proxies whose forwarding headers (Forwarded, X-Forwarded-For) are
+# believed, in CIDR notation. A request carrying those headers from anything
+# else is remote, whatever its address: otherwise a proxy on this machine
+# would make every request it passes on look local. Name your proxy here if
+# you put one in front of POP (docs: remote access). Have it set ONE of the
+# two headers, replacing whatever the client sent: a request carrying both is
+# remote, since a client could have written either.
+#
+# trusted_proxies = ["127.0.0.1/32"]
+trusted_proxies = []
+
+[bam]
+# Where POP reads its printers (docs/integrations/bam.md). Empty: no BAM!.
+url = ""
+# POP's BAM! API token. A secret: give it as POP_BAM_TOKEN, not here.
+token = ""
+# The id of the BAM! category whose assets are the printers.
+category = ""
+
+[bam.fields]
+# Which field of the printer category, by its key, gives each printer's
+# connection (moonraker, octoprint, prusalink, bambu or usb_serial), address,
+# camera, model, materials (comma-separated), training level, and a Bambu
+# printer's serial number.
+connection = "connection"
+address = "address"
+camera = "camera"
+model = "model"
+materials = "materials"
+training = "training"
+serial = "serial"
+
+[go2rtc]
+# The go2rtc that serves the printers' cameras, as its own service
+# (docs/integrations/go2rtc.md): its API address, http://127.0.0.1:1984.
+# Empty: no cameras.
+url = ""
+# go2rtc's api.username and api.password. Set go2rtc's local_auth too, or
+# go2rtc asks nothing of requests from its own machine. The password is a
+# secret: give it as POP_GO2RTC_PASSWORD, not here.
+username = ""
+password = ""
+
+[secrets]
+# Seals the secrets POP keeps, such as a Bambu printer's access code: 32
+# random bytes in base64, as `openssl rand -base64 32` makes. A secret: give
+# it as POP_SECRETS_KEY, not here. Empty: POP refuses to keep secrets.
+key = ""
+
+[guides]
+# The license each published guide is shown under, such as "CC BY-SA 4.0".
+# Empty: none is shown.
+license = ""
+# Whether search engines may index the public guides at /guides.
+indexable = false
+
+[public]
+# What the live stream (/api/events) carries to anyone who is neither signed
+# in nor on the space's network: the public, watching from outside. Whether
+# owners' first names go out on it. Off: nobody is named, in a printer's job
+# or a notice. Signed-in screens, and the space's own network (the kiosk),
+# always see names.
+owner_names = false
+
+[feedback]
+# Feedback from any screen, filed as GitHub issues by a GitHub App installed
+# on the repository with Issues: write and Contents: write. The repository is
+# public, so the issues and their screenshots are too. Empty app_id: no
+# feedback button anywhere.
+app_id = ""
+installation_id = ""
+# The App's private key, as GitHub gives it: a file only POP can read.
+private_key_file = ""
+repo = "Cambridge-Hackspace/print-observation-platform"
+api = "https://api.github.com"
+# The branch screenshots go on.
+branch = "feedback-attachments"
+# Who holds feedback.file: "admin", "member".
+roles = ["admin"]
+# Reports one person may file in an hour.
+per_hour = 10

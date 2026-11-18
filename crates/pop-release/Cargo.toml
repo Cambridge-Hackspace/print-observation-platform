@@ -1,0 +1,18 @@
+[package]
+name = "pop-release"
+description = "Checking a POP release: its SHA256SUMS, signed with both ML-DSA-65 and Ed25519 (#148)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+# Both signatures must check (docs/releases.md): ML-DSA-65 (FIPS 204) so a
+# release stays unforgeable against a quantum computer, and Ed25519 so a
+# fault in the young ML-DSA crate alone cannot pass a forged one.
+ml-dsa = { version = "=0.1.2", default-features = false, features = ["alloc", "pkcs8"] }
+ed25519-dalek = { version = "=3.0.0", default-features = false, features = ["fast", "pkcs8", "pem"] }
+pkcs8 = { version = "0.11", features = ["pem"] }
+sha2 = "0.10"

@@ -1,0 +1,68 @@
+/* The round 6 palette and type (#48), from docs/design/round-6/kit.py.
+   design.test.ts holds these values to the kit's, so they cannot drift.
+   Near things are the logo's pastels, outlined in ink; distant things are the
+   same hues, darkened and grayed, flat. */
+:root {
+  --pop-ink: #121a14;
+  --pop-ground: #1c2620;
+  --pop-panel: #263328;
+  --pop-panel-2: #2f3e31;
+  --pop-text: #f6f0de;
+  --pop-muted: #b9c4ae;
+  --pop-sage: #c3d7bb;
+  --pop-butter: #f1db98;
+  --pop-coral: #f7b294;
+  --pop-cream: #fef7e4;
+  --pop-moss: #9dbb8c;
+  --pop-dusk: #30364a;
+  --pop-far: #2a3a3a;
+  --pop-mid: #33483a;
+  --pop-hill: #2a3a2e;
+  --pop-soil: #202c23;
+  --pop-line: #56664f;
+  --pop-dim: #9aa892;
+  /* The darker stripe of a layer-lined fill, under sage. */
+  --pop-sage-layer: #a3bd99;
+  /* Lexend is bundled (main.ts), not fetched: the kiosk may have no internet. */
+  --pop-font: 'Lexend', 'Segoe UI', system-ui, sans-serif;
+  --pop-radius: 6px;
+  --pop-shadow: 6px 6px 0 var(--pop-ink);
+
+  color-scheme: dark;
+  font-family: var(--pop-font);
+  color: var(--pop-text);
+  background: var(--pop-ground);
+}
+
+body {
+  margin: 0;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--pop-butter);
+}
+
+:focus-visible {
+  outline: 3px solid var(--pop-butter);
+  outline-offset: 3px;
+}
+
+/* Reduced motion is honored everywhere: nothing slides, eases or scrolls on
+   its own. Components that animate in script read the same preference. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

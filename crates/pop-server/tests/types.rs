@@ -9,7 +9,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use pop_server::api::{ApiError, ServerEvent, Status};
+use pop_server::api::{
+    AccessCode, Account, AdminCamera, AdminPrinter, ApiError, AuditEntry, AuditKind, CameraHealth,
+    Device, DiscordWebhook, ErrorGuide, FeedbackKind, FeedbackSettings, FeedbackState,
+    FeedbackStatus, Guide, GuideImage, GuideProblems, GuideSummary, Health, LinkGuide, NewActive,
+    NewFeedback, NewGuideImage, NewName, NewPassword, NewReport, NewRole, NewTraining, NewUser,
+    NotifySettings, PublicGuide, PublicGuideList, ReportTaken, Role, ServerEvent, SignIn, Snapshot,
+    Status, TowerPrinter, TowerState, UpdaterStatus, User,
+};
 use ts_rs::TS;
 
 fn generated_dir() -> PathBuf {
@@ -21,7 +28,55 @@ fn generated_dir() -> PathBuf {
 fn export(dir: &Path) {
     Status::export_all_to(dir).unwrap();
     ServerEvent::export_all_to(dir).unwrap();
+    Snapshot::export_all_to(dir).unwrap();
     ApiError::export_all_to(dir).unwrap();
+    Health::export_all_to(dir).unwrap();
+    Role::export_all_to(dir).unwrap();
+    AuditKind::export_all_to(dir).unwrap();
+    AuditEntry::export_all_to(dir).unwrap();
+    AdminPrinter::export_all_to(dir).unwrap();
+    // "Something looks wrong" (#63).
+    NewReport::export_all_to(dir).unwrap();
+    ReportTaken::export_all_to(dir).unwrap();
+    // Feedback (#96).
+    NewFeedback::export_all_to(dir).unwrap();
+    FeedbackStatus::export_all_to(dir).unwrap();
+    FeedbackSettings::export_all_to(dir).unwrap();
+    FeedbackState::export_all_to(dir).unwrap();
+    FeedbackKind::export_all_to(dir).unwrap();
+    Device::export_all_to(dir).unwrap();
+    // Cameras (#66).
+    AdminCamera::export_all_to(dir).unwrap();
+    CameraHealth::export_all_to(dir).unwrap();
+    TowerState::export_all_to(dir).unwrap();
+    TowerPrinter::export_all_to(dir).unwrap();
+    AccessCode::export_all_to(dir).unwrap();
+    // Guides (#71).
+    Guide::export_all_to(dir).unwrap();
+    GuideSummary::export_all_to(dir).unwrap();
+    GuideProblems::export_all_to(dir).unwrap();
+    GuideImage::export_all_to(dir).unwrap();
+    NewGuideImage::export_all_to(dir).unwrap();
+    PublicGuide::export_all_to(dir).unwrap();
+    PublicGuideList::export_all_to(dir).unwrap();
+    ErrorGuide::export_all_to(dir).unwrap();
+    LinkGuide::export_all_to(dir).unwrap();
+    NotifySettings::export_all_to(dir).unwrap();
+    DiscordWebhook::export_all_to(dir).unwrap();
+    // The printer state model (#25), from pop-printers.
+    pop_printers::PrinterState::export_all_to(dir).unwrap();
+    pop_printers::Capabilities::export_all_to(dir).unwrap();
+    User::export_all_to(dir).unwrap();
+    SignIn::export_all_to(dir).unwrap();
+    NewUser::export_all_to(dir).unwrap();
+    NewPassword::export_all_to(dir).unwrap();
+    NewRole::export_all_to(dir).unwrap();
+    Account::export_all_to(dir).unwrap();
+    NewName::export_all_to(dir).unwrap();
+    NewActive::export_all_to(dir).unwrap();
+    NewTraining::export_all_to(dir).unwrap();
+    // Automatic upgrades (#148).
+    UpdaterStatus::export_all_to(dir).unwrap();
 }
 
 fn read_dir(dir: &Path) -> BTreeMap<String, String> {

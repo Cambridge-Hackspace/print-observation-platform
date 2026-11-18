@@ -5,6 +5,7 @@ home, tap a card at the tower to start them, and watch them from anywhere.
 Printer admins look after the fleet and the filament.
 
 How and why it is built the way it is: [ADR 0001](docs/adr/0001-architecture-and-stack.md).
+What it lets in, from where, and where its secrets live: [the threat model](docs/threat-model.md).
 
 ## Layout
 
@@ -30,10 +31,44 @@ cargo run -p pop-server                            # http://127.0.0.1:8080
 The server embeds `web/dist` when it is compiled, so build the app first.
 For the app with hot reload, run the server, then `npm run dev` in `web/`.
 
-| Variable       | Default          | What it is                                  |
-| -------------- | ---------------- | ------------------------------------------- |
-| `POP_LISTEN`   | `127.0.0.1:8080` | The address the server listens on.          |
-| `POP_DATA_DIR` | `./data`         | The database and uploaded prints live here. |
+Configuration is one TOML file, `pop.toml` beside the binary or named with
+`--config`. [`pop.example.toml`](pop.example.toml) documents every key with its
+default, and `pop config check` validates a file without starting the server.
+Any key can be overridden from the environment as `POP_<SECTION>_<KEY>`:
+`POP_SERVER_LISTEN` overrides `server.listen`.
+
+## Deploying
+
+[docs/deployment.md](docs/deployment.md) takes POP from nothing to running
+at the space, step by step: the binary or the container image from a
+release, the configuration and its secrets, the systemd units
+(`packaging/systemd`), BAM!, cameras through go2rtc, the group chat,
+feedback, watching from outside ([docs/remote-access.md](docs/remote-access.md)),
+backups and upgrading.
+
+## Accounts
+
+Create the first admin from the command line; they create everyone else.
+
+```sh
+pop user create-admin ada --name "Ada Lovelace"   # asks for the password
+```
+
+In a script, give the password on standard input instead. Members and admins
+sign in on the web. On the admin desk (`/admin`), under **People**, an admin
+adds people, renames them, makes them admins or members, records the training
+they hold here (named as a printer's BAM! training field names it), and resets
+passwords, which signs that person out everywhere. Deactivating someone signs
+them out and stops them signing in, and keeps their history; reactivating
+undoes it. POP always keeps at least one active admin.
+
+## Backing up
+
+`pop backup <file>` writes the database and the stored print files to one
+archive, and is safe while the server is running. `pop restore <file>` puts one
+back into the configured data directory, which must not already hold a
+database. A restore checks every file against the archive's manifest and the
+database's integrity before anything is put in place.
 
 ## Testing
 

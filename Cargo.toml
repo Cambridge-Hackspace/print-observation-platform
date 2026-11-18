@@ -21,3 +21,9 @@ all = { level = "warn", priority = -1 }
 lto = "thin"
 codegen-units = 1
 strip = "symbols"
+
+# Password hashing is deliberately slow; unoptimized, it is slow enough to
+# make the tests that sign in crawl. Optimizing these crates alone keeps the
+# rest of a debug build debuggable.
+[profile.dev.package.argon2]
+opt-level = 3
