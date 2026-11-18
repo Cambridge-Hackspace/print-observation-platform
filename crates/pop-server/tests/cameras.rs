@@ -65,6 +65,8 @@ struct Pop {
     health: watch::Receiver<Vec<AdminCamera>>,
     decided: Arc<tokio::sync::Notify>,
     admin: String,
+    /// The tower's printers, as every screen is sent them.
+    printers: watch::Receiver<Vec<pop_server::api::TowerPrinter>>,
 }
 
 async fn decide(db: &SqlitePool, id: &str, to: TowerState) {
@@ -144,8 +146,9 @@ async fn pop_with(setup: impl FnOnce(&FakeGo2rtc)) -> Pop {
             max: Duration::from_millis(200),
             healthy_after: Duration::from_secs(60),
         },
-        cameras: wanted_tx,
+        cameras: Some(wanted_tx),
     });
+    let printers = tower.clone();
     let state = state.with_tower(tower).with_cameras(kept, client);
     let mut pop = Pop {
         _dir: dir,
@@ -156,6 +159,7 @@ async fn pop_with(setup: impl FnOnce(&FakeGo2rtc)) -> Pop {
         health,
         decided,
         admin: String::new(),
+        printers,
     };
     let (_, _, set, _) = pop
         .send(
@@ -277,6 +281,42 @@ async fn a_tower_printers_camera_is_served_by_go2rtc_as_bam_has_it() {
     pop.bam.edit(pop.bam.id("voron"), "camera", " ");
     pop.streams_until("removed the stream", |s| s.is_empty())
         .await;
+}
+
+/// The tower says which printers have a camera to watch (#61), as BAM! and
+/// go2rtc have it.
+#[tokio::test]
+async fn the_tower_says_which_printers_have_a_camera() {
+    let pop = pop().await;
+    pop.voron_served().await;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        let printers = pop.printers.borrow().clone();
+        if let Some(v) = printers.iter().find(|p| p.name == "Voron 2.4")
+            && v.camera
+        {
+            break;
+        }
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "the Voron never read as having a camera: {printers:#?}"
+        );
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    pop.bam.edit(pop.bam.id("voron"), "camera", " ");
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    while pop
+        .printers
+        .borrow()
+        .iter()
+        .any(|p| p.name == "Voron 2.4" && p.camera)
+    {
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "the Voron kept its camera"
+        );
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
 }
 
 #[tokio::test]

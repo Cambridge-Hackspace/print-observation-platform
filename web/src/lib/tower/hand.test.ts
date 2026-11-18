@@ -21,7 +21,7 @@ const printer = (s: Partial<PrinterState>): TowerPrinter => ({
   state: state(s),
   watched: true,
   materials: [],
-  training: null,
+  training: null, camera: false,
 });
 const step = (id: string, then: GuideStep['then']): GuideStep => ({ id, title: `Do ${id}`, body: `About ${id}`, image: null, then });
 const titles = (r: { steps: { title: string }[] }) => r.steps.map((s) => s.title);

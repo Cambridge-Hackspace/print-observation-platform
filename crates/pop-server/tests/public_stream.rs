@@ -55,6 +55,7 @@ fn printer(owner: &str) -> TowerPrinter {
         watched: true,
         materials: vec!["PLA".into()],
         training: Some("basic".into()),
+        camera: true,
     }
 }
 
@@ -108,6 +109,9 @@ const REVIEWED: &[&str] = &[
     "data.printers[].watched",
     "data.printers[].materials",
     "data.printers[].training",
+    // Whether it has a camera a member can watch (#61): the camera itself is
+    // for members only, and its address never goes out.
+    "data.printers[].camera",
     "data.printers[].state",
     "data.printers[].state.status",
     "data.printers[].state.progress",

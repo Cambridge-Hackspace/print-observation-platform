@@ -26,4 +26,9 @@ materials: Array<string>,
 /**
  * The training it needs, from BAM!, if any.
  */
-training: string | null, };
+training: string | null, 
+/**
+ * Whether it has a camera a member can watch (#61): one in BAM!, and a
+ * go2rtc to serve it.
+ */
+camera: boolean, };

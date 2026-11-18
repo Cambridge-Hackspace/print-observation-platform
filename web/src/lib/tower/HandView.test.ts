@@ -23,7 +23,7 @@ const ender = (s: Partial<PrinterState> = {}): TowerPrinter => ({
   },
   watched: true,
   materials: [],
-  training: null,
+  training: null, camera: false,
 });
 
 const GUIDE: PublicGuide = {

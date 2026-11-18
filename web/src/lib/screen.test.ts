@@ -10,7 +10,7 @@ const printer = (name: string, status: 'idle' | 'printing'): TowerPrinter => ({
   name,
   watched: true,
   materials: ['PLA'],
-  training: null,
+  training: null, camera: false,
   state: { status, progress: null, layer: null, seconds_left: null, job: null, error: null, held: false },
 });
 const snapshot = (n: number, printers: TowerPrinter[] = []): ServerEvent => ({

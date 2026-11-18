@@ -242,7 +242,8 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
             .map_err(|e| format!("cannot read the Bambu certificate pins: {e}"))?;
         // One store of pins, for the printers and their cameras alike.
         let pins: Arc<dyn pop_printers::bambu::PinStore> = Arc::new(pins);
-        let (cameras, wanted) = tokio::sync::watch::channel(pop_server::cameras::Wanted::new());
+        let (cameras_tx, wanted) = tokio::sync::watch::channel(pop_server::cameras::Wanted::new());
+        let mut cameras = None;
         if !config.go2rtc.url.is_empty() {
             let g = &config.go2rtc;
             let auth = (!g.username.is_empty()).then(|| (g.username.clone(), g.password.clone()));
@@ -262,6 +263,7 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
                 pins.clone(),
             );
             state = state.with_cameras(kept, client);
+            cameras = Some(cameras_tx);
         }
         let (tower, _runner) = pop_server::run::spawn(pop_server::run::Runner {
             db: state.db.clone(),

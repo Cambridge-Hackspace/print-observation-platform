@@ -138,6 +138,7 @@ async fn pop_with(configured: bool, per_hour: u32) -> Pop {
         watched: true,
         materials: vec![],
         training: None,
+        camera: false,
     };
     let (tx, rx) = watch::channel(vec![tower]);
     std::mem::forget(tx);

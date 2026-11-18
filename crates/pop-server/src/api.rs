@@ -69,6 +69,9 @@ pub struct TowerPrinter {
     pub materials: Vec<String>,
     /// The training it needs, from BAM!, if any.
     pub training: Option<String>,
+    /// Whether it has a camera a member can watch (#61): one in BAM!, and a
+    /// go2rtc to serve it.
+    pub camera: bool,
 }
 
 /// One message on the live-update stream (`GET /api/events`).
