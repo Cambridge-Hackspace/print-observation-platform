@@ -3,6 +3,7 @@
   // who you are signed in as. Installable as a web app (index.html's
   // manifest). Watching a print (#61), being told when it is done (#62) and
   // reporting a problem (#63) arrive as screens inside this shell.
+  import { sensitive } from '../feedback/sensitive';
   import { onDestroy, onMount } from 'svelte';
   import { Logo, ProgressBar, StatusSquare } from '../design';
   import { call } from '../api';
@@ -67,7 +68,7 @@
     <header>
       <div class="brand"><Logo size={34} /><span class="name">POP</span></div>
       {#if me}
-        <a class="who" href="#you">{me.name}</a>
+        <a class="who" href="#you" use:sensitive={'name'}>{me.name}</a>
       {:else}
         <button type="button" class="link" onclick={() => (signingIn = true)}>Sign in</button>
       {/if}
@@ -89,7 +90,7 @@
                 <span class="pname">{p.name}</span>
                 <span style:color={COLOR[n]}><StatusSquare color={COLOR[n]} label={w.state} /></span>
               </div>
-              {#if w.job}<span class="job">{w.job}</span>{/if}
+              {#if w.job}<span class="job" use:sensitive={'file'}>{w.job}</span>{/if}
               {#if (n === 'printing' || n === 'needs_hand') && p.state.progress !== null}
                 <ProgressBar
                   value={p.state.progress}
@@ -108,7 +109,7 @@
       {:else}
         <h1>You</h1>
         {#if me}
-          <p>Signed in as <strong>{me.name}</strong> ({me.username}).</p>
+          <p>Signed in as <strong use:sensitive={'name'}>{me.name}</strong> (<span use:sensitive={'name'}>{me.username}</span>).</p>
           {#if me.role === 'admin'}<p><a href="/admin">Open the admin desk</a></p>{/if}
           <button type="button" class="action" onclick={signOut}>Sign out</button>
         {:else}

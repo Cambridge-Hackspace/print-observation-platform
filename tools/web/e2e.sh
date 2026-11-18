@@ -58,7 +58,7 @@ mkdir -p "$ROOT/web/.e2e"
     fleet=$(mktemp -d)
     cp .e2e/pop "$fleet/pop"
     cp .e2e/pop-fakes "$fleet/pop-fakes"
-    (cd "$fleet" && POP_FAKES_LISTEN=127.0.0.1:8099 POP_FAKES_PRINTERS=11 ./pop-fakes >"$fleet/fakes.out" 2>"$fleet/fakes.log") &
+    (cd "$fleet" && POP_FAKES_LISTEN=127.0.0.1:8099 POP_FAKES_PRINTERS=11 POP_FAKES_GITHUB_KEY="$fleet/github-app.pem" ./pop-fakes >"$fleet/fakes.out" 2>"$fleet/fakes.log") &
     ready=""
     for _ in $(seq 1 50); do
       ready=$(grep -m1 "\"ready\":true" "$fleet/fakes.out" 2>/dev/null || true)
@@ -70,6 +70,8 @@ mkdir -p "$ROOT/web/.e2e"
     (cd "$fleet" && printf "%s\n" "$POP_E2E_ADMIN_PASSWORD" | POP_STORAGE_DATA_DIR="$fleet/data" ./pop user create-admin e2e --name "E2E Admin")
     (cd "$fleet" && POP_STORAGE_DATA_DIR="$fleet/data" POP_SERVER_LISTEN=127.0.0.1:8081 \
       POP_BAM_URL="$(field bam)" POP_BAM_TOKEN="$(field token)" POP_BAM_CATEGORY="$(field category)" \
+      POP_FEEDBACK_APP_ID=12345 POP_FEEDBACK_INSTALLATION_ID=678 POP_FEEDBACK_REPO=acme/pop \
+      POP_FEEDBACK_API="$(field github)" POP_FEEDBACK_PRIVATE_KEY_FILE="$fleet/github-app.pem" \
       ./pop >"$fleet/server.log" 2>&1) &
     up=0
     for _ in $(seq 1 50); do

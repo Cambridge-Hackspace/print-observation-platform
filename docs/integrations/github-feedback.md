@@ -64,6 +64,15 @@ not tried again; the log says why.
 
 ## What is taken out
 
+- **On the screen, before the picture is taken.** The screenshot is made
+  from a clone of the page, and the clone is redacted first
+  (`web/src/lib/feedback/redact.ts`): what screens mark with
+  `use:sensitive` becomes a block labelled `[member]`, `[file]` and so on;
+  form fields are emptied; camera pictures become grey `[camera]` boxes;
+  and every text left is searched for emails, runs of 12 or more digits,
+  UUIDs and tokens. Then the person filing sees the picture, and can black
+  out anything else, before it is sent.
+
 - **The screenshot** must be a PNG, at most 4 MB, and loses every chunk
   that does not draw it: text, times, EXIF.
 - **The context** (route, viewport, recent console errors and failed

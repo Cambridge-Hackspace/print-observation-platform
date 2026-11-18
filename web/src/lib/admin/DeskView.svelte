@@ -1,6 +1,7 @@
 <script lang="ts">
   // The admin desk (#86), as given: Admin.svelte fetches it and acts. The
   // "New in BAM!" banners (#23), then every printer in BAM!'s category.
+  import { sensitive } from '../feedback/sensitive';
   import { Button, Icon, Logo, PrinterDrawing, StatusSquare } from '../design';
   import type { AdminPrinter } from '../generated/AdminPrinter';
   import type { GroupNotice } from '../generated/GroupNotice';
@@ -53,7 +54,7 @@
   <header>
     <div class="brand"><Logo size={40} /><span class="name">POP</span><span class="muted">Printer admin</span></div>
     <div class="who">
-      <span class="muted">Signed in as {me.name}</span>
+      <span class="muted">Signed in as <span use:sensitive={'name'}>{me.name}</span></span>
       <Button size="sm" onclick={onsignout}>Sign out</Button>
     </div>
   </header>

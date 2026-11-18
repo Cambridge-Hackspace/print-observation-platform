@@ -1,6 +1,7 @@
 <script lang="ts">
   // Managing local users (#90): every account, adding one, and editing one --
   // its name, role, training, password, and whether it can sign in.
+  import { sensitive } from '../feedback/sensitive';
   import { onMount } from 'svelte';
   import { Button } from '../design';
   import { call } from '../api';
@@ -117,7 +118,7 @@
     <Button size="sm" onclick={() => (adding = !adding)}>{adding ? 'Cancel' : 'Add a person'}</Button>
   </div>
   {#if problem}<p class="problem" role="alert">{problem}</p>{/if}
-  {#if said}<p class="said" role="status">{said}</p>{/if}
+  {#if said}<p class="said" role="status" use:sensitive={'name'}>{said}</p>{/if}
 
   {#if adding}
     <form class="card" onsubmit={create} data-testid="add-person">
@@ -144,8 +145,8 @@
         <li class="card" class:off={!a.active} data-testid="person">
           <div class="row">
             <div class="who">
-              <span class="pname">{a.name}</span>
-              <span class="muted">{a.username} · {summary(a)}{a.active ? '' : ' · deactivated'}</span>
+              <span class="pname" use:sensitive={'name'}>{a.name}</span>
+              <span class="muted"><span use:sensitive={'name'}>{a.username}</span> · {summary(a)}{a.active ? '' : ' · deactivated'}</span>
             </div>
             {#if open !== a.id}
               <Button size="sm" onclick={() => edit(a)}>Edit</Button>

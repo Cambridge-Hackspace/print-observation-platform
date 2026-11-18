@@ -2,6 +2,7 @@
   // The admin desk (#86): who is signed in, the printers from BAM!, and the
   // tower's live state beside them. A member who is not an admin is told so;
   // nobody signed in is asked to.
+  import { sensitive } from '../feedback/sensitive';
   import { onDestroy, onMount } from 'svelte';
   import { call } from '../api';
   import { follow } from '../live';
@@ -63,7 +64,7 @@
   <SignIn onsignedin={signedIn} />
 {:else if me.role !== 'admin'}
   <main class="wait">
-    <p>This is for printer admins, and {me.name} isn’t one. An admin can change that.</p>
+    <p>This is for printer admins, and <span use:sensitive={'name'}>{me.name}</span> isn’t one. An admin can change that.</p>
     <button type="button" onclick={signOut}>Sign out</button>
   </main>
 {:else}
