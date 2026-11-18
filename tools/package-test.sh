@@ -74,14 +74,20 @@ systemd() {
 
   # go2rtc, as its own service, with its password asked of every request.
   version=v1.9.15
+  # The SHA-256 of each, as go2rtc's release publishes it: pinned here, so
+  # the check needs no lookup (an unauthenticated one is rate limited).
   case "$(uname -m)" in
-    x86_64) asset=go2rtc_linux_amd64 ;;
-    aarch64) asset=go2rtc_linux_arm64 ;;
+    x86_64)
+      asset=go2rtc_linux_amd64
+      want=20b46c6910734cb05ecefb234066f36868ff19b42ba1418a7a32e13a3e035712
+      ;;
+    aarch64)
+      asset=go2rtc_linux_arm64
+      want=af416f22b21a24ab83b8d78642190b4932ae695b4e386853f11d1b0319781763
+      ;;
     *) fail "no go2rtc build named for $(uname -m)" ;;
   esac
   curl -sfL -o /usr/local/bin/go2rtc "https://github.com/AlexxIT/go2rtc/releases/download/$version/$asset"
-  want=$(curl -sf "https://api.github.com/repos/AlexxIT/go2rtc/releases/tags/$version" |
-    python3 -c "import json,sys; print([a['digest'] for a in json.load(sys.stdin)['assets'] if a['name']=='$asset'][0].split(':')[1])")
   got=$(sha256sum /usr/local/bin/go2rtc | cut -d' ' -f1)
   [ "$got" = "$want" ] || fail "go2rtc $version's $asset is not the one released ($got, not $want)"
   chmod 0755 /usr/local/bin/go2rtc
