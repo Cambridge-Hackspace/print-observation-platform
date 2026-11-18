@@ -68,6 +68,17 @@ materials = "materials"
 training = "training"
 serial = "serial"
 
+[go2rtc]
+# The go2rtc that serves the printers' cameras, as its own service
+# (docs/integrations/go2rtc.md): its API address, http://127.0.0.1:1984.
+# Empty: no cameras.
+url = ""
+# go2rtc's api.username and api.password. Set go2rtc's local_auth too, or
+# go2rtc asks nothing of requests from its own machine. The password is a
+# secret: give it as POP_GO2RTC_PASSWORD, not here.
+username = ""
+password = ""
+
 [secrets]
 # Seals the secrets POP keeps, such as a Bambu printer's access code: 32
 # random bytes in base64, as `openssl rand -base64 32` makes. A secret: give

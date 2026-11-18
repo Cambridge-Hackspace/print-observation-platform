@@ -272,6 +272,33 @@ pub struct AdminPrinter {
     pub camera: bool,
 }
 
+/// Whether a printer's camera works, as go2rtc last showed it (#66).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum CameraHealth {
+    /// go2rtc gave a picture from it.
+    Live,
+    /// go2rtc has the stream, but could not get a picture from the camera.
+    NoPicture,
+    /// go2rtc does not have the stream yet; POP adds it at its next look.
+    NotInGo2rtc,
+    /// Not looked at yet, or go2rtc could not be asked.
+    Unknown,
+}
+
+/// A printer's camera, as admins see it (#66). Never its address, which may
+/// hold the camera's password.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct AdminCamera {
+    pub bam_id: String,
+    pub name: String,
+    /// The stream's name in go2rtc.
+    pub stream: String,
+    pub health: CameraHealth,
+    /// What went wrong, when go2rtc could not be asked.
+    pub detail: Option<String>,
+}
+
 /// Where a printer from BAM! stands with the tower (#23).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]

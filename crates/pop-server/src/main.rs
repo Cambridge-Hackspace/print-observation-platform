@@ -239,6 +239,26 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
         let pins = pop_server::pins::DbPins::load(state.db.clone())
             .await
             .map_err(|e| format!("cannot read the Bambu certificate pins: {e}"))?;
+        let (cameras, wanted) = tokio::sync::watch::channel(pop_server::cameras::Wanted::new());
+        if !config.go2rtc.url.is_empty() {
+            let g = &config.go2rtc;
+            let auth = (!g.username.is_empty()).then(|| (g.username.clone(), g.password.clone()));
+            if auth.is_none() {
+                tracing::warn!(
+                    "go2rtc: no user name and password; anything that reaches go2rtc's API can change its streams (docs/integrations/go2rtc.md)"
+                );
+            }
+            let client = pop_integrations::go2rtc::Go2rtc::new(&g.url, auth)
+                .map_err(|e| format!("go2rtc: {e}"))?;
+            // go2rtc serves the tower printers' cameras, kept as BAM! has
+            // them (#66).
+            let (health, _keeper) = pop_server::cameras::spawn(
+                client.clone(),
+                wanted,
+                pop_server::cameras::Options::default(),
+            );
+            state = state.with_cameras(health, client);
+        }
         let (tower, _runner) = pop_server::run::spawn(pop_server::run::Runner {
             db: state.db.clone(),
             secrets: state.secrets.clone(),
@@ -248,8 +268,12 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
             decided: state.decided.clone(),
             pins: Arc::new(pins),
             backoff: pop_printers::fleet::Backoff::default(),
+            cameras,
         });
         state = state.with_tower(tower);
+    }
+    if config.bam.url.is_empty() && !config.go2rtc.url.is_empty() {
+        tracing::warn!("go2rtc is set, but the cameras come from BAM!: set [bam] to show any");
     }
     // Group notices (#68), to the Discord webhook as saved at each one.
     let (notifier, _delivery) = pop_server::notify::spawn(

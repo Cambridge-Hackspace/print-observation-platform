@@ -129,6 +129,7 @@ async fn pop(webhook: Option<&str>) -> Pop {
             max: Duration::from_millis(200),
             healthy_after: Duration::from_secs(60),
         },
+        cameras: tokio::sync::watch::channel(Default::default()).0,
     });
     let secrets = Secrets::new(KEY);
     if let Some(url) = webhook {

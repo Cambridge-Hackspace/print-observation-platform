@@ -26,8 +26,22 @@ pub struct Config {
     pub log: Log,
     pub access: Access,
     pub bam: Bam,
+    pub go2rtc: Go2rtc,
     pub secrets: Secrets,
     pub guides: Guides,
+}
+
+/// The go2rtc that serves the printers' cameras (#66), as its own service.
+/// Off while `url` is empty.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Default)]
+#[serde(deny_unknown_fields, default)]
+pub struct Go2rtc {
+    /// go2rtc's API address: http://127.0.0.1:1984. Empty: no cameras.
+    pub url: String,
+    /// go2rtc's `api.username`. Empty: go2rtc asks for none.
+    pub username: String,
+    /// go2rtc's `api.password`. A secret: give it as POP_GO2RTC_PASSWORD.
+    pub password: String,
 }
 
 /// Where POP reads its printers (#20, #21). Off while `url` is empty.
@@ -268,6 +282,9 @@ impl Config {
         set("POP_BAM_FIELDS_MATERIALS", &mut f.materials);
         set("POP_BAM_FIELDS_TRAINING", &mut f.training);
         set("POP_BAM_FIELDS_SERIAL", &mut f.serial);
+        set("POP_GO2RTC_URL", &mut self.go2rtc.url);
+        set("POP_GO2RTC_USERNAME", &mut self.go2rtc.username);
+        set("POP_GO2RTC_PASSWORD", &mut self.go2rtc.password);
         set("POP_SECRETS_KEY", &mut self.secrets.key);
         set("POP_GUIDES_LICENSE", &mut self.guides.license);
         if let Some(v) = env("POP_GUIDES_INDEXABLE") {
@@ -302,6 +319,18 @@ impl Config {
                 format!(
                     "{:?}: expected an http:// or https:// address",
                     self.bam.url
+                ),
+            ));
+        }
+        if env("POP_GO2RTC_URL").is_some()
+            && !self.go2rtc.url.is_empty()
+            && !is_http(&self.go2rtc.url)
+        {
+            return Err(err(
+                "POP_GO2RTC_URL",
+                format!(
+                    "{:?}: expected go2rtc's http:// or https:// API address",
+                    self.go2rtc.url
                 ),
             ));
         }
@@ -364,6 +393,26 @@ impl Config {
                     "is empty: name the BAM! field's key, or leave it out for the default",
                 ));
             }
+        }
+        let g = &self.go2rtc;
+        if !g.url.is_empty() && !is_http(&g.url) {
+            return Err(err(
+                "go2rtc.url",
+                format!(
+                    "{:?}: expected go2rtc's http:// or https:// API address",
+                    g.url
+                ),
+            ));
+        }
+        if g.username.is_empty() != g.password.is_empty() {
+            return Err(err(
+                if g.username.is_empty() {
+                    "go2rtc.username"
+                } else {
+                    "go2rtc.password"
+                },
+                "go2rtc's user name and password go together: give both (the password as POP_GO2RTC_PASSWORD), or neither",
+            ));
         }
         if !self.secrets.key.is_empty() && !is_key(&self.secrets.key) {
             return Err(err(
@@ -532,6 +581,7 @@ mod tests {
             ("POP_ACCESS_TRUSTED_PROXIES", "a-proxy"),
             ("POP_SECRETS_KEY", "c2hvcnQ="),
             ("POP_BAM_URL", "bam.example.org"),
+            ("POP_GO2RTC_URL", "127.0.0.1:1984"),
         ] {
             assert_eq!(env_err(&[(var, value)]).key, var, "{var}={value:?}");
         }
@@ -628,6 +678,32 @@ mod tests {
         )
         .unwrap();
         assert_eq!(c.bam.token, "bam_x");
+    }
+
+    #[test]
+    fn go2rtc_needs_an_address_and_its_user_name_and_password_together() {
+        let whole = |toml: &str| Config::parse(toml).and_then(|c| c.validate_whole().map(|()| c));
+        let e = whole("[go2rtc]\nurl = \"127.0.0.1:1984\"\n").unwrap_err();
+        assert_eq!(e.key, "go2rtc.url");
+        let e =
+            whole("[go2rtc]\nurl = \"http://127.0.0.1:1984\"\nusername = \"pop\"\n").unwrap_err();
+        assert_eq!(e.key, "go2rtc.password", "a user name with no password");
+        let e = whole("[go2rtc]\nurl = \"http://127.0.0.1:1984\"\npassword = \"p\"\n").unwrap_err();
+        assert_eq!(e.key, "go2rtc.username", "a password with no user name");
+        let c = whole("[go2rtc]\nurl = \"http://127.0.0.1:1984\"\n").unwrap();
+        assert_eq!(c.go2rtc.url, "http://127.0.0.1:1984", "neither is fine");
+        // The password from the environment, as the sample says to give it.
+        let c = Config::load(None, |k| match k {
+            "POP_GO2RTC_URL" => Some("http://127.0.0.1:1984".to_owned()),
+            "POP_GO2RTC_USERNAME" => Some("pop".to_owned()),
+            "POP_GO2RTC_PASSWORD" => Some("from-env".to_owned()),
+            _ => None,
+        })
+        .unwrap();
+        assert_eq!(
+            (c.go2rtc.username.as_str(), c.go2rtc.password.as_str()),
+            ("pop", "from-env")
+        );
     }
 
     #[test]

@@ -10,10 +10,11 @@ use std::{
 };
 
 use pop_server::api::{
-    AccessCode, Account, AdminPrinter, ApiError, AuditEntry, AuditKind, DiscordWebhook, ErrorGuide,
-    Guide, GuideImage, GuideProblems, GuideSummary, Health, LinkGuide, NewActive, NewGuideImage,
-    NewName, NewPassword, NewRole, NewTraining, NewUser, NotifySettings, PublicGuide,
-    PublicGuideList, Role, ServerEvent, SignIn, Snapshot, Status, TowerPrinter, TowerState, User,
+    AccessCode, Account, AdminCamera, AdminPrinter, ApiError, AuditEntry, AuditKind, CameraHealth,
+    DiscordWebhook, ErrorGuide, Guide, GuideImage, GuideProblems, GuideSummary, Health, LinkGuide,
+    NewActive, NewGuideImage, NewName, NewPassword, NewRole, NewTraining, NewUser, NotifySettings,
+    PublicGuide, PublicGuideList, Role, ServerEvent, SignIn, Snapshot, Status, TowerPrinter,
+    TowerState, User,
 };
 use ts_rs::TS;
 
@@ -33,6 +34,9 @@ fn export(dir: &Path) {
     AuditKind::export_all_to(dir).unwrap();
     AuditEntry::export_all_to(dir).unwrap();
     AdminPrinter::export_all_to(dir).unwrap();
+    // Cameras (#66).
+    AdminCamera::export_all_to(dir).unwrap();
+    CameraHealth::export_all_to(dir).unwrap();
     TowerState::export_all_to(dir).unwrap();
     TowerPrinter::export_all_to(dir).unwrap();
     AccessCode::export_all_to(dir).unwrap();

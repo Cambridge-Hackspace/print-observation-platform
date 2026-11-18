@@ -7,6 +7,7 @@ pub mod assets;
 pub mod audit;
 pub mod auth;
 pub mod backup;
+pub mod cameras;
 pub mod config;
 pub mod db;
 pub mod events;
@@ -73,6 +74,8 @@ pub struct AppState {
     pub files_dir: Option<std::path::PathBuf>,
     /// How published guides are offered to everyone (#94).
     pub guides: config::Guides,
+    /// Each printer's camera and its health, when go2rtc is configured (#66).
+    pub cameras: Option<tokio::sync::watch::Receiver<Vec<api::AdminCamera>>>,
 }
 
 impl AppState {
@@ -94,7 +97,19 @@ impl AppState {
             http: reqwest::Client::new(),
             files_dir: None,
             guides: config::Guides::default(),
+            cameras: None,
         }
+    }
+
+    /// Show the cameras as this keeper keeps them (#66), and check go2rtc on
+    /// /healthz.
+    pub fn with_cameras(
+        mut self,
+        cameras: tokio::sync::watch::Receiver<Vec<api::AdminCamera>>,
+        go2rtc: pop_integrations::go2rtc::Go2rtc,
+    ) -> Self {
+        self.cameras = Some(cameras);
+        self.with_check(cameras::Go2rtcHealth(go2rtc))
     }
 
     /// Offer published guides under these settings (#94).
@@ -307,6 +322,14 @@ pub fn routes() -> Vec<Route> {
             reach: Reach::Anywhere,
             who: Who::Admin,
             handler: get(printers::list),
+        },
+        Route {
+            method: Method::GET,
+            path: "/api/admin/cameras",
+            effect: Effect::Read,
+            reach: Reach::Anywhere,
+            who: Who::Admin,
+            handler: get(cameras::list),
         },
         Route {
             method: Method::POST,
