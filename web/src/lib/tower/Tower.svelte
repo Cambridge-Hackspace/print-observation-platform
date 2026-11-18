@@ -6,12 +6,15 @@
   import TowerView from './TowerView.svelte';
   import HandView from './HandView.svelte';
   import { toldAbout } from './hand';
+  import KioskCamera from './KioskCamera.svelte';
 
   let connection: Connection = $state('connecting');
   let screen = $state(empty());
   let now = $state(new Date());
   /** The printer whose "needs a hand" screen is open (#55), by id. */
   let open: string | null = $state(null);
+  /** The printer whose camera is open, full screen (#58), by id. */
+  let watching: string | null = $state(null);
 
   const stop = follow('/api/events', {
     connection: (c) => (connection = c),
@@ -24,8 +27,10 @@
   });
 </script>
 
-{#if open === null}
-  <TowerView {screen} {connection} {now} onopen={(id) => (open = id)} />
+{#if watching !== null}
+  <KioskCamera printer={screen.printers.find((p) => p.id === watching)} onback={() => (watching = null)} />
+{:else if open === null}
+  <TowerView {screen} {connection} {now} onopen={(id) => (open = id)} oncamera={(id) => (watching = id)} />
 {:else}
   <HandView
     printer={screen.printers.find((p) => p.id === open)}

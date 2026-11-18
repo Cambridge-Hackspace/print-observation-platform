@@ -57,6 +57,10 @@ pub enum Who {
     Anyone,
     /// Anyone signed in.
     Member,
+    /// Anyone signed in, and anyone at the space, signed in or not: the kiosk,
+    /// which has no session of its own until kiosk sessions (#12). Watching a
+    /// camera (#58).
+    MemberOrLocal,
     /// An admin.
     Admin,
 }
@@ -212,6 +216,15 @@ async fn require(
         },
     };
     let Some(user) = user else {
+        if who == Who::MemberOrLocal {
+            let peer = req
+                .extensions()
+                .get::<ConnectInfo<SocketAddr>>()
+                .map(|c| c.0.ip());
+            if is_local(&state.access, peer, req.headers()) {
+                return next.run(req).await;
+            }
+        }
         return refuse(StatusCode::UNAUTHORIZED, "sign in first");
     };
     if who == Who::Admin && user.role != crate::api::Role::Admin {

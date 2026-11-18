@@ -131,7 +131,13 @@ async fn pop_with(setup: impl FnOnce(&FakeGo2rtc)) -> Pop {
         pins.clone(),
     );
     let health = kept.health.clone();
-    let state = AppState::new(db.clone(), Arc::new(Embedded));
+    // POP behind a proxy on this machine, as docs/remote-access.md sets it:
+    // a request is from outside unless the proxy says it began at the space.
+    let state =
+        AppState::new(db.clone(), Arc::new(Embedded)).with_access(pop_server::config::Access {
+            local_networks: vec!["192.168.1.0/24".parse().unwrap()],
+            trusted_proxies: vec!["127.0.0.1/32".parse().unwrap()],
+        });
     let decided = state.decided.clone();
     let (tower, _) = run::spawn(run::Runner {
         db: db.clone(),
@@ -511,11 +517,25 @@ type Socket =
 
 /// Open MSE on `bam_id`'s camera as `cookie`: the socket, or the refusal's status.
 async fn open_mse(addr: &str, bam_id: &str, cookie: Option<&str>) -> Result<Socket, u16> {
+    open_mse_from(addr, bam_id, cookie, None).await
+}
+
+/// The same, as the proxy says a request from `at` began.
+async fn open_mse_from(
+    addr: &str,
+    bam_id: &str,
+    cookie: Option<&str>,
+    at: Option<&str>,
+) -> Result<Socket, u16> {
     let mut req = format!("ws://{addr}/api/printers/{bam_id}/camera/mse")
         .into_client_request()
         .unwrap();
     if let Some(c) = cookie {
         req.headers_mut().insert("Cookie", c.parse().unwrap());
+    }
+    if let Some(at) = at {
+        req.headers_mut()
+            .insert("X-Forwarded-For", at.parse().unwrap());
     }
     match tokio_tungstenite::connect_async(req).await {
         Ok((ws, _)) => Ok(ws),
@@ -726,8 +746,11 @@ async fn only_members_watch_and_only_a_tower_printers_camera() {
     pop.voron_served().await;
     let addr = pop.serve().await;
     let http = reqwest::Client::new();
+    // From outside the space, as the proxy says.
     let get = |path: String, cookie: Option<String>| {
-        let mut r = http.get(format!("http://{addr}{path}"));
+        let mut r = http
+            .get(format!("http://{addr}{path}"))
+            .header("X-Forwarded-For", "203.0.113.9");
         if let Some(c) = cookie {
             r = r.header("Cookie", c);
         }
@@ -739,7 +762,12 @@ async fn only_members_watch_and_only_a_tower_printers_camera() {
         .await
         .unwrap();
     assert_eq!(r.status(), 401);
-    assert_eq!(open_mse(&addr, &voron, None).await.err(), Some(401));
+    assert_eq!(
+        open_mse_from(&addr, &voron, None, Some("203.0.113.9"))
+            .await
+            .err(),
+        Some(401)
+    );
     // Not a tower printer's camera: no such thing, however it is named.
     let admin = Some(pop.admin.clone());
     for id in [
@@ -804,4 +832,53 @@ async fn no_more_than_the_limit_watch_at_once() {
         );
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
+}
+
+/// The kiosk watches without signing in (#58): anyone at the space may, and
+/// nobody outside it may without signing in.
+#[tokio::test]
+async fn the_space_watches_without_signing_in_and_outside_does_not() {
+    let pop = pop().await;
+    pop.go2rtc.working(VORON_CAMERA, true);
+    pop.go2rtc.h264(VORON_CAMERA, true);
+    pop.voron_served().await;
+    let addr = pop.serve().await;
+    let voron = pop.bam.id("voron").to_owned();
+    let http = reqwest::Client::new();
+    let mjpeg = |at: Option<&'static str>| {
+        let mut r = http.get(format!("http://{addr}/api/printers/{voron}/camera/mjpeg"));
+        if let Some(at) = at {
+            r = r.header("X-Forwarded-For", at);
+        }
+        r.send()
+    };
+    // At the space, signed out: watched, both ways.
+    let mut res = mjpeg(Some("192.168.1.20")).await.unwrap();
+    assert_eq!(res.status(), 200);
+    assert!(res.chunk().await.unwrap().unwrap().starts_with(b"--frame"));
+    let mut ws = open_mse_from(&addr, &voron, None, Some("192.168.1.20"))
+        .await
+        .unwrap();
+    ws.send(Message::Text(
+        json!({"type": "mse", "value": CODECS}).to_string().into(),
+    ))
+    .await
+    .unwrap();
+    assert_eq!(text(&next(&mut ws).await)["type"], "mse");
+    // Outside, signed out: refused, both ways, and saying so.
+    assert_eq!(mjpeg(Some("203.0.113.9")).await.unwrap().status(), 401);
+    assert_eq!(
+        open_mse_from(&addr, &voron, None, Some("203.0.113.9"))
+            .await
+            .err(),
+        Some(401)
+    );
+    // A client cannot say it is at the space through the proxy.
+    assert_eq!(
+        mjpeg(Some("192.168.1.20, 203.0.113.9"))
+            .await
+            .unwrap()
+            .status(),
+        401
+    );
 }

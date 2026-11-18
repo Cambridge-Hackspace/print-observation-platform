@@ -18,6 +18,7 @@
     connection,
     now,
     onopen = () => {},
+    oncamera = () => {},
   }: {
     screen: ScreenState;
     connection: Connection;
@@ -25,6 +26,8 @@
     now: Date;
     /** A printer that needs a hand was tapped, by id (#55). */
     onopen?: (id: string) => void;
+    /** Watch a printer's camera, full screen (#58). */
+    oncamera?: (id: string) => void;
   } = $props();
 
   const printers = $derived(byNeed(screen.printers));
@@ -140,6 +143,11 @@
           {/if}
           <div class="under"><span>{w.left}</span><span class="muted">{w.right}</span></div>
         </div>
+        {#if p.camera}
+          <button type="button" class="cam" aria-label="Watch {p.name}'s camera" onclick={() => oncamera(p.id)}>
+            <Icon name="camera" size={36} />
+          </button>
+        {/if}
         {#if phone && n === 'printing'}
           <!-- Follow this print from a phone, on its own page (#65). -->
           <div class="follow">
@@ -256,6 +264,21 @@
   }
   .card.hi {
     box-shadow: var(--pop-shadow);
+  }
+  .cam {
+    /* Above the card's own "needs a hand" button, so both can be tapped. */
+    position: relative;
+    z-index: 1;
+    flex: none;
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--pop-cream);
+    border: 3px solid var(--pop-ink);
+    border-radius: var(--pop-radius);
+    cursor: pointer;
   }
   .follow {
     flex: none;

@@ -151,6 +151,9 @@ async fn every_route_refuses_whoever_it_does_not_name() {
         let what = format!("{} {}", r.method, r.path);
         match r.who {
             Who::Anyone => {}
+            // This test's requests come from 127.0.0.1, which is at the
+            // space; tests/cameras.rs asks from outside, signed out, too.
+            Who::MemberOrLocal => {}
             Who::Member => {
                 let anon = pop.send(r.method.clone(), &uri, None, body.clone()).await;
                 assert_eq!(anon.code, StatusCode::UNAUTHORIZED, "{what}, signed out");

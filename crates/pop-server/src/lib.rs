@@ -390,13 +390,14 @@ pub fn routes() -> Vec<Route> {
             who: Who::Member,
             handler: post(report::report),
         },
-        // ---- watching a camera (#67): members, from anywhere, read-only ----
+        // ---- watching a camera (#67, #58): members, and anyone at the space ----
         Route {
             method: Method::GET,
             path: "/api/printers/{bam_id}/camera/mse",
             effect: Effect::Read,
             reach: Reach::Anywhere,
-            who: Who::Member,
+            // Members from anywhere; and at the space, the kiosk (#58).
+            who: Who::MemberOrLocal,
             handler: get(cameras::watch_mse),
         },
         Route {
@@ -404,7 +405,8 @@ pub fn routes() -> Vec<Route> {
             path: "/api/printers/{bam_id}/camera/mjpeg",
             effect: Effect::Read,
             reach: Reach::Anywhere,
-            who: Who::Member,
+            // Members from anywhere; and at the space, the kiosk (#58).
+            who: Who::MemberOrLocal,
             handler: get(cameras::watch_mjpeg),
         },
         Route {
