@@ -3,7 +3,7 @@
 use pop_integrations::{
     bam::{Asset, Bam},
     fakes::bam::{FakeBam, TOKEN},
-    printers::{Connection, FieldMap, Problem, printer_from},
+    printers::{Camera, Connection, FieldMap, Problem, bambu_camera, printer_from},
 };
 
 const RECORDING: &str = include_str!("recordings/v0.20.0/recordings.json");
@@ -121,10 +121,96 @@ async fn a_bambu_printer_waits_for_its_access_code_in_pop() {
             serial: "01S00C123456789".into()
         }
     );
+    // Its own RTSPS camera, on its own address: POP signs in to it.
+    assert_eq!(ready.camera, Some(Camera::BambuRtsps));
+}
+
+/// A Bambu printer's own camera by its model (OpenBambuAPI `video.md`),
+/// written out here rather than taken from the code.
+#[test]
+fn each_bambu_model_has_the_camera_the_sources_say() {
+    for (model, camera) in [
+        ("X1C", Some(Camera::BambuRtsps)),
+        ("X1 Carbon", Some(Camera::BambuRtsps)),
+        ("X1E", Some(Camera::BambuRtsps)),
+        ("Bambu Lab X1-Carbon", Some(Camera::BambuRtsps)),
+        ("P2S", Some(Camera::BambuRtsps)),
+        ("H2D", Some(Camera::BambuRtsps)),
+        ("H2S", Some(Camera::BambuRtsps)),
+        ("A1", Some(Camera::BambuJpeg)),
+        ("A1 mini", Some(Camera::BambuJpeg)),
+        ("P1S", Some(Camera::BambuJpeg)),
+        ("p1p", Some(Camera::BambuJpeg)),
+        ("Voron 2.4", None),
+        ("", None),
+    ] {
+        assert_eq!(bambu_camera(model), camera, "{model:?}");
+    }
+}
+
+#[tokio::test]
+async fn built_in_is_a_bambu_printers_own_camera_and_needs_its_model() {
+    let (_f, all) = recorded().await;
+    let x1 = named(&all, "X1 Carbon");
+    let code = |id: &str| id == x1.asset.id;
+    let a1 = with(x1, &[("camera", "Built-In"), ("model", "A1 mini")]);
+    let p = printer_from(&a1, &FieldMap::default(), &code).unwrap();
+    assert_eq!(p.camera, Some(Camera::BambuJpeg));
+    let x1c = with(x1, &[("camera", "built-in")]);
     assert_eq!(
-        ready.camera.as_deref(),
-        Some("rtsps://192.168.1.50/streaming/live/1")
+        printer_from(&x1c, &FieldMap::default(), &code)
+            .unwrap()
+            .camera,
+        Some(Camera::BambuRtsps)
     );
+    // A model POP does not know, or none: said, naming the model field.
+    for model in ["Kobra 2", ""] {
+        let odd = with(x1, &[("camera", "built-in"), ("model", model)]);
+        let e = printer_from(&odd, &FieldMap::default(), &code).unwrap_err();
+        assert_eq!(e.len(), 1, "{e:?}");
+        assert!(e[0].field.contains("camera"), "{e:?}");
+        assert!(e[0].problem.contains("(model)"), "{e:?}");
+    }
+    // Not a Bambu printer: built-in means nothing.
+    let voron = with(named(&all, "Voron 2.4"), &[("camera", "built-in")]);
+    let e = printer_from(&voron, &FieldMap::default(), &code).unwrap_err();
+    assert!(e[0].problem.contains("Bambu"), "{e:?}");
+}
+
+#[tokio::test]
+async fn a_bambu_printers_other_cameras_are_addresses() {
+    let (_f, all) = recorded().await;
+    let x1 = named(&all, "X1 Carbon");
+    let code = |id: &str| id == x1.asset.id;
+    for (camera, want) in [
+        // Its own address, any port or path: its own camera.
+        (
+            "rtsps://192.168.1.50:322/streaming/live/1",
+            Camera::BambuRtsps,
+        ),
+        // Another camera pointed at it: an address, played as it is.
+        (
+            "rtsps://192.168.1.51/streaming/live/1",
+            Camera::Address {
+                url: "rtsps://192.168.1.51/streaming/live/1".into(),
+            },
+        ),
+        (
+            "http://192.168.1.50:8080/mjpeg",
+            Camera::Address {
+                url: "http://192.168.1.50:8080/mjpeg".into(),
+            },
+        ),
+    ] {
+        let a = with(x1, &[("camera", camera)]);
+        assert_eq!(
+            printer_from(&a, &FieldMap::default(), &code)
+                .unwrap()
+                .camera,
+            Some(want),
+            "{camera}"
+        );
+    }
 }
 
 // ---- addresses as an admin is likely to type them ---------------------------------

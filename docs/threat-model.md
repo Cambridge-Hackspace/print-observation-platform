@@ -195,6 +195,15 @@ on BAM! without naming its address.
   `crates/pop-server/tests/cameras.rs::a_member_watches_an_h264_camera_and_nothing_else_they_send_reaches_go2rtc`,
   `crates/pop-server/tests/cameras.rs::a_codec_list_that_is_not_one_is_refused_before_go2rtc_hears_it`,
   `crates/pop-server/tests/cameras.rs::what_go2rtc_says_about_a_camera_never_reaches_a_viewer`.
+- A Bambu printer's own camera is reached with its certificate pinned, as
+  its MQTT is: go2rtc, which would check none, gets the RTSPS camera only
+  through POP's relay, and a different certificate stops the relay.
+  `crates/pop-server/tests/bambu_cameras.rs::an_x1s_camera_is_played_by_go2rtc_through_the_pinned_relay`,
+  `crates/pop-server/tests/bambu_cameras.rs::an_x1_with_another_certificate_gets_nothing_and_admins_are_told_why`,
+  `crates/pop-printers/tests/bambu_camera.rs::the_relay_passes_nothing_to_a_camera_with_another_certificate`.
+- The port-6000 camera stream is read by a decoder fuzzed to never panic or
+  hold more than one picture.
+  `crates/pop-printers/tests/bambu_camera.rs::the_decoder_survives_whatever_a_camera_sends`.
 - No more than 16 watch at once.
   `crates/pop-server/tests/cameras.rs::no_more_than_the_limit_watch_at_once`.
 
@@ -319,5 +328,7 @@ Each of these is true of POP today, or untested, and none is claimed above.
     program on the box could change its streams. The guide says to turn it
     on; nothing checks. Tracked in #149.
 17. **Camera addresses are plain text in BAM! and in go2rtc's
-    configuration file**, and a camera's address can hold its password.
+    configuration file**, and a camera's address can hold its password. A
+    Bambu X1's access code is among them: go2rtc's address for the relay
+    carries it, though the code itself never goes in BAM!.
     POP does not set that file's permissions. Tracked in #150.

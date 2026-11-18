@@ -292,8 +292,8 @@ pub enum CameraHealth {
 pub struct AdminCamera {
     pub bam_id: String,
     pub name: String,
-    /// The stream's name in go2rtc.
-    pub stream: String,
+    /// The stream's name in go2rtc; none for a camera POP reads itself (#33).
+    pub stream: Option<String>,
     pub health: CameraHealth,
     /// What went wrong, when go2rtc could not be asked.
     pub detail: Option<String>,

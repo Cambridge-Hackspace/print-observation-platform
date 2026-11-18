@@ -80,6 +80,8 @@ pub struct AppState {
     pub go2rtc: Option<pop_integrations::go2rtc::Go2rtc>,
     /// Places for viewers, across every camera.
     pub viewers: Arc<tokio::sync::Semaphore>,
+    /// The cameras POP reads itself (#33).
+    pub jpegs: cameras::Jpegs,
 }
 
 impl AppState {
@@ -104,6 +106,7 @@ impl AppState {
             cameras: None,
             go2rtc: None,
             viewers: Arc::new(tokio::sync::Semaphore::new(cameras::MAX_VIEWERS)),
+            jpegs: cameras::Jpegs::default(),
         }
     }
 
@@ -111,10 +114,11 @@ impl AppState {
     /// /healthz.
     pub fn with_cameras(
         mut self,
-        cameras: tokio::sync::watch::Receiver<Vec<api::AdminCamera>>,
+        kept: cameras::Kept,
         go2rtc: pop_integrations::go2rtc::Go2rtc,
     ) -> Self {
-        self.cameras = Some(cameras);
+        self.cameras = Some(kept.health);
+        self.jpegs = kept.jpegs;
         self.go2rtc = Some(go2rtc.clone());
         self.with_check(cameras::Go2rtcHealth(go2rtc))
     }

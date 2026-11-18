@@ -8,6 +8,10 @@
 //! pieces of `split` bytes as a network may split them. Faults: a header
 //! claiming a picture too large, a picture that is not a JPEG, the
 //! connection cut mid-picture, and a different certificate.
+//!
+//! Started with [`FakeBambuCamera::start_rtsps`], it is instead an X1's
+//! RTSPS port: TLS, answering each RTSP request with a 200 that names it,
+//! and keeping the requests, so a test can see what came through a relay.
 
 use std::{
     net::SocketAddr,
@@ -55,6 +59,8 @@ struct Shared {
     every: Duration,
     signed_in: AtomicU32,
     watching: AtomicU32,
+    rtsp: bool,
+    rtsp_requests: Mutex<Vec<String>>,
 }
 
 /// A fake Bambu camera, listening until dropped.
@@ -100,6 +106,20 @@ pub fn framed(jpeg: &[u8]) -> Vec<u8> {
 impl FakeBambuCamera {
     /// Start one on a free port, sending a picture every `every`.
     pub async fn start(serial: &str, access_code: &str, every: Duration) -> Self {
+        Self::start_as(serial, access_code, every, false).await
+    }
+
+    /// Start an X1's RTSPS port instead, on a free port.
+    pub async fn start_rtsps(serial: &str) -> Self {
+        Self::start_as(serial, "", Duration::ZERO, true).await
+    }
+
+    /// Every RTSP request's first line, oldest first.
+    pub fn rtsp_requests(&self) -> Vec<String> {
+        self.shared.rtsp_requests.lock().unwrap().clone()
+    }
+
+    async fn start_as(serial: &str, access_code: &str, every: Duration, rtsp: bool) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").await.expect("a free port");
         let addr = listener.local_addr().expect("its address");
         let shared = Arc::new(Shared {
@@ -110,6 +130,8 @@ impl FakeBambuCamera {
             every,
             signed_in: AtomicU32::new(0),
             watching: AtomicU32::new(0),
+            rtsp,
+            rtsp_requests: Mutex::new(Vec::new()),
         });
         let s = shared.clone();
         let task = tokio::spawn(async move {
@@ -118,7 +140,11 @@ impl FakeBambuCamera {
                 let s = s.clone();
                 tokio::spawn(async move {
                     if let Ok(tls) = acceptor.accept(tcp).await {
-                        serve(tls, s).await;
+                        if s.rtsp {
+                            serve_rtsp(tls, s).await;
+                        } else {
+                            serve(tls, s).await;
+                        }
                     }
                 });
             }
@@ -225,5 +251,38 @@ async fn serve(mut tls: tokio_rustls::server::TlsStream<tokio::net::TcpStream>, 
             }
         }
         tokio::time::sleep(s.every).await;
+    }
+}
+
+async fn serve_rtsp(
+    mut tls: tokio_rustls::server::TlsStream<tokio::net::TcpStream>,
+    s: Arc<Shared>,
+) {
+    let mut buf = Vec::new();
+    let mut chunk = [0u8; 4096];
+    loop {
+        let Ok(n) = tls.read(&mut chunk).await else {
+            return;
+        };
+        if n == 0 {
+            return;
+        }
+        buf.extend_from_slice(&chunk[..n]);
+        while let Some(end) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+            let request = String::from_utf8_lossy(&buf[..end]).into_owned();
+            buf.drain(..end + 4);
+            let first = request.lines().next().unwrap_or_default().to_owned();
+            let cseq = request
+                .lines()
+                .find_map(|l| l.strip_prefix("CSeq: "))
+                .unwrap_or("0")
+                .to_owned();
+            s.rtsp_requests.lock().unwrap().push(first.clone());
+            let reply =
+                format!("RTSP/1.0 200 OK\r\nCSeq: {cseq}\r\nServer: fake-bambu ({first})\r\n\r\n");
+            if tls.write_all(reply.as_bytes()).await.is_err() {
+                return;
+            }
+        }
     }
 }

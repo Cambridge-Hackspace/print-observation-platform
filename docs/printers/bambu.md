@@ -51,7 +51,27 @@ truncated and corrupted streams on every test run
 printer's, under its own key, since the sources do not say whether the two
 ports present the same certificate.
 
-How a printer's camera reaches the screens is #33's second part.
+In BAM!, set a Bambu printer's `camera` field to `built-in`, and POP picks
+the kind by its `model` (`X1C`, `P1S`, `A1 mini` and so on, as above; a model
+POP does not know is a problem on the printer, naming the field). Its RTSPS
+address on its own host, `rtsps://<printer>:322/streaming/live/1`, means the
+same as `built-in`. Either way POP signs in with the access code it keeps:
+never put the code in BAM!.
+
+- **RTSPS** is played by go2rtc, but not straight from the printer: go2rtc
+  checks no certificate for a camera addressed by IP (go2rtc 1.9.15,
+  `pkg/tcp/dial.go`), as Bambu printers are, so it would give the access
+  code to anything posing as the printer. POP relays the camera instead: it
+  makes the TLS connection, with the pinned certificate, and go2rtc dials
+  POP on the loopback address. A certificate that is not the pin stops the
+  relay, and the admin's camera list says why.
+- **JPEG pictures** are read by POP itself, one connection per printer
+  however many watch, and only while someone does (or while POP looks at it,
+  every half-minute). They are watched as MJPEG; go2rtc is not involved.
+
+What is not proven yet: that a real X1 takes RTSP through the relay (the
+fake answers any request), and that a real A1 or P1 sends what the sources
+describe.
 
 ## What it has been tested against
 

@@ -344,3 +344,73 @@ async fn an_access_code_no_printer_gives_is_refused_before_connecting() {
     assert!(matches!(e, CameraError::Refused(_)), "{e:?}");
     assert_eq!(fake.signed_in(), 0);
 }
+
+// ---- the RTSPS relay (X1, P2S, H2) ---------------------------------------------
+
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+async fn ask_through(port: u16, request: &str) -> String {
+    let mut local = tokio::net::TcpStream::connect(("127.0.0.1", port))
+        .await
+        .unwrap();
+    local.write_all(request.as_bytes()).await.unwrap();
+    let mut got = Vec::new();
+    let mut buf = [0u8; 1024];
+    while !got.windows(4).any(|w| w == b"\r\n\r\n") {
+        match tokio::time::timeout(Duration::from_secs(5), local.read(&mut buf)).await {
+            Ok(Ok(0)) | Err(_) => break,
+            Ok(Ok(n)) => got.extend_from_slice(&buf[..n]),
+            Ok(Err(_)) => break,
+        }
+    }
+    String::from_utf8_lossy(&got).into_owned()
+}
+
+const OPTIONS: &str = "OPTIONS rtsp://127.0.0.1/streaming/live/1 RTSP/1.0\r\nCSeq: 1\r\n\r\n";
+
+#[tokio::test]
+async fn the_relay_passes_rtsp_both_ways_with_the_certificate_pinned() {
+    let fake = FakeBambuCamera::start_rtsps(SERIAL).await;
+    let pins = Arc::new(MemoryPins::default());
+    let relay = camera(&fake, CODE, pins.clone()).relay().await.unwrap();
+    let reply = ask_through(relay.port, OPTIONS).await;
+    assert!(
+        reply.starts_with("RTSP/1.0 200 OK\r\nCSeq: 1\r\n"),
+        "{reply:?}"
+    );
+    assert_eq!(
+        fake.rtsp_requests(),
+        ["OPTIONS rtsp://127.0.0.1/streaming/live/1 RTSP/1.0"]
+    );
+    assert_eq!(
+        pins.pinned(&BambuCamera::pin_key(SERIAL)),
+        Some(fake.fingerprint())
+    );
+    assert_eq!(relay.last_error(), None);
+}
+
+#[tokio::test]
+async fn the_relay_passes_nothing_to_a_camera_with_another_certificate() {
+    let fake = FakeBambuCamera::start_rtsps(SERIAL).await;
+    let pins = Arc::new(MemoryPins::default());
+    let relay = camera(&fake, CODE, pins.clone()).relay().await.unwrap();
+    assert!(
+        ask_through(relay.port, OPTIONS)
+            .await
+            .starts_with("RTSP/1.0 200")
+    );
+    fake.new_certificate(SERIAL);
+    let reply = ask_through(relay.port, OPTIONS).await;
+    assert_eq!(reply, "", "nothing came back");
+    assert_eq!(
+        fake.rtsp_requests().len(),
+        1,
+        "and nothing reached the camera"
+    );
+    assert_eq!(
+        relay.last_error(),
+        Some(CameraError::Certificate {
+            seen: fake.fingerprint()
+        })
+    );
+}

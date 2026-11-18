@@ -69,13 +69,48 @@ pub enum Connection {
 /// The values the connection field may have.
 pub const CONNECTIONS: &[&str] = &["moonraker", "octoprint", "prusalink", "bambu", "usb_serial"];
 
+/// A printer's camera, as BAM! gives it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case", tag = "kind")]
+pub enum Camera {
+    /// An address go2rtc plays: rtsp, rtsps, http or https.
+    Address { url: String },
+    /// A Bambu printer's own camera, RTSPS on port 322: the X1 series, P2S,
+    /// and the H2 series with LAN Only Liveview on (OpenBambuAPI `video.md`).
+    BambuRtsps,
+    /// A Bambu printer's own camera, JPEG pictures on port 6000: the A1 and
+    /// P1 series (the same source).
+    BambuJpeg,
+}
+
+/// What a Bambu model's own camera is, from its model as BAM! has it, by
+/// OpenBambuAPI's `video.md`. `None` for a model POP does not know.
+pub fn bambu_camera(model: &str) -> Option<Camera> {
+    let m: String = model
+        .to_ascii_uppercase()
+        .chars()
+        .filter(|c| !c.is_whitespace() && *c != '-')
+        .collect();
+    let m = m.strip_prefix("BAMBULAB").unwrap_or(&m);
+    if ["X1", "P2S", "H2"].iter().any(|p| m.starts_with(p)) {
+        Some(Camera::BambuRtsps)
+    } else if ["A1", "P1"].iter().any(|p| m.starts_with(p)) {
+        Some(Camera::BambuJpeg)
+    } else {
+        None
+    }
+}
+
+/// The value of the camera field that means a Bambu printer's own camera.
+pub const BUILT_IN: &str = "built-in";
+
 /// A printer as POP runs it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct PrinterConfig {
     pub bam_id: String,
     pub name: String,
     pub connection: Connection,
-    pub camera: Option<String>,
+    pub camera: Option<Camera>,
     pub model: Option<String>,
     pub materials: Vec<String>,
     pub training: Option<String>,
@@ -237,19 +272,59 @@ pub fn printer_from(
             }
         }
     };
+    // A Bambu printer's own address, when it is one.
+    let bambu_host = match &connection {
+        Some(Connection::Bambu { host, .. }) => Some(host.clone()),
+        _ => None,
+    };
+    let model = value(&map.model);
     let camera = match value(&map.camera) {
         None => None,
+        Some(c) if c.eq_ignore_ascii_case(BUILT_IN) => match (&bambu_host, model) {
+            (None, _) => {
+                problem(
+                    &map.camera,
+                    format!(
+                        "{BUILT_IN:?} is for a Bambu printer's own camera; give this printer's camera its address"
+                    ),
+                );
+                None
+            }
+            (Some(_), m) => match m.and_then(bambu_camera) {
+                Some(kind) => Some(kind),
+                None => {
+                    problem(
+                        &map.camera,
+                        format!(
+                            "{BUILT_IN:?} needs a Bambu model POP knows in {}: X1, P2S, H2S, H2D, A1 or P1",
+                            label(&map.model)
+                        ),
+                    );
+                    None
+                }
+            },
+        },
+        // A Bambu printer's own RTSPS camera, by its address: POP signs in
+        // to it with the access code, and checks its certificate.
+        Some(c)
+            if c.starts_with("rtsps://")
+                && bambu_host.as_deref().is_some_and(|h| url_host(c) == h) =>
+        {
+            Some(Camera::BambuRtsps)
+        }
         Some(c)
             if ["rtsp://", "rtsps://", "http://", "https://"]
                 .iter()
                 .any(|s| c.starts_with(s)) =>
         {
-            Some(c.to_owned())
+            Some(Camera::Address { url: c.to_owned() })
         }
         Some(c) => {
             problem(
                 &map.camera,
-                format!("{c:?} is not a camera address POP can show: rtsp, rtsps, http or https"),
+                format!(
+                    "{c:?} is not a camera address POP can show: rtsp, rtsps, http or https, or {BUILT_IN:?} for a Bambu printer's own"
+                ),
             );
             None
         }
@@ -262,7 +337,7 @@ pub fn printer_from(
         name: asset.asset.name.clone(),
         connection: connection.expect("no problems means a connection"),
         camera,
-        model: value(&map.model).map(str::to_owned),
+        model: model.map(str::to_owned),
         materials: value(&map.materials)
             .map(|m| {
                 m.split(',')
@@ -274,6 +349,17 @@ pub fn printer_from(
             .unwrap_or_default(),
         training: value(&map.training).map(str::to_owned),
     })
+}
+
+/// The host of `url`, without its user, port or path.
+fn url_host(url: &str) -> &str {
+    let rest = url.split_once("://").map_or(url, |(_, r)| r);
+    let rest = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    let rest = rest.rsplit_once('@').map_or(rest, |(_, h)| h);
+    match rest.rsplit_once(':') {
+        Some((h, port)) if port.chars().all(|c| c.is_ascii_digit()) => h,
+        _ => rest,
+    }
 }
 
 /// A Moonraker WebSocket address from what an admin is likely to type.
