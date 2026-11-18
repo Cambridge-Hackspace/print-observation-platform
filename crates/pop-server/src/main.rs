@@ -199,7 +199,8 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
             data_dir.display()
         )
     })?;
-    let pool = db::open(&config.database_path()).await.map_err(|e| {
+    // Backed up first when this POP is newer than the database (#147).
+    let (pool, _backed_up) = db::open_upgrading(data_dir).await.map_err(|e| {
         format!(
             "cannot open the database {}: {e}",
             config.database_path().display()
