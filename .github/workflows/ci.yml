@@ -43,3 +43,8 @@ jobs:
           CONTAINER: docker
         run: sudo --preserve-env=CONTAINER tools/package-test.sh systemd
 
+      - name: The kiosk's packages install and its unit is accepted
+        env:
+          CONTAINER: docker
+        run: tools/package-test.sh kiosk
+
