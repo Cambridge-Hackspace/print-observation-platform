@@ -76,6 +76,10 @@ pub struct AppState {
     pub guides: config::Guides,
     /// Each printer's camera and its health, when go2rtc is configured (#66).
     pub cameras: Option<tokio::sync::watch::Receiver<Vec<api::AdminCamera>>>,
+    /// The go2rtc viewers watch through (#67).
+    pub go2rtc: Option<pop_integrations::go2rtc::Go2rtc>,
+    /// Places for viewers, across every camera.
+    pub viewers: Arc<tokio::sync::Semaphore>,
 }
 
 impl AppState {
@@ -98,6 +102,8 @@ impl AppState {
             files_dir: None,
             guides: config::Guides::default(),
             cameras: None,
+            go2rtc: None,
+            viewers: Arc::new(tokio::sync::Semaphore::new(cameras::MAX_VIEWERS)),
         }
     }
 
@@ -109,6 +115,7 @@ impl AppState {
         go2rtc: pop_integrations::go2rtc::Go2rtc,
     ) -> Self {
         self.cameras = Some(cameras);
+        self.go2rtc = Some(go2rtc.clone());
         self.with_check(cameras::Go2rtcHealth(go2rtc))
     }
 
@@ -322,6 +329,23 @@ pub fn routes() -> Vec<Route> {
             reach: Reach::Anywhere,
             who: Who::Admin,
             handler: get(printers::list),
+        },
+        // ---- watching a camera (#67): members, from anywhere, read-only ----
+        Route {
+            method: Method::GET,
+            path: "/api/printers/{bam_id}/camera/mse",
+            effect: Effect::Read,
+            reach: Reach::Anywhere,
+            who: Who::Member,
+            handler: get(cameras::watch_mse),
+        },
+        Route {
+            method: Method::GET,
+            path: "/api/printers/{bam_id}/camera/mjpeg",
+            effect: Effect::Read,
+            reach: Reach::Anywhere,
+            who: Who::Member,
+            handler: get(cameras::watch_mjpeg),
         },
         Route {
             method: Method::GET,

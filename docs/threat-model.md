@@ -186,6 +186,17 @@ on BAM! without naming its address.
   `crates/pop-server/tests/cameras.rs::a_printer_that_leaves_the_tower_leaves_go2rtc`.
 - A wrong go2rtc password is said as such on `/healthz`, and nothing goes in.
   `crates/pop-server/tests/cameras.rs::a_wrong_go2rtc_password_is_said_and_cameras_read_unknown`.
+- Watching is for members, and only a tower printer's camera: no go2rtc
+  stream can be named.
+  `crates/pop-server/tests/cameras.rs::only_members_watch_and_only_a_tower_printers_camera`.
+- Watching is read-only: nothing a viewer sends reaches go2rtc but a codec
+  list POP has checked, and go2rtc's own words about a camera never reach the
+  viewer.
+  `crates/pop-server/tests/cameras.rs::a_member_watches_an_h264_camera_and_nothing_else_they_send_reaches_go2rtc`,
+  `crates/pop-server/tests/cameras.rs::a_codec_list_that_is_not_one_is_refused_before_go2rtc_hears_it`,
+  `crates/pop-server/tests/cameras.rs::what_go2rtc_says_about_a_camera_never_reaches_a_viewer`.
+- No more than 16 watch at once.
+  `crates/pop-server/tests/cameras.rs::no_more_than_the_limit_watch_at_once`.
 
 **Backups** hold the database, so they include the sealed secrets and the
 hashes, but never the secrets key or the BAM! token. A backup alone opens

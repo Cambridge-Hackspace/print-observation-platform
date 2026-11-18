@@ -159,7 +159,7 @@ async fn next_json(ws: &mut Socket) -> Option<Value> {
 
 /// TLS with this build's one crypto provider, named rather than looked up:
 /// a process with two providers compiled in cannot pick a default.
-fn connector() -> Connector {
+pub(crate) fn connector() -> Connector {
     let roots = rustls::RootCertStore {
         roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
     };

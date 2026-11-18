@@ -10,14 +10,14 @@ publish.workspace = true
 [features]
 # A fake BAM! and a fake go2rtc that serve answers recorded from real ones
 # (#20, #66), for tests here and in the server.
-fakes = ["dep:axum", "dep:base64"]
+fakes = ["dep:axum"]
 
 [lints]
 workspace = true
 
 [dependencies]
 axum = { version = "0.8", optional = true, features = ["ws", "query"] }
-base64 = { version = "0.22", optional = true }
+base64 = "0.22"
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
 rustls = "0.23"

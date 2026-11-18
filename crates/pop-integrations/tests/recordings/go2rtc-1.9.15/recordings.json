@@ -271,6 +271,225 @@
       "path": "/api/config",
       "query": {},
       "status": 200
+    },
+    {
+      "auth": true,
+      "body": "",
+      "content_type": "",
+      "method": "PUT",
+      "name": "add-mjpeg-camera",
+      "path": "/api/streams",
+      "query": {
+        "name": "pop_mjpeg",
+        "src": "http://127.0.0.1:18985/stream"
+      },
+      "status": 200
+    },
+    {
+      "auth": true,
+      "body": "",
+      "content_type": "",
+      "method": "PUT",
+      "name": "add-dead-again",
+      "path": "/api/streams",
+      "query": {
+        "name": "pop_dead",
+        "src": "rtsp://127.0.0.1:1/none"
+      },
+      "status": 200
+    },
+    {
+      "auth": true,
+      "body": "",
+      "content_type": "",
+      "method": "PUT",
+      "name": "add-h264",
+      "path": "/api/streams",
+      "query": {
+        "name": "pop_h264",
+        "src": "rtsp://127.0.0.1:1/none/placeholder"
+      },
+      "status": 200
+    },
+    {
+      "auth": true,
+      "body": {
+        "frames": [
+          {
+            "text": {
+              "type": "mse",
+              "value": "video/mp4; codecs=\"avc1.420029\""
+            }
+          },
+          {
+            "binary": "ftyp",
+            "bytes": 672
+          },
+          {
+            "binary": "moof",
+            "bytes": 8046
+          },
+          {
+            "binary": "moof",
+            "bytes": 625
+          }
+        ],
+        "sent": {
+          "type": "mse",
+          "value": "avc1.640029,avc1.64002A,avc1.640033,hvc1.1.6.L153.B0,mp4a.40.2,mp4a.40.5,flac,opus"
+        }
+      },
+      "content_type": "",
+      "method": "GET",
+      "name": "mse-h264",
+      "path": "/api/ws",
+      "query": {
+        "src": "pop_h264"
+      },
+      "status": 101
+    },
+    {
+      "auth": true,
+      "body": {
+        "frames": [
+          {
+            "text": {
+              "type": "error",
+              "value": "mse: streams: codecs not matched: video:JPEG => video:H264, video:H265, audio:AAC, audio:PCMA, audio:PCMU, audio:S16B, audio:S16L, audio:OPUS"
+            }
+          }
+        ],
+        "sent": {
+          "type": "mse",
+          "value": "avc1.640029,avc1.64002A,avc1.640033,hvc1.1.6.L153.B0,mp4a.40.2,mp4a.40.5,flac,opus"
+        }
+      },
+      "content_type": "",
+      "method": "GET",
+      "name": "mse-mjpeg-camera",
+      "path": "/api/ws",
+      "query": {
+        "src": "pop_mjpeg"
+      },
+      "status": 101
+    },
+    {
+      "auth": true,
+      "body": {
+        "frames": [
+          {
+            "text": {
+              "type": "error",
+              "value": "mse: streams: dial tcp 127.0.0.1:1: connect: connection refused"
+            }
+          }
+        ],
+        "sent": {
+          "type": "mse",
+          "value": "avc1.640029,avc1.64002A,avc1.640033,hvc1.1.6.L153.B0,mp4a.40.2,mp4a.40.5,flac,opus"
+        }
+      },
+      "content_type": "",
+      "method": "GET",
+      "name": "mse-dead",
+      "path": "/api/ws",
+      "query": {
+        "src": "pop_dead"
+      },
+      "status": 101
+    },
+    {
+      "auth": true,
+      "body": {
+        "frames": [
+          {
+            "text": {
+              "type": "error",
+              "value": "mse: stream not found"
+            }
+          }
+        ],
+        "sent": {
+          "type": "mse",
+          "value": "avc1.640029,avc1.64002A,avc1.640033,hvc1.1.6.L153.B0,mp4a.40.2,mp4a.40.5,flac,opus"
+        }
+      },
+      "content_type": "",
+      "method": "GET",
+      "name": "mse-missing",
+      "path": "/api/ws",
+      "query": {
+        "src": "pop_nosuch"
+      },
+      "status": 101
+    },
+    {
+      "auth": false,
+      "body": null,
+      "content_type": "",
+      "method": "GET",
+      "name": "mse-no-auth",
+      "path": "/api/ws",
+      "query": {
+        "src": "pop_h264"
+      },
+      "status": 401
+    },
+    {
+      "auth": true,
+      "body": {
+        "first_part": "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: 9056"
+      },
+      "content_type": "multipart/x-mixed-replace; boundary=frame",
+      "method": "GET",
+      "name": "mjpeg-mjpeg-camera",
+      "path": "/api/stream.mjpeg",
+      "query": {
+        "src": "pop_mjpeg"
+      },
+      "status": 200
+    },
+    {
+      "auth": true,
+      "body": {
+        "first_part": ""
+      },
+      "content_type": "",
+      "method": "GET",
+      "name": "mjpeg-h264",
+      "path": "/api/stream.mjpeg",
+      "query": {
+        "src": "pop_h264"
+      },
+      "status": 200
+    },
+    {
+      "auth": true,
+      "body": {
+        "first_part": ""
+      },
+      "content_type": "",
+      "method": "GET",
+      "name": "mjpeg-dead",
+      "path": "/api/stream.mjpeg",
+      "query": {
+        "src": "pop_dead"
+      },
+      "status": 200
+    },
+    {
+      "auth": true,
+      "body": {
+        "first_part": "stream not found\n"
+      },
+      "content_type": "text/plain; charset=utf-8",
+      "method": "GET",
+      "name": "mjpeg-missing",
+      "path": "/api/stream.mjpeg",
+      "query": {
+        "src": "pop_nosuch"
+      },
+      "status": 404
     }
   ],
   "recorded": "2026-11-17",
