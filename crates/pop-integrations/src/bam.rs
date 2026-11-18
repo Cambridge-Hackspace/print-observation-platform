@@ -13,12 +13,25 @@
 //!   which gives only them.
 //! - Field values are strings, keyed by the field's key.
 //! - An asset the token may not read is a 404, and is left out of lists.
+//! - An empty list can come as `null` rather than `[]`: the asset list does,
+//!   for a category with nothing in it and for one with nothing archived
+//!   (BAM!'s internal/api/assets.go). Every list and map POP reads takes
+//!   `null` as empty, so a new, empty printer category is not an error.
 
 use std::{collections::HashMap, time::Duration};
 
 use reqwest::{StatusCode, header};
-use serde::{Deserialize, de::DeserializeOwned};
+use serde::{Deserialize, Deserializer, de::DeserializeOwned};
 use serde_json::Value;
+
+/// `null` as the empty value, for a list or map BAM! may send as `null`.
+fn null_is_empty<'de, D, T>(d: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Default + Deserialize<'de>,
+{
+    Ok(Option::<T>::deserialize(d)?.unwrap_or_default())
+}
 
 /// A category, flat: the tree is its `parent_id`s.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -78,12 +91,12 @@ pub struct AssetCore {
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct Asset {
     pub asset: AssetCore,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_is_empty")]
     pub categories: Vec<Category>,
     /// Every value a string, by the field's key.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_is_empty")]
     pub field_values: HashMap<String, String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "null_is_empty")]
     pub effective_fields: Vec<EffectiveField>,
 }
 
@@ -143,6 +156,7 @@ struct ErrorBody {
 
 #[derive(Deserialize)]
 struct Assets {
+    #[serde(deserialize_with = "null_is_empty")]
     assets: Vec<Asset>,
 }
 
@@ -153,16 +167,19 @@ struct One {
 
 #[derive(Deserialize)]
 struct Categories {
+    #[serde(deserialize_with = "null_is_empty")]
     categories: Vec<Category>,
 }
 
 #[derive(Deserialize)]
 struct Fields {
+    #[serde(deserialize_with = "null_is_empty")]
     fields: Vec<EffectiveField>,
 }
 
 #[derive(Deserialize)]
 struct Events {
+    #[serde(deserialize_with = "null_is_empty")]
     events: Vec<Event>,
     more: bool,
 }
