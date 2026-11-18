@@ -5,8 +5,10 @@
 
 # rust:1.97-bookworm, the toolchain CS:S's battery already uses.
 RUST_IMAGE="docker.io/library/rust@sha256:0e2bcaef56d041a486784e54104a81aebe0da44bd03019bd70bc0401e42e4a97"
-# node:22-alpine, as BAM! uses.
-NODE_IMAGE="docker.io/library/node@sha256:2c752226d477b4a886378baa95b9af252be59301b725fdb0b7e15208131505a8"
+# node:22-alpine, as BAM! uses: node:22.23.3-alpine, by its multi-arch index,
+# so an ARM64 machine gets its own image (#9). Its amd64 image is the one this
+# file pinned before, sha256:2c752226d477b4a8...
+NODE_IMAGE="docker.io/library/node@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402"
 # playwright:v1.64.0-noble, matching @playwright/test in web/package.json.
 PLAYWRIGHT_IMAGE="mcr.microsoft.com/playwright@sha256:bc72a8df40831ded821e3cbc79c318c21b44d6e51dff9fd89ace7a8249c5b462"
 

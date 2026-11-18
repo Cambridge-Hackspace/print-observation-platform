@@ -20,3 +20,26 @@ jobs:
         env:
           CONTAINER: docker
         run: tools/check.sh
+
+  # The packaging (#9), as release.yml builds it: the image on both
+  # architectures, and the systemd units installed and started.
+  package:
+    strategy:
+      # Each architecture says for itself: one failing does not cancel the other.
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: The image builds and serves
+        env:
+          CONTAINER: docker
+        run: tools/package-test.sh image
+
+      - name: The systemd units install and run
+        env:
+          CONTAINER: docker
+        run: sudo --preserve-env=CONTAINER tools/package-test.sh systemd
+

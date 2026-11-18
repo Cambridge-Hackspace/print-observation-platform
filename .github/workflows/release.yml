@@ -1,0 +1,93 @@
+# A release, from a tag (#9): for each of x86-64 and ARM64, the container
+# image (packaging/Containerfile) built natively on a runner of that
+# architecture, pushed to GitHub's container registry, and the `pop` binary
+# taken from it; then one multi-architecture image, and a GitHub release
+# holding both binaries and their SHA-256 sums.
+#
+# Runs only on a tag like v0.1.0. The same build runs on every push in
+# ci.yml's package job, so a release builds what CI built.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/cambridge-hackspace/print-observation-platform
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build the image
+        run: |
+          . tools/images.sh
+          docker build -f packaging/Containerfile \
+            --build-arg RUST_IMAGE="$RUST_IMAGE" --build-arg NODE_IMAGE="$NODE_IMAGE" \
+            -t "$IMAGE:$GITHUB_REF_NAME-${{ matrix.arch }}" .
+
+      - name: Push it
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker push "$IMAGE:$GITHUB_REF_NAME-${{ matrix.arch }}"
+
+      - name: Take the binary out
+        run: |
+          id=$(docker create "$IMAGE:$GITHUB_REF_NAME-${{ matrix.arch }}")
+          docker cp "$id:/usr/local/bin/pop" "pop-$GITHUB_REF_NAME-linux-${{ matrix.arch }}"
+          docker rm "$id"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pop-linux-${{ matrix.arch }}
+          path: pop-${{ github.ref_name }}-linux-${{ matrix.arch }}
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      packages: write
+    env:
+      IMAGE: ghcr.io/cambridge-hackspace/print-observation-platform
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: One image for both architectures
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker manifest create "$IMAGE:$GITHUB_REF_NAME" \
+            "$IMAGE:$GITHUB_REF_NAME-x86_64" "$IMAGE:$GITHUB_REF_NAME-aarch64"
+          docker manifest push "$IMAGE:$GITHUB_REF_NAME"
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: The release
+        run: |
+          cd dist
+          chmod +x pop-*
+          sha256sum pop-* > SHA256SUMS
+          cat SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --title "POP $GITHUB_REF_NAME" --verify-tag \
+            --notes "Binaries for Linux on x86-64 and ARM64, and the image $IMAGE:$GITHUB_REF_NAME. Installing and upgrading: docs/deployment.md." \
+            pop-* SHA256SUMS

@@ -1,0 +1,20 @@
+# go2rtc's starting configuration for POP (docs/integrations/go2rtc.md).
+# Copy it to /var/lib/go2rtc/go2rtc.yaml, mode 0600, and set the password.
+# POP adds the printers' streams through the API; go2rtc writes them below.
+
+api:
+  # This machine only: viewers watch through POP, never go2rtc (#67).
+  listen: "127.0.0.1:1984"
+  username: "pop"
+  # The same as POP_GO2RTC_PASSWORD. Long and random: openssl rand -base64 24
+  password: "CHANGE-ME"
+  # Without this, go2rtc asks nothing of requests from its own machine, and
+  # the password protects nothing (POP checks: #149).
+  local_auth: true
+
+rtsp:
+  listen: "127.0.0.1:8554"
+
+webrtc:
+  # Not used by POP: watching goes through POP as MSE or MJPEG.
+  listen: "127.0.0.1:8555"

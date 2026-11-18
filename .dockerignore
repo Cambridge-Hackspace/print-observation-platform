@@ -1,0 +1,14 @@
+# What a container build (packaging/Containerfile) never needs: build
+# output, dependencies the build fetches itself, local state.
+.git
+target
+out
+data
+web/node_modules
+web/dist
+web/.e2e
+web/test-results
+web/playwright-report
+*.db
+*.db-shm
+*.db-wal
