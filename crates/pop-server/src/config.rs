@@ -30,6 +30,45 @@ pub struct Config {
     pub secrets: Secrets,
     pub guides: Guides,
     pub public: Public,
+    pub feedback: Feedback,
+}
+
+/// Feedback from any screen, filed as GitHub issues (#96) by a GitHub App
+/// installed on the repository. Off while `app_id` is empty.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct Feedback {
+    /// The GitHub App's id. Empty: no feedback button anywhere.
+    pub app_id: String,
+    /// Its installation on the repository.
+    pub installation_id: String,
+    /// The App's private key (PEM), as a file only POP can read. A secret.
+    pub private_key_file: String,
+    /// Where issues go: "owner/name".
+    pub repo: String,
+    /// GitHub's API.
+    pub api: String,
+    /// The branch screenshots go on.
+    pub branch: String,
+    /// The roles that hold `feedback.file`: "admin", "member".
+    pub roles: Vec<String>,
+    /// How many reports one person may file in an hour.
+    pub per_hour: u32,
+}
+
+impl Default for Feedback {
+    fn default() -> Self {
+        Self {
+            app_id: String::new(),
+            installation_id: String::new(),
+            private_key_file: String::new(),
+            repo: "Cambridge-Hackspace/print-observation-platform".into(),
+            api: "https://api.github.com".into(),
+            branch: "feedback-attachments".into(),
+            roles: vec!["admin".into()],
+            per_hour: 10,
+        }
+    }
 }
 
 /// What the public live stream (`/api/events`) carries to anyone who is
@@ -294,6 +333,16 @@ impl Config {
         set("POP_BAM_FIELDS_MATERIALS", &mut f.materials);
         set("POP_BAM_FIELDS_TRAINING", &mut f.training);
         set("POP_BAM_FIELDS_SERIAL", &mut f.serial);
+        set("POP_FEEDBACK_APP_ID", &mut self.feedback.app_id);
+        set(
+            "POP_FEEDBACK_INSTALLATION_ID",
+            &mut self.feedback.installation_id,
+        );
+        set(
+            "POP_FEEDBACK_PRIVATE_KEY_FILE",
+            &mut self.feedback.private_key_file,
+        );
+        set("POP_FEEDBACK_REPO", &mut self.feedback.repo);
         set("POP_GO2RTC_URL", &mut self.go2rtc.url);
         set("POP_GO2RTC_USERNAME", &mut self.go2rtc.username);
         set("POP_GO2RTC_PASSWORD", &mut self.go2rtc.password);
@@ -417,6 +466,42 @@ impl Config {
                     "is empty: name the BAM! field's key, or leave it out for the default",
                 ));
             }
+        }
+        let f = &self.feedback;
+        if !f.app_id.is_empty() {
+            for (key, v) in [
+                ("feedback.installation_id", &f.installation_id),
+                ("feedback.private_key_file", &f.private_key_file),
+            ] {
+                if v.is_empty() {
+                    return Err(err(key, "is empty, with feedback.app_id set"));
+                }
+            }
+            if f.repo.split('/').filter(|p| !p.is_empty()).count() != 2 {
+                return Err(err(
+                    "feedback.repo",
+                    format!("{:?}: expected owner/name", f.repo),
+                ));
+            }
+            if !is_http(&f.api) {
+                return Err(err(
+                    "feedback.api",
+                    format!("{:?}: expected an http(s) address", f.api),
+                ));
+            }
+        }
+        if let Some(r) = f
+            .roles
+            .iter()
+            .find(|r| !["admin", "member"].contains(&r.as_str()))
+        {
+            return Err(err(
+                "feedback.roles",
+                format!("{r:?} is not a role: use \"admin\" or \"member\""),
+            ));
+        }
+        if f.per_hour == 0 {
+            return Err(err("feedback.per_hour", "must be at least 1"));
         }
         let g = &self.go2rtc;
         if !g.url.is_empty() && !is_http(&g.url) {
@@ -745,6 +830,32 @@ mod tests {
         })
         .unwrap();
         assert_eq!(c.server.public_url, "http://10.0.0.5:8080");
+    }
+
+    #[test]
+    fn feedback_is_off_unless_its_app_is_named_and_then_needs_the_rest() {
+        let whole = |toml: &str| Config::parse(toml).and_then(|c| c.validate_whole().map(|()| c));
+        let c = whole("").unwrap();
+        assert!(c.feedback.app_id.is_empty(), "off by default");
+        assert_eq!(c.feedback.roles, ["admin"], "admins only by default");
+        let e = whole("[feedback]\napp_id = \"1\"\n").unwrap_err();
+        assert_eq!(e.key, "feedback.installation_id");
+        let e = whole("[feedback]\napp_id = \"1\"\ninstallation_id = \"2\"\n").unwrap_err();
+        assert_eq!(e.key, "feedback.private_key_file");
+        let e = whole(
+            "[feedback]\napp_id = \"1\"\ninstallation_id = \"2\"\nprivate_key_file = \"k\"\nrepo = \"pop\"\n",
+        )
+        .unwrap_err();
+        assert_eq!(e.key, "feedback.repo");
+        let e = whole("[feedback]\nroles = [\"admin\", \"everyone\"]\n").unwrap_err();
+        assert_eq!(e.key, "feedback.roles");
+        let e = whole("[feedback]\nper_hour = 0\n").unwrap_err();
+        assert_eq!(e.key, "feedback.per_hour");
+        let c = whole(
+            "[feedback]\napp_id = \"1\"\ninstallation_id = \"2\"\nprivate_key_file = \"k\"\nroles = [\"admin\", \"member\"]\n",
+        )
+        .unwrap();
+        assert_eq!(c.feedback.roles, ["admin", "member"]);
     }
 
     #[test]

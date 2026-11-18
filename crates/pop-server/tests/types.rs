@@ -11,10 +11,11 @@ use std::{
 
 use pop_server::api::{
     AccessCode, Account, AdminCamera, AdminPrinter, ApiError, AuditEntry, AuditKind, CameraHealth,
-    DiscordWebhook, ErrorGuide, Guide, GuideImage, GuideProblems, GuideSummary, Health, LinkGuide,
-    NewActive, NewGuideImage, NewName, NewPassword, NewRole, NewTraining, NewUser, NotifySettings,
-    PublicGuide, PublicGuideList, Role, ServerEvent, SignIn, Snapshot, Status, TowerPrinter,
-    TowerState, User,
+    Device, DiscordWebhook, ErrorGuide, FeedbackKind, FeedbackSettings, FeedbackState,
+    FeedbackStatus, Guide, GuideImage, GuideProblems, GuideSummary, Health, LinkGuide, NewActive,
+    NewFeedback, NewGuideImage, NewName, NewPassword, NewRole, NewTraining, NewUser,
+    NotifySettings, PublicGuide, PublicGuideList, Role, ServerEvent, SignIn, Snapshot, Status,
+    TowerPrinter, TowerState, User,
 };
 use ts_rs::TS;
 
@@ -34,6 +35,13 @@ fn export(dir: &Path) {
     AuditKind::export_all_to(dir).unwrap();
     AuditEntry::export_all_to(dir).unwrap();
     AdminPrinter::export_all_to(dir).unwrap();
+    // Feedback (#96).
+    NewFeedback::export_all_to(dir).unwrap();
+    FeedbackStatus::export_all_to(dir).unwrap();
+    FeedbackSettings::export_all_to(dir).unwrap();
+    FeedbackState::export_all_to(dir).unwrap();
+    FeedbackKind::export_all_to(dir).unwrap();
+    Device::export_all_to(dir).unwrap();
     // Cameras (#66).
     AdminCamera::export_all_to(dir).unwrap();
     CameraHealth::export_all_to(dir).unwrap();

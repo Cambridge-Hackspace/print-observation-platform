@@ -99,3 +99,21 @@ indexable = false
 # or a notice. Signed-in screens, and the space's own network (the kiosk),
 # always see names.
 owner_names = false
+
+[feedback]
+# Feedback from any screen, filed as GitHub issues by a GitHub App installed
+# on the repository with Issues: write and Contents: write. The repository is
+# public, so the issues and their screenshots are too. Empty app_id: no
+# feedback button anywhere.
+app_id = ""
+installation_id = ""
+# The App's private key, as GitHub gives it: a file only POP can read.
+private_key_file = ""
+repo = "Cambridge-Hackspace/print-observation-platform"
+api = "https://api.github.com"
+# The branch screenshots go on.
+branch = "feedback-attachments"
+# Who holds feedback.file: "admin", "member".
+roles = ["admin"]
+# Reports one person may file in an hour.
+per_hour = 10

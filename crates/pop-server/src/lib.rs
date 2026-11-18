@@ -11,6 +11,7 @@ pub mod cameras;
 pub mod config;
 pub mod db;
 pub mod events;
+pub mod feedback;
 pub mod guides;
 pub mod health;
 pub mod notices;
@@ -84,6 +85,8 @@ pub struct AppState {
     pub jpegs: cameras::Jpegs,
     /// What the public live stream carries (#134).
     pub public: config::Public,
+    /// Feedback, filed as GitHub issues, when configured (#96).
+    pub feedback: Option<Arc<feedback::Feedback>>,
 }
 
 impl AppState {
@@ -110,6 +113,7 @@ impl AppState {
             viewers: Arc::new(tokio::sync::Semaphore::new(cameras::MAX_VIEWERS)),
             jpegs: cameras::Jpegs::default(),
             public: config::Public::default(),
+            feedback: None,
         }
     }
 
@@ -124,6 +128,12 @@ impl AppState {
         self.jpegs = kept.jpegs;
         self.go2rtc = Some(go2rtc.clone());
         self.with_check(cameras::Go2rtcHealth(go2rtc))
+    }
+
+    /// File feedback through this (#96).
+    pub fn with_feedback(mut self, feedback: Arc<feedback::Feedback>) -> Self {
+        self.feedback = Some(feedback);
+        self
     }
 
     /// Carry the public live stream under these settings (#134).
@@ -342,6 +352,33 @@ pub fn routes() -> Vec<Route> {
             reach: Reach::Anywhere,
             who: Who::Admin,
             handler: get(printers::list),
+        },
+        // ---- feedback from any screen (#96) ----
+        Route {
+            method: Method::GET,
+            path: "/api/feedback",
+            effect: Effect::Read,
+            reach: Reach::Anywhere,
+            who: Who::Member,
+            handler: get(feedback::settings),
+        },
+        Route {
+            method: Method::POST,
+            path: "/api/feedback",
+            // A report: it reaches GitHub, never a printer. The role check,
+            // feedback.file, is the handler's, from [feedback] roles.
+            effect: Effect::Report,
+            reach: Reach::Anywhere,
+            who: Who::Member,
+            handler: post(feedback::file).layer(axum::extract::DefaultBodyLimit::max(8 << 20)),
+        },
+        Route {
+            method: Method::GET,
+            path: "/api/feedback/{id}",
+            effect: Effect::Read,
+            reach: Reach::Anywhere,
+            who: Who::Member,
+            handler: get(feedback::status),
         },
         // ---- watching a camera (#67): members, from anywhere, read-only ----
         Route {
