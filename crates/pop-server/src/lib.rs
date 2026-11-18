@@ -576,6 +576,24 @@ pub fn routes() -> Vec<Route> {
             who: Who::Admin,
             handler: put(printers::set_access_code),
         },
+        Route {
+            method: Method::PUT,
+            path: "/api/admin/printers/{bam_id}/camera-login",
+            // A printer's settings: from inside the space only, as its
+            // access code is (#150).
+            effect: Effect::ControlsPrinter,
+            reach: Reach::LocalOnly,
+            who: Who::Admin,
+            handler: put(printers::set_camera_login),
+        },
+        Route {
+            method: Method::DELETE,
+            path: "/api/admin/printers/{bam_id}/camera-login",
+            effect: Effect::ControlsPrinter,
+            reach: Reach::LocalOnly,
+            who: Who::Admin,
+            handler: delete(printers::clear_camera_login),
+        },
         // ---- the audit log (#8) ----
         Route {
             method: Method::GET,

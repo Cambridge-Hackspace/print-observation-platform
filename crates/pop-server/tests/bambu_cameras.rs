@@ -194,29 +194,36 @@ fn a_bambu_printers_own_camera_is_on_the_port_its_kind_says() {
     assert_eq!(
         source_of(
             &config(Some(PrinterCamera::BambuRtsps), x1.clone()),
-            Some(CODE)
+            Some(CODE),
+            None
         ),
         Some(Source::BambuRtsps(own(322)))
     );
     assert_eq!(
         source_of(
             &config(Some(PrinterCamera::BambuJpeg), x1.clone()),
-            Some(CODE)
+            Some(CODE),
+            None
         ),
         Some(Source::BambuJpeg(own(6000)))
     );
     // No access code: nothing to sign in with, so no camera yet.
     assert_eq!(
-        source_of(&config(Some(PrinterCamera::BambuRtsps), x1.clone()), None),
+        source_of(
+            &config(Some(PrinterCamera::BambuRtsps), x1.clone()),
+            None,
+            None
+        ),
         None
     );
     let url = "rtsp://10.0.0.40/stream";
     assert_eq!(
         source_of(
             &config(Some(PrinterCamera::Address { url: url.into() }), x1),
-            Some(CODE)
+            Some(CODE),
+            None
         ),
-        Some(Source::Address(url.into()))
+        Some(Source::Address(url.into(), None))
     );
 }
 

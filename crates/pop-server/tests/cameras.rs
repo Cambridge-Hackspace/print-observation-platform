@@ -39,8 +39,9 @@ use pop_server::{
     cameras::{self, stream_name},
     db,
     pins::DbPins,
+    printers::BamSource,
     router, run,
-    secrets::Secrets,
+    secrets::{CameraLogin, Secrets},
     tower,
     users::{self, NewAccount},
 };
@@ -52,8 +53,13 @@ const BAM: &str = include_str!("../../pop-integrations/tests/recordings/v0.20.0/
 const GO2RTC: &str =
     include_str!("../../pop-integrations/tests/recordings/go2rtc-1.9.15/recordings.json");
 
-/// The Voron's camera, password and all, as BAM! would hold it.
+/// The Voron's camera as go2rtc is given it: its address, with the login POP
+/// keeps for it put in.
 const VORON_CAMERA: &str = "rtsp://viewer:cam-s3cret@10.0.0.40:554/stream1";
+/// The Voron's camera as BAM! holds it: its address, without its login,
+/// which POP keeps sealed (#150) and puts in on the way to go2rtc.
+const VORON_ADDRESS: &str = "rtsp://10.0.0.40:554/stream1";
+const KEY: &str = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=";
 const LOCAL: &str = "127.0.0.1:4000";
 
 struct Pop {
@@ -100,7 +106,19 @@ async fn pop_with(setup: impl FnOnce(&FakeGo2rtc)) -> Pop {
     .await
     .unwrap();
     let bam = FakeBam::start(BAM).await;
-    bam.edit_without_event(bam.id("voron"), "camera", VORON_CAMERA);
+    bam.edit_without_event(bam.id("voron"), "camera", VORON_ADDRESS);
+    Secrets::new(KEY)
+        .set_camera_login(
+            &db,
+            bam.id("voron"),
+            &CameraLogin {
+                username: "viewer".into(),
+                password: "cam-s3cret".into(),
+                origin: "rtsp://10.0.0.40:554".into(),
+            },
+        )
+        .await
+        .unwrap();
     decide(&db, bam.id("voron"), TowerState::Added).await;
     let go2rtc = FakeGo2rtc::start(GO2RTC).await;
     setup(&go2rtc);
@@ -133,15 +151,21 @@ async fn pop_with(setup: impl FnOnce(&FakeGo2rtc)) -> Pop {
     let health = kept.health.clone();
     // POP behind a proxy on this machine, as docs/remote-access.md sets it:
     // a request is from outside unless the proxy says it began at the space.
-    let state =
-        AppState::new(db.clone(), Arc::new(Embedded)).with_access(pop_server::config::Access {
+    let state = AppState::new(db.clone(), Arc::new(Embedded))
+        .with_access(pop_server::config::Access {
             local_networks: vec!["192.168.1.0/24".parse().unwrap()],
             trusted_proxies: vec!["127.0.0.1/32".parse().unwrap()],
+        })
+        .with_secrets(Secrets::new(KEY))
+        .with_bam(BamSource {
+            client: Bam::new(bam.url(), TOKEN).unwrap(),
+            category: bam.id("printers").to_owned(),
+            fields: FieldMap::default(),
         });
     let decided = state.decided.clone();
     let (tower, _) = run::spawn(run::Runner {
         db: db.clone(),
-        secrets: Secrets::none(),
+        secrets: Secrets::new(KEY),
         fields: FieldMap::default(),
         view,
         events: state.events.clone(),
@@ -274,7 +298,8 @@ async fn a_tower_printers_camera_is_served_by_go2rtc_as_bam_has_it() {
     // Only the Voron is added; the X1, which has a camera in BAM!, is not.
     assert_eq!(s.len(), 1, "{s:#?}");
 
-    // Its camera changes in BAM!: go2rtc follows.
+    // Its camera changes in BAM!: go2rtc follows, without the login, which
+    // was entered for the old camera (#150).
     pop.bam
         .edit(pop.bam.id("voron"), "camera", "http://10.0.0.41/mjpeg");
     pop.streams_until("followed the new camera", |s| {
@@ -436,7 +461,7 @@ async fn a_wrong_go2rtc_password_is_said_and_cameras_read_unknown() {
         "p1".into(),
         cameras::Camera {
             name: "A printer".into(),
-            source: cameras::Source::Address(VORON_CAMERA.into()),
+            source: cameras::Source::Address(VORON_CAMERA.into(), None),
         },
     );
     let (_tx, rx) = watch::channel(wanted);
@@ -881,4 +906,178 @@ async fn the_space_watches_without_signing_in_and_outside_does_not() {
             .status(),
         401
     );
+}
+
+/// A camera's login is entered on the desk, kept sealed in POP, and put in the
+/// address go2rtc is given, there and nowhere else (#150). It takes effect
+/// at once, not at BAM!'s next change.
+#[tokio::test]
+async fn a_camera_login_entered_on_the_desk_reaches_go2rtc_and_nowhere_else() {
+    let pop = pop().await;
+    let voron = pop.voron();
+    let id = pop.bam.id("voron").to_owned();
+    pop.streams_until("served the Voron with its login", |s| {
+        s.get(&voron).is_some_and(|v| v == &[VORON_CAMERA])
+    })
+    .await;
+    let uri = format!("/api/admin/printers/{id}/camera-login");
+    // Removed: go2rtc is given the address alone.
+    let (code, body, _, _) = pop.send(Method::DELETE, &uri, Some(&pop.admin), None).await;
+    assert_eq!(code, StatusCode::NO_CONTENT, "{body}");
+    pop.streams_until("dropped the login", |s| {
+        s.get(&voron).is_some_and(|v| v == &[VORON_ADDRESS])
+    })
+    .await;
+    // Entered again, with characters a URL cannot hold as they are.
+    let password = "n3w p@ss:/#";
+    let (code, body, _, _) = pop
+        .send(
+            Method::PUT,
+            &uri,
+            Some(&pop.admin),
+            Some(json!({"username": "view er", "password": password})),
+        )
+        .await;
+    assert_eq!(code, StatusCode::NO_CONTENT, "{body}");
+    pop.streams_until("put the new login in", |s| {
+        s.get(&voron)
+            .is_some_and(|v| v == &["rtsp://view%20er:n3w%20p%40ss%3A%2F%23@10.0.0.40:554/stream1"])
+    })
+    .await;
+    // Nowhere else: not BAM!, not the desk, not the audit log, not /healthz.
+    let asked = pop.bam.requests().join("\n");
+    assert!(
+        !asked.contains("n3w") && !asked.contains("s3cret"),
+        "{asked}"
+    );
+    for path in [
+        "/api/admin/printers",
+        "/api/admin/audit",
+        "/api/admin/cameras",
+        "/healthz",
+    ] {
+        let (_, _, _, raw) = pop.send(Method::GET, path, Some(&pop.admin), None).await;
+        assert!(
+            !raw.contains("n3w") && !raw.contains("p%40ss") && !raw.contains("s3cret"),
+            "{path}: {raw}"
+        );
+    }
+    let sealed: Vec<Vec<u8>> = sqlx::query_scalar("SELECT sealed FROM printer_secrets")
+        .fetch_all(&pop.db)
+        .await
+        .unwrap();
+    assert!(
+        sealed
+            .iter()
+            .all(|b| !String::from_utf8_lossy(b).contains("n3w")),
+        "kept in plain text"
+    );
+}
+
+/// A login goes only to the camera it was entered for: the same scheme, host
+/// and port. Anyone who can change the address in BAM! could otherwise send
+/// it to a machine of theirs, or to the camera without TLS (#150).
+#[tokio::test]
+async fn a_login_goes_only_to_the_scheme_host_and_port_it_was_entered_for() {
+    let pop = pop().await;
+    let voron = pop.voron();
+    let id = pop.bam.id("voron").to_owned();
+    for (address, given) in [
+        // Another stream on the same camera: the login goes with it.
+        (
+            "rtsp://10.0.0.40:554/stream2",
+            "rtsp://viewer:cam-s3cret@10.0.0.40:554/stream2",
+        ),
+        // Another host, another port, another scheme: it does not.
+        (
+            "rtsp://203.0.113.66:554/stream1",
+            "rtsp://203.0.113.66:554/stream1",
+        ),
+        (
+            "rtsp://10.0.0.40:8554/stream1",
+            "rtsp://10.0.0.40:8554/stream1",
+        ),
+        (
+            "http://10.0.0.40:554/stream1",
+            "http://10.0.0.40:554/stream1",
+        ),
+        // Back to the address it was entered for: it goes with it again.
+        (VORON_ADDRESS, VORON_CAMERA),
+    ] {
+        pop.bam.edit(&id, "camera", address);
+        pop.streams_until(&format!("followed {address}"), |s| {
+            s.get(&voron).is_some_and(|v| v == &[given])
+        })
+        .await;
+    }
+    // The desk says when the login it holds no longer fits.
+    pop.bam
+        .edit(&id, "camera", "rtsp://203.0.113.66:554/stream1");
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        let (_, all, _, _) = pop
+            .send(Method::GET, "/api/admin/printers", Some(&pop.admin), None)
+            .await;
+        let v = all
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["name"] == "Voron 2.4")
+            .unwrap()
+            .clone();
+        assert_eq!(v["camera_login_fits"], true, "{v}");
+        if v["camera_login"] == false {
+            break;
+        }
+        assert!(tokio::time::Instant::now() < deadline, "{v}");
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    // Entered for the new address, it goes there.
+    let (code, body, _, _) = pop
+        .send(
+            Method::PUT,
+            &format!("/api/admin/printers/{id}/camera-login"),
+            Some(&pop.admin),
+            Some(json!({"username": "viewer", "password": "other"})),
+        )
+        .await;
+    assert_eq!(code, StatusCode::NO_CONTENT, "{body}");
+    pop.streams_until("gave the new camera its own login", |s| {
+        s.get(&voron)
+            .is_some_and(|v| v == &["rtsp://viewer:other@203.0.113.66:554/stream1"])
+    })
+    .await;
+}
+
+/// Entering a Bambu printer's access code starts it at once, rather than at
+/// BAM!'s next change.
+#[tokio::test]
+async fn entering_an_access_code_starts_the_printer_without_waiting_for_bam() {
+    let pop = pop().await;
+    let x1 = pop.bam.id("x1").to_owned();
+    decide(&pop.db, &x1, TowerState::Added).await;
+    pop.decided.notify_one();
+    // Added, but without its code the tower cannot run it.
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert!(
+        !pop.printers.borrow().iter().any(|p| p.id == x1),
+        "ran without its code"
+    );
+    let (code, body, _, _) = pop
+        .send(
+            Method::PUT,
+            &format!("/api/admin/printers/{x1}/access-code"),
+            Some(&pop.admin),
+            Some(json!({"access_code": "12345678"})),
+        )
+        .await;
+    assert_eq!(code, StatusCode::NO_CONTENT, "{body}");
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    while !pop.printers.borrow().iter().any(|p| p.id == x1) {
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "the X1 never started"
+        );
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
 }

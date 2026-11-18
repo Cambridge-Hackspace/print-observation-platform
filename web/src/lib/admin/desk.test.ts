@@ -1,6 +1,6 @@
 // The printers table's words (#86).
 import { describe, expect, it } from 'vitest';
-import { connectsBy, fieldsSay, midSentence, needsYou, now, offered, training } from './desk';
+import { connectsBy, fieldsSay, midSentence, needsYou, now, offered, training, whatItNeeds } from './desk';
 import type { AdminPrinter } from '../generated/AdminPrinter';
 import type { PrinterState } from '../generated/PrinterState';
 import type { TowerPrinter } from '../generated/TowerPrinter';
@@ -15,6 +15,9 @@ const admin = (more: Partial<AdminPrinter> = {}): AdminPrinter => ({
   categories: ['Printers'],
   training: 'advanced',
   camera: true,
+  access_code: false,
+  camera_login_fits: false,
+  camera_login: false,
   ...more,
 });
 const live = (s: Partial<PrinterState>): TowerPrinter => ({
@@ -134,7 +137,7 @@ describe('what needs you', () => {
       bam_id: 'b',
       name: 'MK4',
       ready: false,
-      problems: [{ field: 'Connection (connection)', problem: 'missing' }],
+      problems: [{ field: 'Connection (connection)', problem: 'missing', in_pop: false }],
     });
     const items = needsYou(
       [broken, admin({ bam_id: 'n', ready: false, tower: 'offered' }), admin({ bam_id: 'd', ready: false, tower: 'declined' })],
@@ -143,5 +146,31 @@ describe('what needs you', () => {
     );
     expect(items.map((i) => i.key)).toEqual(['e:needs_hand', 'b:fields']);
     expect(items[1]).toMatchObject({ title: 'MK4 can’t run: fix it in BAM!', detail: 'Connection (connection): missing' });
+  });
+
+  it('sends an admin to the desk, not BAM!, for an access code POP keeps', () => {
+    const x1 = admin({
+      bam_id: 'x',
+      name: 'X1 Carbon',
+      ready: false,
+      connection: 'bambu',
+      problems: [{ field: 'LAN access code', problem: 'not entered in POP yet', in_pop: true }],
+    });
+    expect(needsYou([x1], [], [])[0]).toMatchObject({
+      title: 'X1 Carbon can’t run: enter its LAN access code',
+      detail: 'LAN access code: not entered in POP yet',
+    });
+    expect(whatItNeeds(x1)).toBe('Enter its LAN access code here.');
+    // Both: BAM!'s fix first, and only BAM!'s problems sent to BAM!.
+    const both = admin({
+      ready: false,
+      connection: 'bambu',
+      problems: [
+        { field: 'Serial (serial)', problem: 'missing', in_pop: false },
+        { field: 'LAN access code', problem: 'not entered in POP yet', in_pop: true },
+      ],
+    });
+    expect(whatItNeeds(both)).toBe('Fix it in BAM! before it can be added: Serial (serial): missing. Then enter its LAN access code here.');
+    expect(needsYou([both], [], [])[0]).toMatchObject({ title: 'Voron 2.4 can’t run: fix it in BAM!', detail: 'Serial (serial): missing' });
   });
 });

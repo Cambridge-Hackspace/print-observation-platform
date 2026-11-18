@@ -32,6 +32,7 @@
 //! go2rtc is a list of codecs, checked first. go2rtc's own error text,
 //! which can name the camera's address, never reaches a viewer.
 
+use crate::secrets::CameraLogin;
 use std::{
     collections::BTreeMap,
     fmt,
@@ -93,8 +94,9 @@ impl fmt::Debug for Bambu {
 /// Where a printer's camera comes from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Source {
-    /// An address go2rtc plays: rtsp, rtsps, http or https.
-    Address(String),
+    /// An address go2rtc plays: rtsp, rtsps, http or https; with the login
+    /// POP keeps for it (#150), which goes in only on the way to go2rtc.
+    Address(String, Option<CameraLogin>),
     /// A Bambu printer's RTSPS camera, played by go2rtc through POP's relay.
     BambuRtsps(Bambu),
     /// A Bambu printer's JPEG pictures on port 6000, read by POP.
@@ -114,7 +116,11 @@ pub type Wanted = BTreeMap<String, Camera>;
 
 /// Where a running printer's camera comes from: none when it has none, or
 /// when a Bambu printer's own camera has no access code to sign in with.
-pub fn source_of(config: &PrinterConfig, access_code: Option<&str>) -> Option<Source> {
+pub fn source_of(
+    config: &PrinterConfig,
+    access_code: Option<&str>,
+    login: Option<&CameraLogin>,
+) -> Option<Source> {
     let bambu = |port: u16| match (&config.connection, access_code) {
         (Connection::Bambu { host, serial }, Some(code)) => Some(Bambu {
             host: host.clone(),
@@ -125,10 +131,40 @@ pub fn source_of(config: &PrinterConfig, access_code: Option<&str>) -> Option<So
         _ => None,
     };
     match config.camera.as_ref()? {
-        PrinterCamera::Address { url } => Some(Source::Address(url.clone())),
+        // The login goes only to the camera it was entered for.
+        PrinterCamera::Address { url } => Some(Source::Address(
+            url.clone(),
+            login.filter(|l| l.origin == origin(url)).cloned(),
+        )),
         PrinterCamera::BambuRtsps => bambu(RTSPS_PORT).map(Source::BambuRtsps),
         PrinterCamera::BambuJpeg => bambu(JPEG_PORT).map(Source::BambuJpeg),
     }
+}
+
+/// A camera address's scheme, host and port, lowercased, without its user,
+/// path or query: `rtsp://10.0.0.40:554`. What a camera login is bound to.
+pub fn origin(url: &str) -> String {
+    let (scheme, rest) = url.split_once("://").unwrap_or(("", url));
+    let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let authority = &rest[..end];
+    let host = authority.rsplit_once('@').map_or(authority, |(_, h)| h);
+    format!("{}://{}", scheme.to_lowercase(), host.to_lowercase())
+}
+
+/// `url` with `login` in it, percent-encoded, in place of any user it named:
+/// `rtsp://user:pass@host/...`, as go2rtc takes a camera's login.
+pub fn with_login(url: &str, login: &CameraLogin) -> String {
+    let Some((scheme, rest)) = url.split_once("://") else {
+        return url.to_owned();
+    };
+    let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let (authority, tail) = rest.split_at(end);
+    let host = authority.rsplit_once('@').map_or(authority, |(_, h)| h);
+    format!(
+        "{scheme}://{}:{}@{host}{tail}",
+        userinfo(&login.username),
+        userinfo(&login.password)
+    )
 }
 
 /// The stream go2rtc serves a printer's camera as.
@@ -146,7 +182,8 @@ pub fn stream_name(bam_id: &str) -> String {
     format!("{PREFIX}{safe}")
 }
 
-/// `s` as it may stand in a URL's user part.
+/// `s` as it may stand in a URL's user or password: RFC 3986's unreserved
+/// characters as they are, every other byte percent-encoded.
 fn userinfo(s: &str) -> String {
     s.bytes()
         .map(|b| {
@@ -376,8 +413,12 @@ impl Keeper {
         let mut unmade = BTreeMap::new();
         for (id, cam) in want {
             match &cam.source {
-                Source::Address(url) => {
-                    to_go2rtc.insert(id.clone(), (cam.name.clone(), url.clone()));
+                Source::Address(url, login) => {
+                    let url = match login {
+                        Some(l) => with_login(url, l),
+                        None => url.clone(),
+                    };
+                    to_go2rtc.insert(id.clone(), (cam.name.clone(), url));
                 }
                 Source::BambuRtsps(b) => {
                     if !self.relays.contains_key(id) {

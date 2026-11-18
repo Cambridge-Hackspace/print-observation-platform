@@ -43,6 +43,15 @@
     await load();
   }
 
+  /** Send a secret for a printer; true once POP has it. */
+  async function secret(method: 'PUT' | 'DELETE', id: string, what: string, body?: unknown): Promise<boolean> {
+    problem = null;
+    const a = await call(method, `/api/admin/printers/${encodeURIComponent(id)}/${what}`, body);
+    if (!a.ok) problem = a.error;
+    await load();
+    return a.ok;
+  }
+
   async function signOut() {
     await call('DELETE', '/api/session');
     me = null;
@@ -77,6 +86,9 @@
     {busy}
     onadd={(id) => act(id, 'add')}
     ondecline={(id) => act(id, 'decline')}
+    onaccesscode={(id, code) => secret('PUT', id, 'access-code', { access_code: code })}
+    oncameralogin={(id, username, password) => secret('PUT', id, 'camera-login', { username, password })}
+    onclearlogin={(id) => secret('DELETE', id, 'camera-login')}
     onsignout={signOut}
   />
 {/if}

@@ -297,3 +297,69 @@ async fn a_database_a_newer_pop_used_is_refused_and_left_alone() {
     );
     assert!(!dir.path().join(db::UPGRADE_BACKUPS).exists());
 }
+
+/// Camera logins (#150) make printer_secrets again to widen its check; the
+/// seed above cannot fill that table (its check refuses made-up kinds), so a
+/// real sealed access code is carried across here, and still opens.
+#[tokio::test]
+async fn a_sealed_access_code_survives_the_table_being_made_again() {
+    const KEY: &str = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=";
+    let dir = tempfile::tempdir().unwrap();
+    // Sealed by this build, on a database of its own.
+    let now = db::open(&dir.path().join("now.db")).await.unwrap();
+    let secrets = pop_server::secrets::Secrets::new(KEY);
+    secrets
+        .set_access_code(&now, "p1", "24681357")
+        .await
+        .unwrap();
+    let (nonce, sealed, at): (Vec<u8>, Vec<u8>, i64) =
+        sqlx::query_as("SELECT nonce, sealed, updated_at FROM printer_secrets")
+            .fetch_one(&now)
+            .await
+            .unwrap();
+    now.close().await;
+    // Put in a database from just before the change, which then upgrades.
+    let before = migration_files()
+        .iter()
+        .position(|f| f.to_string_lossy().contains("_camera_logins"))
+        .expect("the camera logins migration");
+    let old_dir = dir.path().join("old");
+    fs::create_dir(&old_dir).unwrap();
+    let path = at_schema(&old_dir, before).await;
+    let mut conn = connect(&path).await;
+    sqlx::query("INSERT INTO printer_secrets (bam_id, kind, nonce, sealed, updated_at) VALUES ('p1', 'access_code', ?, ?, ?)")
+        .bind(&nonce)
+        .bind(&sealed)
+        .bind(at)
+        .execute(&mut conn)
+        .await
+        .unwrap();
+    conn.close().await.unwrap();
+    let upgraded = db::open(&path).await.unwrap();
+    assert_eq!(
+        secrets
+            .access_code(&upgraded, "p1")
+            .await
+            .unwrap()
+            .as_deref(),
+        Some("24681357")
+    );
+    let kept: (Vec<u8>, i64) = sqlx::query_as("SELECT sealed, updated_at FROM printer_secrets")
+        .fetch_one(&upgraded)
+        .await
+        .unwrap();
+    assert_eq!(kept, (sealed, at));
+    // And the new kind is taken.
+    secrets
+        .set_camera_login(
+            &upgraded,
+            "p1",
+            &pop_server::secrets::CameraLogin {
+                username: "u".into(),
+                password: "p".into(),
+                origin: "rtsp://10.0.0.40:554".into(),
+            },
+        )
+        .await
+        .unwrap();
+}

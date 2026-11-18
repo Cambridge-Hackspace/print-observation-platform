@@ -58,6 +58,24 @@ export function now(p: AdminPrinter, live: TowerPrinter | undefined): Now {
   }
 }
 
+/** What is wrong that is fixed in BAM!. */
+export const inBam = (p: AdminPrinter) => p.problems.filter((x) => !x.in_pop);
+/** What is wrong that is fixed in POP, on this desk: a secret POP keeps. */
+export const inPop = (p: AdminPrinter) => p.problems.filter((x) => x.in_pop);
+
+/** A Bambu printer, which signs in with an access code POP keeps. */
+export const needsAccessCode = (p: AdminPrinter) => p.connection === 'bambu';
+
+/** What a not-ready printer needs, for its banner: BAM!'s fixes, then POP's. */
+export function whatItNeeds(p: AdminPrinter): string {
+  const bam = inBam(p);
+  const pop = inPop(p);
+  const parts: string[] = [];
+  if (bam.length) parts.push(`Fix it in BAM! before it can be added: ${bam.map((x) => `${x.field}: ${x.problem}`).join('; ')}.`);
+  if (pop.length) parts.push(`${bam.length ? 'Then enter' : 'Enter'} its LAN access code here.`);
+  return parts.join(' ');
+}
+
 /** The printers waiting for an admin to say, for the "New in BAM!" banners. */
 export const offered = (all: readonly AdminPrinter[]) => all.filter((p) => p.tower === 'offered');
 
@@ -120,11 +138,14 @@ export function needsYou(
     .sort((a, b) => a.title.localeCompare(b.title));
   const fields: Attention[] = printers
     .filter((p) => p.tower === 'added' && !p.ready)
-    .map((p) => ({
-      key: `${p.bam_id}:fields`,
-      kind: 'fields' as const,
-      title: `${p.name} can’t run: fix it in BAM!`,
-      detail: p.problems.map((x) => `${x.field}: ${x.problem}`).join('; '),
-    }));
+    .map((p) => {
+      const bam = inBam(p);
+      return {
+        key: `${p.bam_id}:fields`,
+        kind: 'fields' as const,
+        title: bam.length ? `${p.name} can’t run: fix it in BAM!` : `${p.name} can’t run: enter its LAN access code`,
+        detail: (bam.length ? bam : inPop(p)).map((x) => `${x.field}: ${x.problem}`).join('; '),
+      };
+    });
   return [...hands, ...fields];
 }

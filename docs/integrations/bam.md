@@ -40,7 +40,7 @@ of the printer category that gives each printer's settings
 | --- | --- | --- |
 | connection | `connection` | `moonraker`, `octoprint`, `prusalink`, `bambu` or `usb_serial` |
 | address | `address` | Moonraker: its host, or a ws:// or http:// address. OctoPrint and PrusaLink: an http:// address. Bambu: its IP address or name alone. USB: the device, such as /dev/ttyACM0 |
-| camera | `camera` | an rtsp, rtsps, http or https address, or `built-in` for a Bambu printer's own camera (optional; docs/printers/bambu.md) |
+| camera | `camera` | an rtsp, rtsps, http or https address, without its password, or `built-in` for a Bambu printer's own camera (optional; docs/printers/bambu.md). A camera's login is entered on POP's desk |
 | model | `model` | the model, as people say it (optional) |
 | materials | `materials` | the materials it prints, comma-separated (optional) |
 | training | `training` | the training level it needs (optional) |

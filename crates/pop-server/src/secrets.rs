@@ -1,5 +1,5 @@
-//! Secrets POP keeps (#21), such as a Bambu printer's LAN access code: never
-//! in BAM!, never in plain text.
+//! Secrets POP keeps (#21), such as a Bambu printer's LAN access code and a
+//! camera's login (#150): never in BAM!, never in plain text.
 //!
 //! Each is sealed with ChaCha20-Poly1305 under the configured key
 //! ([secrets] key, or POP_SECRETS_KEY), with a fresh random nonce, and the
@@ -55,6 +55,28 @@ pub struct Secrets {
 }
 
 const ACCESS_CODE: &str = "access_code";
+const CAMERA_LOGIN: &str = "camera_login";
+
+/// A camera's login, as POP keeps it for a printer (#150).
+#[derive(Clone, PartialEq, Eq)]
+pub struct CameraLogin {
+    pub username: String,
+    pub password: String,
+    /// Where it was entered for: the camera address's scheme, host and port
+    /// (cameras::origin). POP gives it to that camera only, so changing the
+    /// address in BAM! cannot send the password somewhere else.
+    pub origin: String,
+}
+
+impl std::fmt::Debug for CameraLogin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CameraLogin")
+            .field("username", &self.username)
+            .field("password", &"<sealed>")
+            .field("origin", &self.origin)
+            .finish()
+    }
+}
 const SETTING: &str = "setting";
 
 impl Secrets {
@@ -91,6 +113,78 @@ impl Secrets {
         bam_id: &str,
         code: &str,
     ) -> Result<(), SecretError> {
+        self.seal_for_printer(db, bam_id, ACCESS_CODE, code).await
+    }
+
+    /// Keep a camera's login for a printer (#150).
+    pub async fn set_camera_login(
+        &self,
+        db: &SqlitePool,
+        bam_id: &str,
+        login: &CameraLogin,
+    ) -> Result<(), SecretError> {
+        let both = serde_json::json!({
+            "username": login.username,
+            "password": login.password,
+            "origin": login.origin,
+        });
+        self.seal_for_printer(db, bam_id, CAMERA_LOGIN, &both.to_string())
+            .await
+    }
+
+    /// A printer's camera login, if POP holds one.
+    pub async fn camera_login(
+        &self,
+        db: &SqlitePool,
+        bam_id: &str,
+    ) -> Result<Option<CameraLogin>, SecretError> {
+        let Some(both) = self.open_for_printer(db, bam_id, CAMERA_LOGIN).await? else {
+            return Ok(None);
+        };
+        let v: serde_json::Value =
+            serde_json::from_str(&both).map_err(|_| SecretError::WillNotOpen)?;
+        match (
+            v["username"].as_str(),
+            v["password"].as_str(),
+            v["origin"].as_str(),
+        ) {
+            (Some(u), Some(p), Some(o)) => Ok(Some(CameraLogin {
+                username: u.to_owned(),
+                password: p.to_owned(),
+                origin: o.to_owned(),
+            })),
+            _ => Err(SecretError::WillNotOpen),
+        }
+    }
+
+    /// Forget a printer's camera login; whether there was one.
+    pub async fn clear_camera_login(db: &SqlitePool, bam_id: &str) -> Result<bool, SecretError> {
+        let done = sqlx::query("DELETE FROM printer_secrets WHERE bam_id = ? AND kind = ?")
+            .bind(bam_id)
+            .bind(CAMERA_LOGIN)
+            .execute(db)
+            .await?;
+        Ok(done.rows_affected() > 0)
+    }
+
+    /// The printers POP holds a camera login for, by BAM! id.
+    pub async fn with_camera_logins(db: &SqlitePool) -> Result<Vec<String>, SecretError> {
+        Ok(
+            sqlx::query_scalar("SELECT bam_id FROM printer_secrets WHERE kind = ?")
+                .bind(CAMERA_LOGIN)
+                .fetch_all(db)
+                .await?,
+        )
+    }
+
+    async fn seal_for_printer(
+        &self,
+        db: &SqlitePool,
+        bam_id: &str,
+        kind: &str,
+        value: &str,
+    ) -> Result<(), SecretError> {
+        let code = value;
         let cipher = self.cipher.as_ref().ok_or(SecretError::NoKey)?;
         let nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
         let sealed = cipher
@@ -98,7 +192,7 @@ impl Secrets {
                 &nonce,
                 Payload {
                     msg: code.as_bytes(),
-                    aad: &Self::aad(bam_id, ACCESS_CODE),
+                    aad: &Self::aad(bam_id, kind),
                 },
             )
             .map_err(|_| SecretError::WillNotOpen)?;
@@ -108,7 +202,7 @@ impl Secrets {
                                                    updated_at = excluded.updated_at",
         )
         .bind(bam_id)
-        .bind(ACCESS_CODE)
+        .bind(kind)
         .bind(nonce.as_slice())
         .bind(sealed)
         .bind(now())
@@ -123,11 +217,20 @@ impl Secrets {
         db: &SqlitePool,
         bam_id: &str,
     ) -> Result<Option<String>, SecretError> {
+        self.open_for_printer(db, bam_id, ACCESS_CODE).await
+    }
+
+    async fn open_for_printer(
+        &self,
+        db: &SqlitePool,
+        bam_id: &str,
+        kind: &str,
+    ) -> Result<Option<String>, SecretError> {
         let row: Option<(Vec<u8>, Vec<u8>)> = sqlx::query_as(
             "SELECT nonce, sealed FROM printer_secrets WHERE bam_id = ? AND kind = ?",
         )
         .bind(bam_id)
-        .bind(ACCESS_CODE)
+        .bind(kind)
         .fetch_optional(db)
         .await?;
         let Some((nonce, sealed)) = row else {
@@ -142,7 +245,7 @@ impl Secrets {
                 chacha20poly1305::Nonce::from_slice(&nonce),
                 Payload {
                     msg: &sealed,
-                    aad: &Self::aad(bam_id, ACCESS_CODE),
+                    aad: &Self::aad(bam_id, kind),
                 },
             )
             .map_err(|_| SecretError::WillNotOpen)?;
