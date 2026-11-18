@@ -135,6 +135,8 @@ notices go.
 | Secrets key | `POP_SECRETS_KEY` (or `[secrets] key`), 32 bytes | Never in the database or a backup |
 | Bambu access codes | Database, `printer_secrets` | Sealed with the secrets key |
 | Discord webhook URL | Database, `sealed_settings` | Sealed with the secrets key |
+| go2rtc API password | `POP_GO2RTC_PASSWORD` (or `[go2rtc] password`) | Never in the database or a backup |
+| Camera addresses, which may hold a password | BAM!'s `camera` field, and go2rtc's configuration file | Plain text in both; never shown or logged by POP (gap 17) |
 | Passwords | Database | Argon2id hash only |
 | Session tokens | Database | SHA-256 hash only |
 
@@ -168,6 +170,22 @@ notices go.
 on BAM! without naming its address.
 `crates/pop-integrations/tests/bam.rs::every_request_carries_the_token_and_asks_only_what_was_recorded`,
 `crates/pop-server/tests/printers.rs::healthz_reports_bam_by_name_and_without_detail`.
+
+**Cameras and go2rtc** (docs/integrations/go2rtc.md).
+- A camera's address is never shown to admins, and never in an error POP
+  makes about a request to go2rtc.
+  `crates/pop-server/tests/cameras.rs::each_cameras_health_is_what_go2rtc_shows_and_admins_see_it`,
+  `crates/pop-integrations/tests/go2rtc.rs::an_error_never_repeats_a_cameras_address`.
+- Only `rtsp`, `rtsps`, `http` and `https` cameras are taken from BAM!; and
+  go2rtc's own refusal of a source that runs a program is kept, in its words.
+  `crates/pop-integrations/tests/go2rtc.rs::a_source_go2rtc_refuses_is_refused_in_its_words`.
+- POP removes every `pop_` stream no printer wants, so a camera's address
+  does not stay in go2rtc after its printer leaves, and leaves every other
+  stream alone.
+  `crates/pop-server/tests/cameras.rs::streams_that_are_not_pops_are_left_alone_and_stale_ones_of_pops_go`,
+  `crates/pop-server/tests/cameras.rs::a_printer_that_leaves_the_tower_leaves_go2rtc`.
+- A wrong go2rtc password is said as such on `/healthz`, and nothing goes in.
+  `crates/pop-server/tests/cameras.rs::a_wrong_go2rtc_password_is_said_and_cameras_read_unknown`.
 
 **Backups** hold the database, so they include the sealed secrets and the
 hashes, but never the secrets key or the BAM! token. A backup alone opens
@@ -266,8 +284,8 @@ Each of these is true of POP today, or untested, and none is claimed above.
 **Secrets and data.**
 9. **The data directory, database and backups are written with default
    file permissions.** Tracked in #139.
-10. **POP's configuration derives `Debug` with the BAM! token and secrets
-    key in it.** Nothing prints it today, but nothing stops it. No test
+10. **POP's configuration derives `Debug` with the BAM! token, the go2rtc
+    password and the secrets key in it.** Nothing prints it today, but nothing stops it. No test
     keeps the BAM! token, cookies or request headers out of the log. Tracked in #140.
 11. **A sealed setting (the webhook) is not tested against being moved to
     another setting's row**, as access codes are. Tracked in #141.
@@ -283,3 +301,12 @@ Each of these is true of POP today, or untested, and none is claimed above.
     the audit write fails, the change stands without its entry. Tracked in #144.
 15. **A guide image's 5 MB limit is likely unreachable**, because the
     server's default request size is 2 MB. Tracked in #145.
+
+**Cameras.**
+16. **POP does not check that go2rtc asks for its password.** go2rtc skips
+    it for requests from its own machine unless `local_auth` is on, so any
+    program on the box could change its streams. The guide says to turn it
+    on; nothing checks. Tracked in #149.
+17. **Camera addresses are plain text in BAM! and in go2rtc's
+    configuration file**, and a camera's address can hold its password.
+    POP does not set that file's permissions. Tracked in #150.

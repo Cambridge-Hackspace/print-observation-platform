@@ -1,0 +1,278 @@
+{
+  "camera": "http://127.0.0.1:18985/stream",
+  "dead": "rtsp://127.0.0.1:1/none",
+  "exchanges": [
+    {
+      "auth": true,
+      "body": {
+        "config_path": "rec.yaml",
+        "host": "127.0.0.1:18984",
+        "revision": "7c05066",
+        "rtsp": {
+          "default_query": "video&audio",
+          "listen": "127.0.0.1:18554"
+        },
+        "version": "1.9.15"
+      },
+      "content_type": "application/json",
+      "method": "GET",
+      "name": "info",
+      "path": "/api",
+      "query": {},
+      "status": 200
+    },
+    {
+      "auth": false,
+      "body": "Unauthorized\n",
+      "content_type": "text/plain; charset=utf-8",
+      "method": "GET",
+      "name": "no-auth",
+      "path": "/api/streams",
+      "query": {},
+      "status": 401
+    },
+    {
+      "auth": "wrong",
+      "body": "Unauthorized\n",
+      "content_type": "text/plain; charset=utf-8",
+      "method": "GET",
+      "name": "wrong-password",
+      "path": "/api/streams",
+      "query": {},
+      "status": 401
+    },
+    {
+      "auth": true,
+      "body": {},
+      "content_type": "application/json",
+      "method": "GET",
+      "name": "streams-empty",
+      "path": "/api/streams",
+      "query": {},
+      "status": 200
+    },
+    {
+      "auth": true,
+      "body": "",
+      "content_type": "",
+      "method": "PUT",
+      "name": "add-good",
+      "path": "/api/streams",
+      "query": {
+        "name": "pop_good",
+        "src": "http://127.0.0.1:18985/stream"
+      },
+      "status": 200
+    },
+    {
+      "auth": true,
+      "body": "",
+      "content_type": "",
+      "method": "PUT",
+      "name": "add-dead",
+      "path": "/api/streams",
+      "query": {
+        "name": "pop_dead",
+        "src": "rtsp://127.0.0.1:1/none"
+      },
+      "status": 200
+    },
+    {
+      "auth": true,
+      "body": "streams: source from insecure producer\n",
+      "content_type": "text/plain; charset=utf-8",
+      "method": "PUT",
+      "name": "add-insecure",
+      "path": "/api/streams",
+      "query": {
+        "name": "pop_exec",
+        "src": "exec:echo hi"
+      },
+      "status": 400
+    },
+    {
+      "auth": true,
+      "body": {
+        "pop_dead": {
+          "consumers": null,
+          "producers": [
+            {
+              "url": "rtsp://127.0.0.1:1/none"
+            }
+          ]
+        },
+        "pop_good": {
+          "consumers": null,
+          "producers": [
+            {
+              "url": "http://127.0.0.1:18985/stream"
+            }
+          ]
+        }
+      },
+      "content_type": "application/json",
+      "method": "GET",
+      "name": "streams-two",
+      "path": "/api/streams",
+      "query": {},
+      "status": 200
+    },
+    {
+      "auth": true,
+      "body": {
+        "consumers": null,
+        "producers": [
+          {
+            "url": "rtsp://127.0.0.1:1/none"
+          }
+        ]
+      },
+      "content_type": "application/json",
+      "method": "GET",
+      "name": "stream-one",
+      "path": "/api/streams",
+      "query": {
+        "src": "pop_dead"
+      },
+      "status": 200
+    },
+    {
+      "auth": true,
+      "body": "\n",
+      "content_type": "text/plain; charset=utf-8",
+      "method": "GET",
+      "name": "stream-missing",
+      "path": "/api/streams",
+      "query": {
+        "src": "pop_nosuch"
+      },
+      "status": 404
+    },
+    {
+      "auth": true,
+      "body": {
+        "jpeg_bytes": 9056,
+        "starts_with_soi": true
+      },
+      "content_type": "image/jpeg",
+      "method": "GET",
+      "name": "frame-good",
+      "path": "/api/frame.jpeg",
+      "query": {
+        "src": "pop_good"
+      },
+      "status": 200
+    },
+    {
+      "auth": true,
+      "body": "",
+      "content_type": "",
+      "method": "GET",
+      "name": "frame-dead",
+      "path": "/api/frame.jpeg",
+      "query": {
+        "src": "pop_dead"
+      },
+      "status": 200
+    },
+    {
+      "auth": true,
+      "body": "stream not found\n",
+      "content_type": "text/plain; charset=utf-8",
+      "method": "GET",
+      "name": "frame-missing",
+      "path": "/api/frame.jpeg",
+      "query": {
+        "src": "pop_nosuch"
+      },
+      "status": 404
+    },
+    {
+      "auth": true,
+      "body": "",
+      "content_type": "",
+      "method": "PUT",
+      "name": "replace-dead",
+      "path": "/api/streams",
+      "query": {
+        "name": "pop_dead",
+        "src": "rtsp://127.0.0.1:1/none2"
+      },
+      "status": 200
+    },
+    {
+      "auth": true,
+      "body": {
+        "consumers": null,
+        "producers": [
+          {
+            "url": "rtsp://127.0.0.1:1/none2"
+          }
+        ]
+      },
+      "content_type": "application/json",
+      "method": "GET",
+      "name": "stream-replaced",
+      "path": "/api/streams",
+      "query": {
+        "src": "pop_dead"
+      },
+      "status": 200
+    },
+    {
+      "auth": true,
+      "body": "",
+      "content_type": "",
+      "method": "DELETE",
+      "name": "delete-dead",
+      "path": "/api/streams",
+      "query": {
+        "src": "pop_dead"
+      },
+      "status": 200
+    },
+    {
+      "auth": true,
+      "body": "",
+      "content_type": "",
+      "method": "DELETE",
+      "name": "delete-missing",
+      "path": "/api/streams",
+      "query": {
+        "src": "pop_nosuch"
+      },
+      "status": 200
+    },
+    {
+      "auth": true,
+      "body": {
+        "pop_good": {
+          "consumers": [],
+          "producers": [
+            {
+              "url": "http://127.0.0.1:18985/stream"
+            }
+          ]
+        }
+      },
+      "content_type": "application/json",
+      "method": "GET",
+      "name": "streams-one",
+      "path": "/api/streams",
+      "query": {},
+      "status": 200
+    },
+    {
+      "auth": true,
+      "body": "# go2rtc as tools/go2rtc/record.py expects it: loopback only, no streams of\n# its own, its API behind a user name and password. go2rtc skips the\n# password for requests from its own machine unless local_auth is on.\napi:\n  listen: \"127.0.0.1:18984\"\n  username: \"pop\"\n  password: \"recording-only\"\n  local_auth: true\nrtsp:\n  listen: \"127.0.0.1:18554\"\nwebrtc:\n  listen: \"127.0.0.1:18555\"\nstreams:\n  pop_good:\n    - http://127.0.0.1:18985/stream\n",
+      "content_type": "application/yaml",
+      "method": "GET",
+      "name": "config",
+      "path": "/api/config",
+      "query": {},
+      "status": 200
+    }
+  ],
+  "recorded": "2026-11-17",
+  "version": "1.9.15"
+}

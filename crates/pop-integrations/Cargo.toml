@@ -8,15 +8,16 @@ repository.workspace = true
 publish.workspace = true
 
 [features]
-# A fake BAM! that serves answers recorded from a real one (#20), for tests
-# here and in the server.
-fakes = ["dep:axum"]
+# A fake BAM! and a fake go2rtc that serve answers recorded from real ones
+# (#20, #66), for tests here and in the server.
+fakes = ["dep:axum", "dep:base64"]
 
 [lints]
 workspace = true
 
 [dependencies]
-axum = { version = "0.8", optional = true, features = ["ws"] }
+axum = { version = "0.8", optional = true, features = ["ws", "query"] }
+base64 = { version = "0.22", optional = true }
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
 rustls = "0.23"

@@ -90,6 +90,7 @@ async fn pop(added: &[&str]) -> Pop {
             max: Duration::from_millis(200),
             healthy_after: Duration::from_secs(60),
         },
+        cameras: tokio::sync::watch::channel(Default::default()).0,
     });
     let state = state.with_tower(tower.clone());
     Pop {

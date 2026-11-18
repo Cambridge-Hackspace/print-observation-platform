@@ -43,6 +43,8 @@ pub struct Runner {
     pub decided: Arc<Notify>,
     pub pins: Arc<dyn PinStore>,
     pub backoff: Backoff,
+    /// Told the cameras of the printers that run (#66).
+    pub cameras: watch::Sender<crate::cameras::Wanted>,
 }
 
 /// A printer as it runs: its settings, and the access code it was given.
@@ -108,6 +110,7 @@ async fn run(mut r: Runner, tx: watch::Sender<Vec<TowerPrinter>>) {
             },
         }
         publish(&r.events, &tx, &fleet, &running);
+        cameras(&r.cameras, &running);
     }
 }
 
@@ -181,6 +184,29 @@ async fn reconcile(r: &Runner, fleet: &mut Fleet, running: &mut BTreeMap<String,
         }
         running.insert(id, next);
     }
+}
+
+/// Tell the cameras' keeper the running printers' cameras, if they changed.
+fn cameras(tx: &watch::Sender<crate::cameras::Wanted>, running: &BTreeMap<String, Running>) {
+    let wanted: crate::cameras::Wanted = running
+        .iter()
+        .filter_map(|(id, r)| {
+            r.config.camera.as_ref().map(|source| {
+                (
+                    id.clone(),
+                    crate::cameras::Camera {
+                        name: r.config.name.clone(),
+                        source: source.clone(),
+                    },
+                )
+            })
+        })
+        .collect();
+    tx.send_if_modified(|w| {
+        let changed = *w != wanted;
+        *w = wanted;
+        changed
+    });
 }
 
 /// Send every screen the tower's printers, if they changed.

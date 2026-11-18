@@ -1568,6 +1568,7 @@ name = "pop-integrations"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "base64 0.22.1",
  "futures-util",
  "pop-integrations",
  "reqwest",
