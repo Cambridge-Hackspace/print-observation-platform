@@ -87,6 +87,22 @@ describe('the tower', () => {
     ]);
   });
 
+  it('gives each printing printer a QR code that follows that print on a phone', () => {
+    const printers = [
+      printer('Voron 2.4', state({ status: 'printing', progress: 0.4, seconds_left: 600, job: { name: 'gear.gcode', owner: null } })),
+      printer('Mk4', state({ status: 'idle' })),
+    ];
+    const withUrl = render(TowerView, { screen: screen(printers, 'https://pop.example.org'), connection: 'live', now: NOW });
+    const qr = withUrl.getByRole('img', { name: 'Follow Voron 2.4 on your phone' });
+    expect(qr.getAttribute('data-text')).toBe(`https://pop.example.org/#watch/${encodeURIComponent(printers[0]!.id)}`);
+    // Only a print is followed: an idle printer has nothing to follow.
+    expect(withUrl.queryByRole('img', { name: 'Follow Mk4 on your phone' })).toBeNull();
+    cleanup();
+    // No public address, nowhere for a phone to go.
+    const without = render(TowerView, { screen: screen(printers), connection: 'live', now: NOW });
+    expect(without.queryByRole('img', { name: /^Follow / })).toBeNull();
+  });
+
   it('keeps the tap prompt, and shows the phone QR code only when POP knows its address', () => {
     const without = render(TowerView, { screen: screen(TOWER), connection: 'live', now: NOW });
     expect(without.getByText('Tap your card to start printing')).toBeTruthy();

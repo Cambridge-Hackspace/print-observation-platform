@@ -15,7 +15,8 @@
   const span = $derived(code.size + QUIET * 2);
 </script>
 
-<svg width={size} height={size} viewBox="0 0 {span} {span}" role="img" aria-label={label} shape-rendering="crispEdges">
+<!-- data-text says what it encodes, for tests to read without decoding it. -->
+<svg width={size} height={size} viewBox="0 0 {span} {span}" role="img" aria-label={label} data-text={text} shape-rendering="crispEdges">
   <rect width={span} height={span} fill="var(--pop-cream)" />
   <path d={path} fill="var(--pop-ink)" />
 </svg>
