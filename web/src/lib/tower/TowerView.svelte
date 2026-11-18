@@ -10,6 +10,7 @@
   import { byNeed, card, clock, countLabels, need, type Need } from './need';
   import { AutoScroll, DEFAULTS } from './autoscroll';
   import Qr from './Qr.svelte';
+  import { followUrl } from '../phone/tabs';
   import type { TowerPrinter } from '../generated/TowerPrinter';
 
   let {
@@ -139,6 +140,12 @@
           {/if}
           <div class="under"><span>{w.left}</span><span class="muted">{w.right}</span></div>
         </div>
+        {#if phone && n === 'printing'}
+          <!-- Follow this print from a phone, on its own page (#65). -->
+          <div class="follow">
+            <Qr text={followUrl(phone, p.id)} size={56} label="Follow {p.name} on your phone" />
+          </div>
+        {/if}
       </article>
     {:else}
       <p class="none muted">No printers yet: an admin adds them from BAM!.</p>
@@ -249,6 +256,11 @@
   }
   .card.hi {
     box-shadow: var(--pop-shadow);
+  }
+  .follow {
+    flex: none;
+    margin-left: auto;
+    line-height: 0;
   }
   .card {
     position: relative;

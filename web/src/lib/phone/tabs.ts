@@ -27,3 +27,9 @@ export function watching(hash: string): string | null {
 export function watchHash(printer: string): string {
   return `#watch/${encodeURIComponent(printer)}`;
 }
+
+/** Where a phone follows `printer`, from POP's public address: the address a
+ *  kiosk's QR code for that print holds (#65). */
+export function followUrl(publicUrl: string, printer: string): string {
+  return new URL(watchHash(printer), publicUrl).toString();
+}
