@@ -1,0 +1,13 @@
+# Nightly, at 02:30 by this machine's clock: before the updater's default
+# hours (03:00-05:00, docs/upgrades.md). Missed while the box was off, it
+# runs when the box is back.
+
+[Unit]
+Description=A nightly backup of POP's data
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

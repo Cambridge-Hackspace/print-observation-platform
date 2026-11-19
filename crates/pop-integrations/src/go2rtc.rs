@@ -376,12 +376,11 @@ impl Go2rtc {
                 })?,
             );
         }
-        let connect = tokio_tungstenite::connect_async_tls_with_config(
-            req,
-            None,
-            false,
-            Some(crate::sync::connector()),
-        );
+        let connector = crate::sync::connector().map_err(|e| {
+            Go2rtcError::Unreachable(format!("this machine's trusted certificates: {e}"))
+        })?;
+        let connect =
+            tokio_tungstenite::connect_async_tls_with_config(req, None, false, Some(connector));
         let (mut ws, _) = tokio::time::timeout(Duration::from_secs(10), connect)
             .await
             .map_err(|_| Go2rtcError::Unreachable(format!("{}: no answer", self.base)))?

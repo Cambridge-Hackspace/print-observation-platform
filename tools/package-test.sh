@@ -63,7 +63,7 @@ systemd() {
   systemd-analyze verify /etc/systemd/system/pop.service
   systemctl daemon-reload
   systemctl start pop
-  trap 'journalctl -u pop -u go2rtc --no-pager -n 80 >&2 || true' EXIT
+  trap 'journalctl -u pop -u go2rtc -u pop-backup --no-pager -n 80 >&2 || true' EXIT
   healthy http://127.0.0.1:18081/healthz
   # What POP writes, only POP can read (UMask=0077; threat model, gap 9).
   [ "$(stat -c %a /var/lib/pop)" = 700 ] || fail "/var/lib/pop is $(stat -c %a /var/lib/pop), not 700"
@@ -143,6 +143,49 @@ EOF
     fail "pop-updater did not record its check: $(cat /var/lib/pop/updater/events.jsonl 2>&1)"
   sudo -u pop test -r /var/lib/pop/updater/events.jsonl || fail "POP cannot read the updater's record"
   echo "package-test: pop-updater's units are accepted; off it does nothing, on it checks and records"
+
+  # popctl (#183): POP's own commands, run as the service runs POP. A
+  # setting only in pop.env, which is root's alone, must reach the command.
+  install -m 0755 "$ROOT/packaging/popctl" /usr/local/sbin/popctl
+  cp /etc/pop/pop.toml /etc/pop/pop.toml.served
+  printf '[server]\nlisten = "127.0.0.1:18081"\n[bam]\nurl = "https://bam.invalid"\ncategory = "c"\n' >/etc/pop/pop.toml
+  install -m 0600 /dev/null /etc/pop/pop.env
+  echo 'POP_BAM_TOKEN=package-test-token' >/etc/pop/pop.env
+  # The control: without pop.env, as the guide's old commands ran it.
+  if sudo -u pop POP_STORAGE_DATA_DIR=/var/lib/pop /usr/local/bin/pop --config /etc/pop/pop.toml config check >/dev/null 2>&1; then
+    fail "the configuration is valid without pop.env: this test proves nothing"
+  fi
+  popctl config check | grep -q "The configuration is valid" ||
+    fail "popctl did not give the command pop.env"
+  ! popctl config nonsense >/dev/null 2>&1 || fail "popctl hid a failing command's exit"
+  cp /etc/pop/pop.toml.served /etc/pop/pop.toml
+  printf 'package-test-password\n' | popctl user create-admin ci-admin --name "CI admin" ||
+    fail "popctl user create-admin failed"
+  code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+    -d '{"username":"ci-admin","password":"package-test-password"}' http://127.0.0.1:18081/api/session)
+  [ "$code" = 200 ] || fail "the admin popctl made cannot sign in ($code)"
+  echo "package-test: popctl gives POP's commands pop.env, and its first admin signs in"
+
+  # The nightly backup (#183): an archive only POP can read, and those over
+  # two weeks old deleted, newer ones kept.
+  install -m 0644 "$ROOT/packaging/systemd/pop-backup.service" /etc/systemd/system/
+  install -m 0644 "$ROOT/packaging/systemd/pop-backup.timer" /etc/systemd/system/
+  systemd-analyze verify /etc/systemd/system/pop-backup.service /etc/systemd/system/pop-backup.timer
+  systemctl daemon-reload
+  install -d -o pop -g pop -m 0700 /var/backups/pop
+  install -o pop -g pop -m 0600 /dev/null /var/backups/pop/pop-old.tar.gz
+  touch -d '20 days ago' /var/backups/pop/pop-old.tar.gz
+  install -o pop -g pop -m 0600 /dev/null /var/backups/pop/pop-recent.tar.gz
+  touch -d '3 days ago' /var/backups/pop/pop-recent.tar.gz
+  systemctl start pop-backup.service || fail "pop-backup failed"
+  made=$(find /var/backups/pop -name 'pop-2*.tar.gz' | head -1)
+  [ -n "$made" ] || fail "pop-backup made no archive: $(ls -l /var/backups/pop)"
+  [ -s "$made" ] || fail "$made is empty"
+  [ "$(stat -c %a "$made")" = 600 ] || fail "$made is $(stat -c %a "$made"), not 600"
+  [ "$(stat -c %U "$made")" = pop ] || fail "$made is $(stat -c %U "$made")'s, not pop's"
+  [ ! -e /var/backups/pop/pop-old.tar.gz ] || fail "a backup 20 days old was kept"
+  [ -e /var/backups/pop/pop-recent.tar.gz ] || fail "a backup 3 days old was deleted"
+  echo "package-test: pop-backup writes an archive only POP can read, and keeps two weeks"
 }
 
 # The kiosk's packages and unit (#10), in the Debian the box runs: what the

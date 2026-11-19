@@ -100,18 +100,26 @@ impl Bam {
             HeaderValue::from_str(&format!("Bearer {}", self.token()))
                 .map_err(|_| BamError::Unexpected("the token is not a valid header".into()))?,
         );
-        let (mut ws, _) =
-            tokio_tungstenite::connect_async_tls_with_config(req, None, false, Some(connector()))
-                .await
-                .map_err(|e| match e {
-                    tokio_tungstenite::tungstenite::Error::Http(r) if r.status() == 401 => {
-                        BamError::Token("the live connection was refused".into())
-                    }
-                    tokio_tungstenite::tungstenite::Error::Http(r) if r.status() == 403 => {
-                        BamError::Permission("the live connection needs events.read".into())
-                    }
-                    other => BamError::Unreachable(format!("the live connection: {other}")),
-                })?;
+        let connector = connector().map_err(|e| {
+            BamError::Unreachable(format!("this machine's trusted certificates: {e}"))
+        })?;
+        // Within the same time as the hello: a BAM! (or a proxy) that takes the
+        // connection and never finishes the handshake must not hold the live
+        // connection open for ever, waiting.
+        let connect =
+            tokio_tungstenite::connect_async_tls_with_config(req, None, false, Some(connector));
+        let (mut ws, _) = tokio::time::timeout(within, connect)
+            .await
+            .map_err(|_| BamError::Unreachable("the live connection did not open".into()))?
+            .map_err(|e| match e {
+                tokio_tungstenite::tungstenite::Error::Http(r) if r.status() == 401 => {
+                    BamError::Token("the live connection was refused".into())
+                }
+                tokio_tungstenite::tungstenite::Error::Http(r) if r.status() == 403 => {
+                    BamError::Permission("the live connection needs events.read".into())
+                }
+                other => BamError::Unreachable(format!("the live connection: {other}")),
+            })?;
         // BAM! says hello first; until it has, nothing is subscribed.
         let hello = tokio::time::timeout(within, next_json(&mut ws))
             .await
@@ -159,18 +167,21 @@ async fn next_json(ws: &mut Socket) -> Option<Value> {
 
 /// TLS with this build's one crypto provider, named rather than looked up:
 /// a process with two providers compiled in cannot pick a default.
-pub(crate) fn connector() -> Connector {
-    let roots = rustls::RootCertStore {
-        roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
-    };
+///
+/// It trusts what this machine trusts, as POP's HTTP requests do: a BAM! or
+/// go2rtc whose certificate the space's own authority signed is trusted once
+/// that authority is installed (on Debian, update-ca-certificates). A list
+/// of public authorities compiled into POP left the live connection failing
+/// where every request beside it worked.
+pub(crate) fn connector() -> Result<Connector, rustls::Error> {
+    use rustls_platform_verifier::BuilderVerifierExt;
     let cfg = rustls::ClientConfig::builder_with_provider(Arc::new(
         rustls::crypto::aws_lc_rs::default_provider(),
     ))
-    .with_safe_default_protocol_versions()
-    .expect("TLS 1.2 and 1.3")
-    .with_root_certificates(roots)
+    .with_safe_default_protocol_versions()?
+    .with_platform_verifier()?
     .with_no_client_auth();
-    Connector::Rustls(Arc::new(cfg))
+    Ok(Connector::Rustls(Arc::new(cfg)))
 }
 
 /// Keep `category`'s printers in sync, until the returned task is aborted.

@@ -3,7 +3,7 @@
 # POP_SECRETS_KEY, POP_GO2RTC_PASSWORD) in /etc/pop/pop.env, mode 0600, owned
 # by root: systemd reads it before it drops to the pop user.
 #
-# The first admin: sudo -u pop POP_STORAGE_DATA_DIR=/var/lib/pop pop --config /etc/pop/pop.toml user create-admin <username>
+# The first admin: sudo popctl user create-admin <username> (packaging/popctl).
 
 [Unit]
 Description=POP, the print observation platform
