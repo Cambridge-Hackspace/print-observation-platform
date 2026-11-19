@@ -5,7 +5,7 @@
   // reporting a problem (#63) arrive as screens inside this shell.
   import { sensitive } from '../feedback/sensitive';
   import { onDestroy, onMount } from 'svelte';
-  import { Logo, ProgressBar, StatusSquare } from '../design';
+  import { Logo, ProgressBar, StatusSquare, Version } from '../design';
   import { call } from '../api';
   import { follow, type Connection } from '../live';
   import { empty, reduce } from '../screen';
@@ -142,6 +142,7 @@
           </dl>
         </section>
       {/if}
+      <Version />
     </main>
 
     <nav aria-label="Sections">
