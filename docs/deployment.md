@@ -38,23 +38,40 @@ settings given as `POP_*` environment variables instead of a file.
 
 To build it yourself instead: README.md, "Running it".
 
+The steps below also use files from the repository, at the same release:
+the example configuration, the service units, and `popctl`. Get them, and
+run the rest of this guide from inside that folder:
+
+```sh
+git clone --depth 1 --branch "$VERSION" https://github.com/Cambridge-Hackspace/print-observation-platform pop-src
+cd pop-src
+```
+
 ## 2. A user, and where POP keeps its data
 
 ```sh
 sudo useradd --system --home-dir /var/lib/pop --shell /usr/sbin/nologin pop
 sudo install -d -m 0755 /etc/pop
+sudo install -m 0755 packaging/popctl /usr/local/sbin/popctl
 ```
 
-systemd makes `/var/lib/pop` itself, readable only by POP.
+`/etc/pop` must be `0755`, so the `pop` user can reach its configuration in
+it; a folder only root can enter stops POP with "cannot be read: Permission
+denied". systemd makes `/var/lib/pop` itself, readable only by POP.
+
+`popctl` runs POP's own commands, such as making the first admin, the way
+the service runs POP: as `pop`, with the secrets in `/etc/pop/pop.env`
+read by systemd. Run without it, those commands do not see the secrets.
 
 ## 3. The configuration
 
-Copy `pop.example.toml` to `/etc/pop/pop.toml`: it documents every key with
-its default. The ones a deployment sets:
+Copy `pop.example.toml` to `/etc/pop/pop.toml`, readable by POP:
+`sudo install -m 0644 pop.example.toml /etc/pop/pop.toml`. It documents
+every key with its default, and holds no secrets. The ones a deployment sets:
 
 ```toml
 [server]
-listen = "127.0.0.1:8080"          # or 0.0.0.0:8080 with no proxy in front
+listen = "127.0.0.1:8080"          # with a proxy in front; with none, 0.0.0.0:8080
 public_url = "https://pop.example.org"   # what phones open; the kiosk's QR codes use it
 
 [access]
@@ -88,8 +105,8 @@ EOF
 access code and the Discord webhook. Keep a copy somewhere safe: a backup
 cannot be opened without it, and it is not in the backup.
 
-Check it: `sudo -u pop env $(sudo cat /etc/pop/pop.env) pop --config /etc/pop/pop.toml config check`
-says "The configuration is valid", or names what is wrong.
+Check it: `sudo popctl config check` says "The configuration is valid", or
+names what is wrong.
 
 ## 4. The service
 
@@ -106,8 +123,7 @@ fails: the database, BAM!, go2rtc. `journalctl -u pop` has the detail.
 ## 5. The first admin
 
 ```sh
-sudo -u pop env POP_STORAGE_DATA_DIR=/var/lib/pop pop --config /etc/pop/pop.toml \
-  user create-admin <username> --name "<their name>"
+sudo popctl user create-admin <username> --name "<their name>"
 ```
 
 It asks for the password. Then sign in at `/admin`; the admin adds everyone
@@ -129,8 +145,14 @@ Check it: the tower (`/kiosk`) shows each added printer, live.
 go2rtc runs as its own service (docs/integrations/go2rtc.md):
 
 ```sh
+case $(uname -m) in
+  x86_64)  A=go2rtc_linux_amd64; SUM=20b46c6910734cb05ecefb234066f36868ff19b42ba1418a7a32e13a3e035712 ;;
+  aarch64) A=go2rtc_linux_arm64; SUM=af416f22b21a24ab83b8d78642190b4932ae695b4e386853f11d1b0319781763 ;;
+esac
+curl -fLO "https://github.com/AlexxIT/go2rtc/releases/download/v1.9.15/$A"
+echo "$SUM  $A" | sha256sum -c -                                    # says OK
 sudo useradd --system --home-dir /var/lib/go2rtc --shell /usr/sbin/nologin go2rtc
-sudo install -m 0755 go2rtc_linux_amd64 /usr/local/bin/go2rtc     # 1.9.15 or later
+sudo install -m 0755 "$A" /usr/local/bin/go2rtc
 sudo install -d -o go2rtc -g go2rtc -m 0700 /var/lib/go2rtc
 sudo install -o go2rtc -g go2rtc -m 0600 packaging/go2rtc.yaml /var/lib/go2rtc/go2rtc.yaml
 sudoedit /var/lib/go2rtc/go2rtc.yaml        # set its password: the same as POP_GO2RTC_PASSWORD
@@ -166,18 +188,20 @@ POP allows from anywhere, and says truthfully where each request came from.
 
 ## 11. Backups
 
-`pop backup <file>` is safe while POP runs. A nightly one, kept for two
-weeks:
+A backup is safe while POP runs. A nightly one, at 02:30, kept for two
+weeks in `/var/backups/pop`:
 
 ```sh
-sudo install -d -o pop -g pop -m 0700 /var/backups/pop
-sudo tee /etc/cron.d/pop-backup >/dev/null <<'EOF'
-15 3 * * * pop POP_STORAGE_DATA_DIR=/var/lib/pop /usr/local/bin/pop --config /etc/pop/pop.toml backup /var/backups/pop/pop-$(date +\%F).tar.gz && find /var/backups/pop -name 'pop-*.tar.gz' -mtime +14 -delete
-EOF
+sudo install -m 0644 packaging/systemd/pop-backup.service packaging/systemd/pop-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now pop-backup.timer
+sudo systemctl start pop-backup.service      # one now, to check: ls -l /var/backups/pop
 ```
 
+One by hand: `sudo popctl backup /var/backups/pop/<name>.tar.gz`.
+
 Copy them off the box. To restore onto a fresh data directory:
-`pop restore <file>`, then start POP; it needs the same `POP_SECRETS_KEY`.
+`sudo popctl restore <file>`, then start POP; it needs the same `POP_SECRETS_KEY`.
 
 ## 12. Upgrading
 
@@ -204,8 +228,7 @@ sudo systemctl stop pop
 sudo install -m 0755 pop-<old>-linux-$(uname -m) /usr/local/bin/pop
 sudo mv /var/lib/pop /var/lib/pop.upgraded                  # kept, not deleted
 sudo install -d -o pop -g pop -m 0700 /var/lib/pop
-sudo -u pop env POP_STORAGE_DATA_DIR=/var/lib/pop pop --config /etc/pop/pop.toml \
-  restore /var/lib/pop.upgraded/backups/before-schema-<new>-from-<old>-<time>.tar.gz
+sudo popctl restore /var/lib/pop.upgraded/backups/before-schema-<new>-from-<old>-<time>.tar.gz
 sudo systemctl start pop
 ```
 
