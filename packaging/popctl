@@ -1,0 +1,25 @@
+#!/bin/sh
+# popctl (#183): run one of POP's own commands the way pop.service runs POP --
+# as the pop user, with /etc/pop/pop.toml and its data in /var/lib/pop, and
+# the secrets in /etc/pop/pop.env read by systemd, as root, as it reads them
+# for the service. pop.env stays root's alone; nothing here copies it out.
+#
+#   sudo popctl user create-admin <username> --name "<their name>"
+#   sudo popctl config check
+#   sudo popctl backup /var/backups/pop/pop-now.tar.gz
+#
+# Install: sudo install -m 0755 packaging/popctl /usr/local/sbin/popctl
+set -eu
+if [ "$(id -u)" != 0 ]; then
+  echo "popctl: run it as root (sudo popctl ...): systemd reads /etc/pop/pop.env for it" >&2
+  exit 1
+fi
+# A person at a terminal gets one, for a password prompt; a script's
+# standard input and output are passed through.
+if [ -t 0 ]; then io=--pty; else io=--pipe; fi
+exec systemd-run --quiet --wait --collect "$io" \
+  --uid=pop --gid=pop \
+  -p EnvironmentFile=-/etc/pop/pop.env \
+  -p UMask=0077 \
+  --setenv=POP_STORAGE_DATA_DIR=/var/lib/pop \
+  /usr/local/bin/pop --config /etc/pop/pop.toml "$@"
