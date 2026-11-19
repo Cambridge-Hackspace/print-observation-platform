@@ -7,4 +7,5 @@
 pub mod bambu;
 pub mod bambu_camera;
 pub mod moonraker;
+pub mod octoprint;
 pub mod prusalink;

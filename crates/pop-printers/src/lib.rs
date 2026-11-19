@@ -18,6 +18,7 @@ pub mod fakes;
 pub mod fleet;
 pub mod login;
 pub mod moonraker;
+pub mod octoprint;
 pub mod prusalink;
 pub mod state;
 
