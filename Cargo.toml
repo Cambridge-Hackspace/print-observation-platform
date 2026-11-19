@@ -22,6 +22,17 @@ lto = "thin"
 codegen-units = 1
 strip = "symbols"
 
+# Debug builds keep line tables only, and dependencies none: a backtrace
+# still names POP's file and line, but a debugger cannot show variables. Full
+# debug info made each of the 44 test binaries 150-300 MB, and target/ grew to
+# tens of gigabytes. For a debugging session, override it for that build:
+# CARGO_PROFILE_DEV_DEBUG=true cargo test ...
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
 # Password hashing is deliberately slow; unoptimized, it is slow enough to
 # make the tests that sign in crawl. Optimizing these crates alone keeps the
 # rest of a debug build debuggable.
