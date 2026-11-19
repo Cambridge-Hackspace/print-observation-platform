@@ -39,7 +39,7 @@ of the printer category that gives each printer's settings
 | Setting | Default key | What POP needs in it |
 | --- | --- | --- |
 | connection | `connection` | `moonraker`, `octoprint`, `prusalink`, `bambu` or `usb_serial` |
-| address | `address` | Moonraker: its host, or a ws:// or http:// address. OctoPrint and PrusaLink: an http:// address. Bambu: its IP address or name alone. USB: the device, such as /dev/ttyACM0 |
+| address | `address` | Moonraker: its host, or a ws:// or http:// address. OctoPrint and PrusaLink: an http:// or https:// address; their login is entered on POP's desk (docs/printers/octoprint.md, docs/printers/prusalink.md). Bambu: its IP address or name alone. USB: the device, such as /dev/ttyACM0 |
 | camera | `camera` | an rtsp, rtsps, http or https address, without its password, or `built-in` for a Bambu printer's own camera (optional; docs/printers/bambu.md). A camera's login is entered on POP's desk |
 | model | `model` | the model, as people say it (optional) |
 | materials | `materials` | the materials it prints, comma-separated (optional) |

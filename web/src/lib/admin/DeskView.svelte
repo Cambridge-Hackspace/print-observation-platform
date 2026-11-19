@@ -9,7 +9,7 @@
   import type { User } from '../generated/User';
   import People from './People.svelte';
   import Kiosks from './Kiosks.svelte';
-  import SecretForm from './SecretForm.svelte';
+  import SecretForm, { type Secret } from './SecretForm.svelte';
   import type { UpdaterStatus } from '../generated/UpdaterStatus';
   import { connectsBy, fieldsSay, needsAccessCode, needsYou, now, offered, training, updaterSays, whatItNeeds, type Now } from './desk';
 
@@ -26,6 +26,8 @@
     onaccesscode = async () => false,
     oncameralogin = async () => false,
     onclearlogin = () => {},
+    onprinterlogin = async () => false,
+    onclearprinterlogin = () => {},
     updater = null,
   }: {
     me: User;
@@ -48,20 +50,29 @@
     oncameralogin?: (id: string, username: string, password: string) => Promise<boolean>;
     /** Remove the login POP holds for a printer's camera. */
     onclearlogin?: (id: string) => void;
+    /** Enter the login for a printer's own host, OctoPrint's or PrusaLink's
+     * (#29, #30); true once POP has it. */
+    onprinterlogin?: (id: string, login: { api_key: string } | { username: string; password: string }) => Promise<boolean>;
+    /** Remove the login POP holds for a printer's own host. */
+    onclearprinterlogin?: (id: string) => void;
     /** The running version and what the updater last did (#148). */
     updater?: UpdaterStatus | null;
   } = $props();
 
   /** The secret being entered, and for which printer. */
-  let entering: { id: string; kind: 'access_code' | 'camera_login' } | null = $state(null);
+  let entering: { id: string; kind: 'access_code' | 'camera_login' | 'printer_login' } | null = $state(null);
   const enteringFor = $derived(entering ? printers?.find((p) => p.bam_id === entering!.id) : undefined);
 
-  async function save(secret: { access_code: string } | { username: string; password: string }) {
+  async function save(secret: Secret) {
     if (!entering) return false;
     const ok =
       'access_code' in secret
         ? await onaccesscode(entering.id, secret.access_code)
-        : await oncameralogin(entering.id, secret.username, secret.password);
+        : entering.kind === 'printer_login'
+          ? await onprinterlogin(entering.id, secret as { api_key: string } | { username: string; password: string })
+          : 'username' in secret
+            ? await oncameralogin(entering.id, secret.username, secret.password)
+            : false;
     if (ok) entering = null;
     return ok;
   }
@@ -162,7 +173,21 @@
                       >
                     {/if}
                   {/if}
-                  {#if !needsAccessCode(p) && !p.camera_login_fits}<span class="muted">—</span>{/if}
+                  {#if p.printer_login_fits}
+                    <span>{p.connection === 'octoprint' ? 'API key' : 'Printer login'}: {p.printer_login ? 'entered' : 'none'}</span>
+                    <button
+                      type="button"
+                      class="link"
+                      aria-label="{p.printer_login ? 'Change' : 'Enter'} the login for {p.name}"
+                      onclick={() => (entering = { id: p.bam_id, kind: 'printer_login' })}>{p.printer_login ? 'Change' : 'Enter'}</button
+                    >
+                    {#if p.printer_login}
+                      <button type="button" class="link" aria-label="Remove the login for {p.name}" onclick={() => onclearprinterlogin(p.bam_id)}
+                        >Remove</button
+                      >
+                    {/if}
+                  {/if}
+                  {#if !needsAccessCode(p) && !p.camera_login_fits && !p.printer_login_fits}<span class="muted">—</span>{/if}
                 </td>
                 <td><span style:color={TONE[n.tone]}><StatusSquare color={TONE[n.tone]} label={n.text} /></span></td>
               </tr>
@@ -173,10 +198,16 @@
     {/if}
     {#if entering && enteringFor}
       {#key `${entering.id}:${entering.kind}`}
-        <SecretForm name={enteringFor.name} kind={entering.kind} onsubmit={save} oncancel={() => (entering = null)} />
+        <SecretForm
+          name={enteringFor.name}
+          kind={entering.kind}
+          host={enteringFor.connection === 'octoprint' ? 'octoprint' : 'prusalink'}
+          onsubmit={save}
+          oncancel={() => (entering = null)}
+        />
       {/key}
     {/if}
-    <span class="muted foot">Change a printer’s category or fields in BAM! and POP follows. Access codes and camera logins live in POP only.</span>
+    <span class="muted foot">Change a printer’s category or fields in BAM! and POP follows. Access codes and logins live in POP only.</span>
   </section>
 
   <aside class="needs" aria-labelledby="needs-you">

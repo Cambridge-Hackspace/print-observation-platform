@@ -288,10 +288,16 @@ async fn a_new_address_in_bam_gets_a_fresh_driver() {
 
 #[tokio::test]
 async fn a_printer_pop_cannot_watch_yet_is_listed_offline() {
+    // USB is the one connection with no driver yet (#34); PrusaLink, this
+    // test's printer before, has one (#30).
     let pop = pop(&["mk4"]).await;
-    let ps = until(&pop.tower, "the MK4", |ps| named(ps, "MK4").is_some()).await;
-    let mk4 = named(&ps, "MK4").unwrap();
-    assert!(!mk4.watched, "PrusaLink has no driver yet");
+    let mk4 = pop.fake.id("mk4").to_owned();
+    pop.fake.edit(&mk4, "connection", "usb_serial");
+    pop.fake.edit(&mk4, "address", "/dev/ttyACM0");
+    let ps = until(&pop.tower, "the MK4 on USB", |ps| {
+        named(ps, "MK4").is_some_and(|p| !p.watched)
+    })
+    .await;
     assert_eq!(status(&ps, "MK4").as_deref(), Some("offline"));
 }
 

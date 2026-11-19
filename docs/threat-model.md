@@ -187,6 +187,7 @@ factor for admins online is #175 (gap 18).
 | Discord webhook URL | Database, `sealed_settings` | Sealed with the secrets key |
 | go2rtc API password | `POP_GO2RTC_PASSWORD` (or `[go2rtc] password`) | Never in the database or a backup |
 | Camera logins (#150) | Database, `printer_secrets` | Sealed with the secrets key; given only to go2rtc, in the address of the camera they were entered for |
+| Printer logins (#29, #30): OctoPrint's API key, PrusaLink's user and password or key | Database, `printer_secrets` | Sealed with the secrets key; sent only to the address they were entered for (gap 20) |
 | Camera addresses, without their password | BAM!'s `camera` field | Plain text; a password there is refused |
 | Camera addresses, with their login | go2rtc's configuration file | Plain text, readable by the go2rtc user only (gap 17) |
 | Passwords | Database | Argon2id hash only |
@@ -226,6 +227,22 @@ factor for admins online is #175 (gap 18).
 - Refused without a secrets key, from outside the space, for a printer
   with no camera address, and when it cannot be a login.
   `crates/pop-server/tests/printers.rs::a_camera_login_is_refused_when_it_cannot_be_kept_rightly`.
+
+**Printer logins (#29, #30).**
+- Entered on the desk by an admin and sealed like a camera login, bound to
+  their printer and to being a printer login: one sealed as a printer login
+  does not open as a camera login, and neither shows in the audit log.
+  `crates/pop-server/tests/printers.rs::a_prusalink_login_is_entered_kept_sealed_bound_recorded_and_removed`.
+- Bound to the address BAM! gave the printer when the login was entered.
+  Given another, POP does not sign in there with it: no API key is sent, no
+  Digest answered, and the desk asks for it again.
+  `crates/pop-server/tests/printer_logins.rs::a_login_is_not_given_to_an_address_it_was_not_entered_for`.
+- OctoPrint takes a key only; refused without a secrets key, signed out,
+  for a printer that connects some other way, and when it cannot be one.
+  `crates/pop-server/tests/printers.rs::octoprint_takes_an_api_key_and_nothing_else`,
+  `crates/pop-server/tests/printers.rs::a_printer_login_is_refused_when_it_cannot_be_kept_rightly`.
+- Never in a log or a panic: `Login`'s Debug hides the secret.
+  `crates/pop-printers/src/prusalink.rs::tests::a_login_never_shows_its_secret`.
 
 **Automatic upgrades (#148, docs/upgrades.md).** Off unless turned on. The
 updater runs as root, since it replaces POP's binary and restarts it, so
@@ -509,3 +526,11 @@ Each of these is true of POP today, or untested, and none is claimed above.
     it would make another configured network local too. Serve POP over HTTPS
     at the space (docs/remote-access.md), configure only the networks that
     are the space, and revoke a kiosk you suspect on the desk.
+20. **An OctoPrint API key crosses the space's network as written.** POP
+    talks to OctoPrint and PrusaLink over the address BAM! gives, which on
+    a printer's own network is usually plain HTTP. PrusaLink on the printer
+    uses HTTP Digest, which never sends its password; an API key (OctoPrint,
+    or PrusaLink on a Raspberry Pi) is in every request, readable by anyone
+    who can watch that network. Give the printer an `https://` address where
+    its host offers one, keep printers on a network members' devices do not
+    share, and use a key that can only watch and print, not administer.

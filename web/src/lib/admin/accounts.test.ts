@@ -17,6 +17,8 @@ const printer = (training: string | null): AdminPrinter => ({
   access_code: false,
   camera_login_fits: false,
   camera_login: false,
+  printer_login_fits: false,
+  printer_login: false,
 });
 const account = (training: string[], more: Partial<Account> = {}): Account => ({
   id: 1,

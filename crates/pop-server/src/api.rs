@@ -62,7 +62,7 @@ pub struct TowerPrinter {
     /// As its driver last reported; offline when POP has no driver for it.
     pub state: pop_printers::PrinterState,
     /// Whether POP has a driver for how this printer connects. When it has
-    /// not (OctoPrint, PrusaLink and USB, so far), the printer is listed but
+    /// not (USB, so far), the printer is listed but
     /// always reads offline.
     pub watched: bool,
     /// What it prints with, from BAM!.
@@ -291,6 +291,10 @@ pub enum AuditKind {
     CameraLoginSet,
     /// A camera's login was removed from POP.
     CameraLoginCleared,
+    /// A printer's own login was entered in POP (never the secret) (#29, #30).
+    PrinterLoginSet,
+    /// A printer's own login was removed from POP.
+    PrinterLoginCleared,
     /// An admin enrolled a kiosk (#12).
     KioskEnrolled,
     /// An admin revoked a kiosk.
@@ -395,6 +399,12 @@ pub struct AdminPrinter {
     pub camera_login_fits: bool,
     /// Whether POP holds a login for its camera (#150).
     pub camera_login: bool,
+    /// Whether it is reached through a host that may ask for a login of its
+    /// own: OctoPrint (an API key) or PrusaLink (a user and password, or a
+    /// key) (#29, #30).
+    pub printer_login_fits: bool,
+    /// Whether POP holds that login, for the address BAM! gives now.
+    pub printer_login: bool,
 }
 
 /// Whether a printer's camera works, as go2rtc last showed it (#66).
@@ -459,6 +469,19 @@ pub struct CameraLoginBody {
     /// Empty for a camera that asks for a password only.
     pub username: String,
     pub password: String,
+}
+
+/// `PUT /api/admin/printers/{bam_id}/printer-login` (#29, #30): an API key,
+/// or a user and password for PrusaLink on the printer itself. One or the
+/// other, never both.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, TS)]
+pub struct PrinterLoginBody {
+    #[serde(default)]
+    pub api_key: Option<String>,
+    #[serde(default)]
+    pub username: Option<String>,
+    #[serde(default)]
+    pub password: Option<String>,
 }
 
 /// `GET /api/updater/quiet` (#148): for the updater, from this machine.

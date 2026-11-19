@@ -95,6 +95,8 @@
     onaccesscode={(id, code) => secret('PUT', id, 'access-code', { access_code: code })}
     oncameralogin={(id, username, password) => secret('PUT', id, 'camera-login', { username, password })}
     onclearlogin={(id) => secret('DELETE', id, 'camera-login')}
+    onprinterlogin={(id, login) => secret('PUT', id, 'printer-login', login)}
+    onclearprinterlogin={(id) => secret('DELETE', id, 'printer-login')}
     {updater}
     onsignout={signOut}
   />

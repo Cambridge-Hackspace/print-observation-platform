@@ -15,7 +15,7 @@ id: string, name: string,
 state: PrinterState, 
 /**
  * Whether POP has a driver for how this printer connects. When it has
- * not (OctoPrint, PrusaLink and USB, so far), the printer is listed but
+ * not (USB, so far), the printer is listed but
  * always reads offline.
  */
 watched: boolean, 

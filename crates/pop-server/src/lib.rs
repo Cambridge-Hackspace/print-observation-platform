@@ -616,6 +616,23 @@ pub fn routes() -> Vec<Route> {
             reach: Reach::Anywhere,
             handler: delete(printers::clear_camera_login),
         },
+        Route {
+            method: Method::PUT,
+            path: "/api/admin/printers/{bam_id}/printer-login",
+            // A printer's settings: admin-class, as its access code (#29, #30).
+            effect: Effect::ControlsPrinter,
+            need: Need::Class(Class::Admin),
+            reach: Reach::Anywhere,
+            handler: put(printers::set_printer_login),
+        },
+        Route {
+            method: Method::DELETE,
+            path: "/api/admin/printers/{bam_id}/printer-login",
+            effect: Effect::ControlsPrinter,
+            need: Need::Class(Class::Admin),
+            reach: Reach::Anywhere,
+            handler: delete(printers::clear_printer_login),
+        },
         // ---- automatic upgrades (#148) ----
         Route {
             method: Method::GET,

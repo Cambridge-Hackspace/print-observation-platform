@@ -18,6 +18,8 @@ const admin = (more: Partial<AdminPrinter> = {}): AdminPrinter => ({
   access_code: false,
   camera_login_fits: false,
   camera_login: false,
+  printer_login_fits: false,
+  printer_login: false,
   ...more,
 });
 const live = (s: Partial<PrinterState>): TowerPrinter => ({

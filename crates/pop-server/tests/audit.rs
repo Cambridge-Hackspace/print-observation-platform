@@ -127,6 +127,16 @@ const WRITE_ROUTES: &[(&str, &str, &str)] = &[
         "tests/printers.rs: a_camera_login_is_entered_kept_sealed_recorded_and_removed",
     ),
     (
+        "PUT",
+        "/api/admin/printers/{bam_id}/printer-login",
+        "tests/printers.rs: a_prusalink_login_is_entered_kept_sealed_bound_recorded_and_removed",
+    ),
+    (
+        "DELETE",
+        "/api/admin/printers/{bam_id}/printer-login",
+        "tests/printers.rs: a_prusalink_login_is_entered_kept_sealed_bound_recorded_and_removed",
+    ),
+    (
         "POST",
         "/api/admin/kiosks",
         "tests/kiosks.rs: an_admin_enrolls_a_kiosk_whose_credential_pop_keeps_only_as_a_hash",

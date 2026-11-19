@@ -18,12 +18,12 @@ use pop_integrations::{
 use crate::{
     AppState,
     api::{
-        AccessCode, AdminPrinter, ApiError, AuditKind, CameraLoginBody, PrinterProblem, TowerState,
-        User,
+        AccessCode, AdminPrinter, ApiError, AuditKind, CameraLoginBody, PrinterLoginBody,
+        PrinterProblem, TowerState, User,
     },
     audit::{self, Actor, Event},
     health::{CheckFuture, HealthCheck},
-    secrets::{CameraLogin, SecretError, Secrets},
+    secrets::{CameraLogin, PrinterLogin, SecretError, Secrets},
 };
 
 /// BAM!, as POP is configured to read it.
@@ -84,6 +84,18 @@ pub async fn list(State(state): State<AppState>) -> Response {
         }
     }
     let has_login = |id: &str| fitting.iter().any(|h| h == id);
+    // A printer's own login, likewise only for the address it was entered for.
+    let mut own = Vec::new();
+    for a in &assets {
+        if let Ok(p) = printer_from(a, &bam.fields, &has_code)
+            && let Some(url) = login_host(&p.connection)
+            && let Ok(Some(l)) = state.secrets.printer_login(&state.db, &a.asset.id).await
+            && l.origin == crate::cameras::origin(url)
+        {
+            own.push(a.asset.id.clone());
+        }
+    }
+    let has_own = |id: &str| own.iter().any(|h| h == id);
     let decided = match crate::tower::states(&state.db).await {
         Ok(d) => d,
         Err(e) => return error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
@@ -116,6 +128,8 @@ pub async fn list(State(state): State<AppState>) -> Response {
                 camera: p.camera.is_some(),
                 access_code: has_code(&a.asset.id),
                 camera_login: has_login(&a.asset.id),
+                printer_login_fits: login_host(&p.connection).is_some(),
+                printer_login: has_own(&a.asset.id),
             },
             Err(problems) => AdminPrinter {
                 bam_id: a.asset.id.clone(),
@@ -138,6 +152,8 @@ pub async fn list(State(state): State<AppState>) -> Response {
                 // Not until BAM! has the printer right.
                 camera_login_fits: false,
                 camera_login: has_login(&a.asset.id),
+                printer_login_fits: false,
+                printer_login: false,
             },
         })
         .collect();
@@ -359,6 +375,167 @@ pub async fn clear_camera_login(
         &state,
         &admin,
         AuditKind::CameraLoginCleared,
+        &bam_id,
+        summary,
+    )
+    .await
+}
+
+/// The address of the host a printer's own login is for, when it connects
+/// through one that may ask for one (#29, #30).
+pub(crate) fn login_host(c: &Connection) -> Option<&str> {
+    match c {
+        Connection::OctoPrint { url } | Connection::PrusaLink { url } => Some(url),
+        _ => None,
+    }
+}
+
+fn plain(s: &str, max: usize) -> bool {
+    !s.is_empty() && s.chars().count() <= max && !s.chars().any(char::is_control)
+}
+
+/// `PUT /api/admin/printers/{bam_id}/printer-login` (#29, #30): the login
+/// for the printer's own host, kept sealed in POP so BAM! holds only its
+/// address. OctoPrint takes an API key; PrusaLink a user and password (on
+/// the printer) or an API key (on a Raspberry Pi).
+pub async fn set_printer_login(
+    State(state): State<AppState>,
+    Extension(admin): Extension<User>,
+    Path(bam_id): Path<String>,
+    body: Result<Json<PrinterLoginBody>, JsonRejection>,
+) -> Response {
+    let Json(body) = match body {
+        Ok(b) => b,
+        Err(e) => return error(StatusCode::BAD_REQUEST, e.body_text()),
+    };
+    let Some(bam) = state.bam.as_ref() else {
+        return error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "POP has no BAM! to read the printer's address from",
+        );
+    };
+    let asset = match bam.client.asset(&bam_id).await {
+        Ok(a) => a,
+        Err(BamError::NotFound) => {
+            return error(
+                StatusCode::NOT_FOUND,
+                "BAM! has no such printer, or POP's token may not see it",
+            );
+        }
+        Err(e) => return error(StatusCode::BAD_GATEWAY, e.to_string()),
+    };
+    // Whether it takes a login is BAM!'s fields' to say: a Bambu printer
+    // whose access code POP lacks is not thereby wrong in BAM!.
+    let Ok(printer) = printer_from(&asset, &bam.fields, &|_: &str| true) else {
+        return error(
+            StatusCode::CONFLICT,
+            "BAM! does not have this printer right yet: put its fields right first",
+        );
+    };
+    let Some(url) = login_host(&printer.connection) else {
+        return error(
+            StatusCode::CONFLICT,
+            format!(
+                "{} connects through {}, which takes no login POP keeps",
+                printer.name,
+                kind(&printer.connection)
+            ),
+        );
+    };
+    let api_key = body
+        .api_key
+        .as_deref()
+        .map(str::trim)
+        .filter(|k| !k.is_empty());
+    let username = body
+        .username
+        .as_deref()
+        .map(str::trim)
+        .filter(|u| !u.is_empty());
+    let password = body.password.filter(|p| !p.is_empty());
+    let octoprint = matches!(printer.connection, Connection::OctoPrint { .. });
+    let login = match (api_key, username, password) {
+        (Some(k), None, None) if plain(k, 128) && !k.contains(char::is_whitespace) => {
+            pop_printers::Login::ApiKey(k.to_owned())
+        }
+        (Some(_), None, None) => {
+            return error(
+                StatusCode::BAD_REQUEST,
+                "api_key: the key, 1 to 128 characters with no spaces",
+            );
+        }
+        (None, Some(u), Some(p)) if !octoprint => {
+            if !plain(u, 64) || !plain(&p, 128) {
+                return error(
+                    StatusCode::BAD_REQUEST,
+                    "username and password: the printer's, up to 64 and 128 characters",
+                );
+            }
+            pop_printers::Login::Digest {
+                username: u.to_owned(),
+                password: p,
+            }
+        }
+        _ if octoprint => {
+            return error(
+                StatusCode::BAD_REQUEST,
+                "api_key: OctoPrint takes an API key, and nothing else",
+            );
+        }
+        _ => {
+            return error(
+                StatusCode::BAD_REQUEST,
+                "PrusaLink takes either a username and password (on the printer), or an api_key (on a Raspberry Pi)",
+            );
+        }
+    };
+    let what = match &login {
+        pop_printers::Login::ApiKey(_) => "API key",
+        pop_printers::Login::Digest { .. } => "login",
+    };
+    let login = PrinterLogin {
+        login,
+        origin: crate::cameras::origin(url),
+    };
+    if let Err(e) = state
+        .secrets
+        .set_printer_login(&state.db, &bam_id, &login)
+        .await
+    {
+        let status = if e == SecretError::NoKey {
+            StatusCode::CONFLICT
+        } else {
+            StatusCode::SERVICE_UNAVAILABLE
+        };
+        return error(status, e.to_string());
+    }
+    // The driver signs in now, not at BAM!'s next change.
+    state.decided.notify_one();
+    // Never the secret.
+    let summary = format!("{} entered the {what} for {}", admin.name, printer.name);
+    recorded(&state, &admin, AuditKind::PrinterLoginSet, &bam_id, summary).await
+}
+
+/// `DELETE /api/admin/printers/{bam_id}/printer-login` (#29, #30).
+pub async fn clear_printer_login(
+    State(state): State<AppState>,
+    Extension(admin): Extension<User>,
+    Path(bam_id): Path<String>,
+) -> Response {
+    match Secrets::clear_printer_login(&state.db, &bam_id).await {
+        Ok(true) => {}
+        Ok(false) => return error(StatusCode::NOT_FOUND, "POP holds no login for that printer"),
+        Err(e) => return error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
+    }
+    state.decided.notify_one();
+    let name = name_of(&state, &bam_id)
+        .await
+        .unwrap_or_else(|| bam_id.clone());
+    let summary = format!("{} removed the login for {name}", admin.name);
+    recorded(
+        &state,
+        &admin,
+        AuditKind::PrinterLoginCleared,
         &bam_id,
         summary,
     )
