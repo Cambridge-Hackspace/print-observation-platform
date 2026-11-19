@@ -173,9 +173,15 @@
     gap: 8px;
     padding: 20px;
     border-radius: 12px;
-    background: var(--pop-cream, #f6f1e6);
-    color: var(--pop-ink, #1d2620);
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+    /* POP's own panel, which its buttons are drawn for: on a light sheet the
+       plain buttons' light text (Cancel, Close) could not be read. */
+    background: var(--pop-panel);
+    color: var(--pop-text);
+    border: 3px solid var(--pop-ink);
+    box-shadow: var(--pop-shadow);
+  }
+  .sheet a {
+    color: var(--pop-butter);
   }
   .sheet input:not([type='radio']),
   .sheet textarea {
@@ -195,7 +201,7 @@
   }
   .preview {
     max-width: 100%;
-    border: 1px solid rgba(0, 0, 0, 0.2);
+    border: 2px solid var(--pop-line);
   }
   pre {
     font-size: 12px;
@@ -205,7 +211,7 @@
     font-size: 15px;
   }
   .problem {
-    color: var(--pop-coral, #c4472f);
+    color: var(--pop-coral);
   }
   .actions {
     display: flex;
