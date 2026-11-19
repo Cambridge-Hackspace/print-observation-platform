@@ -1781,7 +1781,7 @@ dependencies = [
 
 [[package]]
 name = "pop-fakes"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "axum",
  "pop-integrations",
@@ -1792,11 +1792,11 @@ dependencies = [
 
 [[package]]
 name = "pop-gcode"
-version = "0.1.1"
+version = "0.1.2"
 
 [[package]]
 name = "pop-integrations"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -1816,7 +1816,7 @@ dependencies = [
 
 [[package]]
 name = "pop-printers"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bytes",
  "futures-util",
@@ -1837,7 +1837,7 @@ dependencies = [
 
 [[package]]
 name = "pop-release"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "ed25519-dalek",
  "ml-dsa",
@@ -1847,7 +1847,7 @@ dependencies = [
 
 [[package]]
 name = "pop-server"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "argon2",
  "axum",
@@ -1886,7 +1886,7 @@ dependencies = [
 
 [[package]]
 name = "pop-updater"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "axum",
  "ed25519-dalek",
