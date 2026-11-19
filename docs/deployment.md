@@ -189,16 +189,16 @@ POP allows from anywhere, and says truthfully where each request came from.
 ## 11. Backups
 
 A backup is safe while POP runs. A nightly one, at 02:30, kept for two
-weeks in `/var/backups/pop`:
+weeks in `/var/lib/pop-backups`, which systemd makes, readable only by POP:
 
 ```sh
 sudo install -m 0644 packaging/systemd/pop-backup.service packaging/systemd/pop-backup.timer /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now pop-backup.timer
-sudo systemctl start pop-backup.service      # one now, to check: ls -l /var/backups/pop
+sudo systemctl start pop-backup.service      # one now, to check: sudo ls -l /var/lib/pop-backups
 ```
 
-One by hand: `sudo popctl backup /var/backups/pop/<name>.tar.gz`.
+One by hand: `sudo popctl backup /var/lib/pop-backups/<name>.tar.gz`.
 
 Copy them off the box. To restore onto a fresh data directory:
 `sudo popctl restore <file>`, then start POP; it needs the same `POP_SECRETS_KEY`.
