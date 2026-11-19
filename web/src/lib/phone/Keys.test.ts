@@ -76,7 +76,8 @@ describe('your slicer keys', () => {
     await fireEvent.click(r.getByRole('button', { name: 'Done' }));
     await waitFor(() => expect(r.queryByTestId('made')).toBeNull());
     expect(r.container.textContent).not.toContain(SECRET);
-    expect(r.getByTestId('key').textContent).toContain('PrusaSlicer');
+    // The list reloads after the key is made: listed once that is back.
+    await waitFor(() => expect(r.getByTestId('key').textContent).toContain('PrusaSlicer'));
   });
 
   it('asks before revoking, then revokes', async () => {
