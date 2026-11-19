@@ -1,6 +1,8 @@
 <script lang="ts">
-  // Signing in with a local account (#11), for the admin desk.
+  // Signing in with a local account (#11), or through a provider (#14), for
+  // the admin desk and the phone app.
   import { Button, Logo } from '../design';
+  import Providers from './Providers.svelte';
   import { call } from '../api';
   import type { User } from '../generated/User';
 
@@ -8,12 +10,15 @@
     onsignedin,
     subtitle = 'Printer admin',
     oncancel,
+    then = '/admin',
   }: {
     onsignedin: (u: User) => void;
     /** Beside the name: which part of POP this signs in to. */
     subtitle?: string;
     /** Offered as "Not now" when given. */
     oncancel?: () => void;
+    /** The screen a provider's sign-in comes back to. */
+    then?: '/' | '/admin';
   } = $props();
 
   let username = $state('');
@@ -36,6 +41,7 @@
   <div class="brand"><Logo size={40} /><span class="name">POP</span><span class="muted">{subtitle}</span></div>
   <form onsubmit={submit} data-testid="signin">
     <h1>Sign in</h1>
+    <Providers {then} />
     <label for="signin-username">Username</label>
     <input id="signin-username" autocomplete="username" bind:value={username} required />
     <label for="signin-password">Password</label>

@@ -13,6 +13,9 @@ name = "pop"
 path = "src/main.rs"
 
 [dependencies]
+# Signing in through an OpenID Connect provider, CS:S first (#14, #16): no
+# HTTP client of its own; POP's reqwest makes its requests.
+openidconnect = { version = "=4.1.0", default-features = false }
 argon2 = { version = "0.5", features = ["std"] }
 axum = { version = "0.8", features = ["ws"] }
 base64 = "0.22"
@@ -48,6 +51,9 @@ http-body-util = "0.1"
 pop-integrations = { path = "../pop-integrations", features = ["fakes"] }
 pop-printers = { path = "../pop-printers", features = ["fakes"] }
 regex-automata = "0.4"
+# A test sign-in provider signs its ID tokens itself (tests/sign_in.rs), so
+# what POP verifies is not made by the code that verifies it.
+rsa = { version = "0.9", features = ["sha2"] }
 tempfile = "3"
 tokio-tungstenite = "0.29"
 tower = { version = "0.5", features = ["util"] }

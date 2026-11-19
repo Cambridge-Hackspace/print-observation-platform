@@ -319,7 +319,9 @@ pub async fn set_role(db: &SqlitePool, id: i64, role: Role, by: &Actor) -> Resul
     {
         return Err(UserError::LastAdmin);
     }
-    sqlx::query("UPDATE users SET role = ? WHERE id = ?")
+    // A role set on the desk is the desk's: no provider's sign-in takes it
+    // back afterwards (#14).
+    sqlx::query("UPDATE users SET role = ?, admin_from = NULL WHERE id = ?")
         .bind(role_str(role))
         .bind(id)
         .execute(&mut *tx)
@@ -603,6 +605,18 @@ pub async fn start_session_with(
     outside: bool,
     idle_secs: Option<u32>,
 ) -> Result<String, UserError> {
+    start_session_via(db, user, outside, idle_secs, None).await
+}
+
+/// The same, signed in through a provider (`via`, its label), which the
+/// audit log says (#14).
+pub async fn start_session_via(
+    db: &SqlitePool,
+    user: &User,
+    outside: bool,
+    idle_secs: Option<u32>,
+    via: Option<&str>,
+) -> Result<String, UserError> {
     let mut b = [0u8; 32];
     rand::rngs::OsRng.fill_bytes(&mut b);
     let token = URL_SAFE_NO_PAD.encode(b);
@@ -627,10 +641,15 @@ pub async fn start_session_with(
             kind: AuditKind::SignedIn,
             printer: None,
             subject: Some((user.id, &user.name)),
-            summary: match (idle_secs.is_some(), outside) {
-                (true, _) => format!("{} signed in at the kiosk", user.name),
-                (false, true) => format!("{} signed in from outside the space", user.name),
-                (false, false) => format!("{} signed in", user.name),
+            summary: {
+                let with = via.map(|v| format!(" with {v}")).unwrap_or_default();
+                match (idle_secs.is_some(), outside) {
+                    (true, _) => format!("{} signed in{with} at the kiosk", user.name),
+                    (false, true) => {
+                        format!("{} signed in{with} from outside the space", user.name)
+                    }
+                    (false, false) => format!("{} signed in{with}", user.name),
+                }
             },
         },
     )
@@ -721,4 +740,226 @@ pub async fn end_session(db: &SqlitePool, token: &str, user: &User) -> Result<()
     }
     tx.commit().await?;
     Ok(())
+}
+
+// ---- accounts signed in through a provider (#14) ---------------------------
+
+/// The account linked to `provider`'s `subject`, and whether it is active.
+pub async fn by_identity(
+    db: &SqlitePool,
+    provider: &str,
+    subject: &str,
+) -> Result<Option<(User, bool)>, UserError> {
+    let row: Option<(i64, String, String, String, bool)> = sqlx::query_as(
+        "SELECT u.id, u.username, u.name, u.role, u.active
+           FROM user_identities i JOIN users u ON u.id = i.user_id
+          WHERE i.provider = ? AND i.subject = ?",
+    )
+    .bind(provider)
+    .bind(subject)
+    .fetch_optional(db)
+    .await?;
+    if row.is_some() {
+        sqlx::query(
+            "UPDATE user_identities SET last_sign_in_at = ? WHERE provider = ? AND subject = ?",
+        )
+        .bind(now())
+        .bind(provider)
+        .bind(subject)
+        .execute(db)
+        .await?;
+    }
+    Ok(row.map(|(id, username, name, role, active)| {
+        (
+            User {
+                id,
+                username,
+                name,
+                role: role_from(&role),
+            },
+            active,
+        )
+    }))
+}
+
+/// A username for a new account from what a provider calls the member:
+/// POP's characters only, and a number added until it is free. Never the
+/// account of whoever already has that name: accounts link by subject only.
+async fn free_username(tx: &mut sqlx::SqliteConnection, wanted: &str) -> Result<String, UserError> {
+    let mut base: String = wanted
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .trim_matches(['-', '.', '_'])
+        .chars()
+        .take(48)
+        .collect();
+    if base.is_empty() {
+        base = "member".into();
+    }
+    for n in 1..10_000 {
+        let candidate = if n == 1 {
+            base.clone()
+        } else {
+            format!("{base}-{n}")
+        };
+        let taken: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE username = ?")
+            .bind(&candidate)
+            .fetch_one(&mut *tx)
+            .await?;
+        if taken == 0 {
+            return Ok(candidate);
+        }
+    }
+    Err(invalid("username", "no free username near the provider's"))
+}
+
+/// The member account made at someone's first sign-in with `provider`
+/// (cal, 2026-11-19), linked to its `subject`. Its password is a random one
+/// nobody knows: it signs in through the provider, and a wrong password for
+/// it takes as long to refuse as any other's.
+pub async fn create_from_provider(
+    db: &SqlitePool,
+    provider: &str,
+    label: &str,
+    subject: &str,
+    username: &str,
+    name: &str,
+) -> Result<User, UserError> {
+    let name = {
+        let n: String = name
+            .trim()
+            .chars()
+            .filter(|c| !c.is_control())
+            .take(100)
+            .collect();
+        if n.is_empty() {
+            username.trim().to_owned()
+        } else {
+            n
+        }
+    };
+    let mut b = [0u8; 32];
+    rand::rngs::OsRng.fill_bytes(&mut b);
+    let hash = hash_password(&URL_SAFE_NO_PAD.encode(b));
+    let t = now();
+    let mut tx = db.begin().await?;
+    let username = free_username(
+        &mut tx,
+        if username.trim().is_empty() {
+            &name
+        } else {
+            username
+        },
+    )
+    .await?;
+    let name = if name.is_empty() {
+        username.clone()
+    } else {
+        name
+    };
+    let id: i64 = sqlx::query_scalar(
+        "INSERT INTO users (username, name, role, password_hash, created_at) VALUES (?, ?, 'member', ?, ?) RETURNING id",
+    )
+    .bind(&username)
+    .bind(&name)
+    .bind(&hash)
+    .bind(t)
+    .fetch_one(&mut *tx)
+    .await?;
+    sqlx::query(
+        "INSERT INTO user_identities (provider, subject, user_id, created_at, last_sign_in_at) VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(provider)
+    .bind(subject)
+    .bind(id)
+    .bind(t)
+    .bind(t)
+    .execute(&mut *tx)
+    .await?;
+    audit::record(
+        &mut tx,
+        &Actor::sign_in_with(label),
+        Event {
+            kind: AuditKind::UserCreated,
+            printer: None,
+            subject: Some((id, &name)),
+            summary: format!("{name}'s account was made at their first sign-in with {label}"),
+        },
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(User {
+        id,
+        username,
+        name,
+        role: Role::Member,
+    })
+}
+
+/// What a provider's roles say about being an admin, applied at sign-in
+/// (cal, 2026-11-19): holding a configured role makes a member an admin,
+/// recorded as that provider's doing; holding none takes back only what
+/// that provider gave, never an admin made on the desk, and never the last
+/// admin. The account as it is afterwards.
+pub async fn apply_provider_roles(
+    db: &SqlitePool,
+    user: User,
+    provider: &str,
+    label: &str,
+    holds_admin_role: bool,
+) -> Result<User, UserError> {
+    let mut tx = db.begin().await?;
+    let from: Option<String> = sqlx::query_scalar("SELECT admin_from FROM users WHERE id = ?")
+        .bind(user.id)
+        .fetch_one(&mut *tx)
+        .await?;
+    let by = Actor::sign_in_with(label);
+    let change = match (user.role, holds_admin_role) {
+        (Role::Member, true) => Some(Role::Admin),
+        (Role::Admin, false) if from.as_deref() == Some(provider) => {
+            if active_admins_besides(&mut tx, user.id).await? == 0 {
+                tracing::warn!(
+                    "{}: {label} no longer gives them an admin role, but they are the last admin, so they stay one",
+                    user.name
+                );
+                None
+            } else {
+                Some(Role::Member)
+            }
+        }
+        _ => None,
+    };
+    let Some(role) = change else {
+        tx.commit().await?;
+        return Ok(user);
+    };
+    sqlx::query("UPDATE users SET role = ?, admin_from = ? WHERE id = ?")
+        .bind(role_str(role))
+        .bind((role == Role::Admin).then_some(provider))
+        .bind(user.id)
+        .execute(&mut *tx)
+        .await?;
+    audit::record(
+        &mut tx,
+        &by,
+        Event {
+            kind: AuditKind::RoleChanged,
+            printer: None,
+            subject: Some((user.id, &user.name)),
+            summary: match role {
+                Role::Admin => format!("the {label} sign-in made {} an admin: {label} gives them an admin role", user.name),
+                Role::Member => format!("the {label} sign-in made {} a member: {label} no longer gives them an admin role", user.name),
+            },
+        },
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(User { role, ..user })
 }

@@ -36,6 +36,15 @@ impl Actor {
         }
     }
 
+    /// A provider's sign-in acting on its configured roles (#14): "the CS:S
+    /// sign-in".
+    pub fn sign_in_with(label: &str) -> Self {
+        Self {
+            id: None,
+            name: Some(format!("the {label} sign-in")),
+        }
+    }
+
     /// The updater service (#148).
     pub fn updater() -> Self {
         Self {

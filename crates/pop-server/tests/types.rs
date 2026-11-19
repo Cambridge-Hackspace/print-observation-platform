@@ -68,6 +68,8 @@ fn export(dir: &Path) {
     pop_printers::PrinterState::export_all_to(dir).unwrap();
     pop_printers::Capabilities::export_all_to(dir).unwrap();
     User::export_all_to(dir).unwrap();
+    // Signing in through a provider (#14).
+    pop_server::sign_in::SignInProvider::export_all_to(dir).unwrap();
     // Personal API keys (#13).
     ApiKey::export_all_to(dir).unwrap();
     NewApiKey::export_all_to(dir).unwrap();
