@@ -6,7 +6,7 @@
 #
 #   sudo popctl user create-admin <username> --name "<their name>"
 #   sudo popctl config check
-#   sudo popctl backup /var/backups/pop/pop-now.tar.gz
+#   sudo popctl backup /var/lib/pop-backups/pop-now.tar.gz
 #
 # Install: sudo install -m 0755 packaging/popctl /usr/local/sbin/popctl
 set -eu
