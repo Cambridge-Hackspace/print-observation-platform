@@ -6,7 +6,7 @@
   import { prefersReducedMotion } from 'svelte/motion';
   import type { Connection } from '../live';
   import type { ScreenState } from '../screen';
-  import { Icon, Logo, Pine, Fern, Shroom, PrinterDrawing, ProgressBar, StatusSquare } from '../design';
+  import { Icon, Logo, Pine, Fern, Shroom, PrinterDrawing, ProgressBar, StatusSquare, Version } from '../design';
   import { byNeed, card, clock, countLabels, need, type Need } from './need';
   import { AutoScroll, DEFAULTS } from './autoscroll';
   import Qr from './Qr.svelte';
@@ -181,6 +181,7 @@
       <Shroom x={124} b={84} s={15} cap="var(--pop-coral)" />
       <Shroom x={148} b={84} s={9} cap="var(--pop-butter)" />
     </svg>
+    <div class="version"><Version compact /></div>
   </footer>
 </div>
 
@@ -360,6 +361,14 @@
     border: 3px solid var(--pop-ink);
     border-radius: var(--pop-radius);
     box-shadow: var(--pop-shadow);
+    position: relative;
+  }
+  /* In the corner below the arrow, clear of the prompt, the phone's QR code
+     and the scene: the footer's layout is unchanged. */
+  .version {
+    position: absolute;
+    left: 10px;
+    bottom: 4px;
   }
   .prompt {
     display: flex;

@@ -221,6 +221,11 @@ impl Pop {
     }
 
     async fn file(&self, cookie: &str, context: Value) -> (StatusCode, Value) {
+        self.file_from(cookie, "kiosk", context).await
+    }
+
+    /// A report sent from `device`, the screen it was filed on.
+    async fn file_from(&self, cookie: &str, device: &str, context: Value) -> (StatusCode, Value) {
         self.send(
             Method::POST,
             "/api/feedback",
@@ -229,7 +234,7 @@ impl Pop {
                 "kind": "bug",
                 "title": "The X1 reads offline",
                 "description": "It was printing a minute ago.",
-                "device": "kiosk",
+                "device": device,
                 "screenshot": base64::engine::general_purpose::STANDARD.encode(png_with_metadata()),
                 "context": context,
             })),
@@ -250,6 +255,24 @@ impl Pop {
             assert!(tokio::time::Instant::now() < deadline, "never {state}: {s}");
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
+    }
+}
+
+#[tokio::test]
+async fn the_issue_names_the_screen_it_came_from_as_people_know_it() {
+    // "from the phone" read as the device, for a report sent from the phone
+    // app open in a desktop browser: it is the screen, by its name.
+    let pop = pop().await;
+    for (device, said) in [("phone", "the phone app"), ("desk", "the admin desk")] {
+        let (code, accepted) = pop.file_from(&pop.ada, device, json!({"route": "/"})).await;
+        assert_eq!(code, StatusCode::ACCEPTED, "{accepted}");
+        pop.until(accepted["id"].as_str().unwrap(), "sent").await;
+        let issues = pop.github.issues();
+        let body = &issues.last().unwrap().body;
+        assert!(
+            body.contains(&format!("Reported by Ada from {said}.")),
+            "{body}"
+        );
     }
 }
 

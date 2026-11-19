@@ -5,6 +5,7 @@
   import { sensitive } from '../feedback/sensitive';
   import { onDestroy, onMount } from 'svelte';
   import { call } from '../api';
+  import { Version } from '../design';
   import { follow } from '../live';
   import { empty, reduce } from '../screen';
   import type { AdminPrinter } from '../generated/AdminPrinter';
@@ -98,6 +99,9 @@
     {updater}
     onsignout={signOut}
   />
+{/if}
+{#if checked}
+  <Version />
 {/if}
 
 <style>

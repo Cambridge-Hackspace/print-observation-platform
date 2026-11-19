@@ -30,7 +30,10 @@
 
   let tool: Tool = $state('pen');
   let marks: Marks = $state(none());
-  let typing: { at: [number, number]; text: string } | null = $state(null);
+  /** Text being typed, where it was asked for on the picture, and where its
+   * box sits on the screen (the picture is centered, so the two differ). */
+  let typing: { at: [number, number]; box: [number, number]; text: string } | null = $state(null);
+  let frame: HTMLDivElement;
   let host: HTMLDivElement;
   let stage: Konva.Stage | null = null;
   let layer: Konva.Layer | null = null;
@@ -89,7 +92,11 @@
     stage.on('pointerdown', () => {
       const p = at();
       if (tool === 'text') {
-        typing = { at: p, text: '' };
+        // A second place asked for keeps what was typed at the first.
+        placeText();
+        const pic = host.querySelector('.konvajs-content')!.getBoundingClientRect();
+        const room = frame.getBoundingClientRect();
+        typing = { at: p, box: [pic.left - room.left + p[0], pic.top - room.top + p[1]], text: '' };
         return;
       }
       drawing = tool === 'pen' ? { tool, points: [...p] } : { tool, from: p, to: p };
@@ -117,20 +124,29 @@
     draw();
   });
 
+  /** The text typed so far becomes a mark; nothing typed, no mark. */
   function placeText() {
-    if (typing) marks = add(marks, { tool: 'text', at: typing.at, text: typing.text });
+    if (typing && typing.text.trim() !== '') marks = add(marks, { tool: 'text', at: typing.at, text: typing.text });
     typing = null;
+  }
+
+  function choose(t: Tool) {
+    // Choosing another tool is done with the text box: what was typed stays.
+    placeText();
+    tool = t;
   }
 
   function done() {
     if (!stage) return;
+    placeText();
+    draw();
     // At the screenshot's own size, whatever size it was drawn at.
     const url = stage.toDataURL({ mimeType: 'image/png', pixelRatio: 1 / scale });
     ondone(url.replace(/^data:image\/png;base64,/, ''));
   }
 </script>
 
-<div class="annotate" data-testid="feedback-annotate">
+<div class="annotate" data-testid="feedback-annotate" bind:this={frame}>
   <div class="tools" role="toolbar" aria-label="Drawing tools">
     {#each TOOLS as t (t.tool)}
       <Button
@@ -138,7 +154,7 @@
         variant={tool === t.tool ? 'primary' : 'plain'}
         aria-pressed={tool === t.tool}
         data-testid="tool-{t.tool}"
-        onclick={() => (tool = t.tool)}>{t.label}</Button
+        onclick={() => choose(t.tool)}>{t.label}</Button
       >
     {/each}
     <span class="gap"></span>
@@ -150,11 +166,28 @@
   </div>
   <div class="canvas" bind:this={host}></div>
   {#if typing}
-    <form class="typing" style="left:{typing.at[0]}px; top:{typing.at[1] + 56}px" onsubmit={(e) => (e.preventDefault(), placeText())}>
+    <form
+      class="typing"
+      data-testid="feedback-typing"
+      style="left:{typing.box[0]}px; top:{typing.box[1]}px"
+      onsubmit={(e) => (e.preventDefault(), placeText())}
+    >
       <label for="feedback-mark-text" class="visually-hidden">Text to add</label>
       <!-- svelte-ignore a11y_autofocus -->
-      <input id="feedback-mark-text" bind:value={typing.text} autofocus />
-      <Button size="sm" type="submit">Add</Button>
+      <input
+        id="feedback-mark-text"
+        bind:value={typing.text}
+        autofocus
+        onkeydown={(e) => {
+          // Escape puts the text box away, and what was typed with it.
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            typing = null;
+          }
+        }}
+      />
+      <Button size="sm" variant="primary" type="submit">Add</Button>
     </form>
   {/if}
 </div>
@@ -168,12 +201,15 @@
     flex-direction: column;
     background: var(--pop-ink, #1d2620);
   }
+  /* POP's own panel, which its buttons are drawn for: a light bar left the
+     plain buttons' light text unreadable on it. */
   .tools {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     padding: 8px 12px;
-    background: var(--pop-cream, #f6f1e6);
+    background: var(--pop-panel);
+    border-bottom: 3px solid var(--pop-ink);
   }
   .gap {
     flex: 1;
@@ -192,8 +228,13 @@
     gap: 6px;
   }
   .typing input {
+    font: inherit;
     font-size: 20px;
     padding: 8px;
+    color: var(--pop-ink);
+    background: var(--pop-cream);
+    border: 3px solid var(--pop-ink);
+    border-radius: var(--pop-radius);
   }
   .visually-hidden {
     position: absolute;
