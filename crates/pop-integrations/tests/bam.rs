@@ -38,6 +38,64 @@ async fn archived_printers_are_read_on_their_own() {
     assert!(archived[0].asset.archived_at.is_some());
 }
 
+/// What the fake sends for a listing, raw: the precondition of the two tests
+/// below is that it is BAM!'s `null`, not a `[]` POP would have read anyway.
+async fn raw_listing(f: &FakeBam, archived: bool) -> serde_json::Value {
+    let q = if archived { "archived=true&" } else { "" };
+    reqwest::Client::new()
+        .get(format!(
+            "{}/api/v1/assets?{q}category_id={}",
+            f.url(),
+            f.id("printers")
+        ))
+        .bearer_auth(TOKEN)
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn a_category_with_nothing_archived_lists_none_not_an_error() {
+    let (f, bam) = fake().await;
+    f.restore(f.id("old"));
+    assert_eq!(
+        raw_listing(&f, true).await["assets"],
+        serde_json::Value::Null
+    );
+    assert_eq!(bam.assets(f.id("printers"), true).await.unwrap(), []);
+}
+
+#[tokio::test]
+async fn a_new_empty_printer_category_lists_none_not_an_error() {
+    let (f, bam) = fake().await;
+    for p in ["mk4", "voron", "x1", "incomplete"] {
+        f.archive(f.id(p));
+    }
+    assert_eq!(
+        raw_listing(&f, false).await["assets"],
+        serde_json::Value::Null
+    );
+    assert_eq!(bam.assets(f.id("printers"), false).await.unwrap(), []);
+}
+
+#[tokio::test]
+async fn an_answer_without_its_list_is_unexpected_not_empty() {
+    // null is BAM!'s "none"; a missing list is something else answering.
+    let (f, bam) = fake().await;
+    f.send_body("{}");
+    assert!(matches!(
+        bam.assets(f.id("printers"), false).await.unwrap_err(),
+        BamError::Unexpected(_)
+    ));
+    assert!(matches!(
+        bam.categories().await.unwrap_err(),
+        BamError::Unexpected(_)
+    ));
+}
+
 #[tokio::test]
 async fn a_printers_fields_are_strings_by_key() {
     let (f, bam) = fake().await;
