@@ -172,19 +172,29 @@ EOF
   install -m 0644 "$ROOT/packaging/systemd/pop-backup.timer" /etc/systemd/system/
   systemd-analyze verify /etc/systemd/system/pop-backup.service /etc/systemd/system/pop-backup.timer
   systemctl daemon-reload
-  install -d -o pop -g pop -m 0700 /var/backups/pop
-  install -o pop -g pop -m 0600 /dev/null /var/backups/pop/pop-old.tar.gz
-  touch -d '20 days ago' /var/backups/pop/pop-old.tar.gz
-  install -o pop -g pop -m 0600 /dev/null /var/backups/pop/pop-recent.tar.gz
-  touch -d '3 days ago' /var/backups/pop/pop-recent.tar.gz
-  systemctl start pop-backup.service || fail "pop-backup failed"
-  made=$(find /var/backups/pop -name 'pop-2*.tar.gz' | head -1)
-  [ -n "$made" ] || fail "pop-backup made no archive: $(ls -l /var/backups/pop)"
+  # As on a machine that has never run it: no folder for the backups. The
+  # unit must make it itself; the first install found one made by a step
+  # of the unit comes too late (#188).
+  b=/var/lib/pop-backups
+  rm -rf "$b"
+  systemctl start pop-backup.service || fail "pop-backup failed on a machine with no $b"
+  [ "$(stat -c %a "$b")" = 700 ] || fail "$b is $(stat -c %a "$b"), not 700"
+  [ "$(stat -c %U "$b")" = pop ] || fail "$b is $(stat -c %U "$b")'s, not pop's"
+  made=$(find "$b" -name 'pop-2*.tar.gz' | head -1)
+  [ -n "$made" ] || fail "pop-backup made no archive: $(ls -l "$b")"
   [ -s "$made" ] || fail "$made is empty"
   [ "$(stat -c %a "$made")" = 600 ] || fail "$made is $(stat -c %a "$made"), not 600"
   [ "$(stat -c %U "$made")" = pop ] || fail "$made is $(stat -c %U "$made")'s, not pop's"
-  [ ! -e /var/backups/pop/pop-old.tar.gz ] || fail "a backup 20 days old was kept"
-  [ -e /var/backups/pop/pop-recent.tar.gz ] || fail "a backup 3 days old was deleted"
+  # A second run, as the next night's: those over two weeks old go.
+  install -o pop -g pop -m 0600 /dev/null "$b/pop-old.tar.gz"
+  touch -d '20 days ago' "$b/pop-old.tar.gz"
+  install -o pop -g pop -m 0600 /dev/null "$b/pop-recent.tar.gz"
+  touch -d '3 days ago' "$b/pop-recent.tar.gz"
+  sleep 1
+  systemctl start pop-backup.service || fail "pop-backup's second run failed"
+  [ "$(find "$b" -name 'pop-2*.tar.gz' | wc -l)" = 2 ] || fail "the second run made no second archive: $(ls -l "$b")"
+  [ ! -e "$b/pop-old.tar.gz" ] || fail "a backup 20 days old was kept"
+  [ -e "$b/pop-recent.tar.gz" ] || fail "a backup 3 days old was deleted"
   echo "package-test: pop-backup writes an archive only POP can read, and keeps two weeks"
 }
 

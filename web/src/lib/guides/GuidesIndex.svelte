@@ -1,7 +1,7 @@
 <script lang="ts">
   // Every published guide (#94).
   import { onMount } from 'svelte';
-  import { Logo } from '../design';
+  import { Logo, Version } from '../design';
   import type { PublicGuideList } from '../generated/PublicGuideList';
 
   let list: PublicGuideList | null = $state(null);
@@ -41,6 +41,7 @@
   {:else}
     <p class="muted" role="status">Loading…</p>
   {/if}
+  <Version />
 </main>
 
 <style>

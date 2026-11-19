@@ -1,5 +1,5 @@
 # A backup of POP's data (#183), run nightly by pop-backup.timer: one archive
-# in /var/backups/pop, and those older than two weeks deleted. Safe while POP
+# in /var/lib/pop-backups, and those older than two weeks deleted. Safe while POP
 # runs. Copy them off the box; restoring needs the same POP_SECRETS_KEY.
 #
 # Now, by hand: sudo systemctl start pop-backup.service
@@ -17,12 +17,14 @@ Group=pop
 EnvironmentFile=-/etc/pop/pop.env
 Environment=POP_STORAGE_DATA_DIR=/var/lib/pop
 UMask=0077
-# Made by root ("+"), then the pop user's alone.
-ExecStartPre=+/usr/bin/install -d -o pop -g pop -m 0700 /var/backups/pop
+# systemd makes it, the pop user's alone, before it sets up the sandbox
+# below: a folder made by a step of this unit would be too late, since the
+# sandbox is set up for every step (#188).
+StateDirectory=pop-backups
+StateDirectoryMode=0700
 # The time too, so a second run in a day is not refused for the name.
-ExecStart=/bin/sh -c 'exec /usr/local/bin/pop --config /etc/pop/pop.toml backup "/var/backups/pop/pop-$(date +%%Y-%%m-%%dT%%H%%M%%S).tar.gz"'
-ExecStart=/usr/bin/find /var/backups/pop -name pop-*.tar.gz -mtime +14 -delete
-ReadWritePaths=/var/backups/pop
+ExecStart=/bin/sh -c 'exec /usr/local/bin/pop --config /etc/pop/pop.toml backup "/var/lib/pop-backups/pop-$(date +%%Y-%%m-%%dT%%H%%M%%S).tar.gz"'
+ExecStart=/usr/bin/find /var/lib/pop-backups -name pop-*.tar.gz -mtime +14 -delete
 
 NoNewPrivileges=yes
 ProtectSystem=strict

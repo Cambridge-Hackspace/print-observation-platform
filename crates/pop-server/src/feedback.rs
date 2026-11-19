@@ -253,10 +253,13 @@ fn report_id() -> String {
 /// The issue's body: what the person wrote, who and where, the context. The
 /// screenshot's place is `{screenshot}`, filled in once it is uploaded.
 fn compose(r: &NewFeedback, user: &User, context: &Value, printers: &Value, id: &str) -> String {
+    // The screen it was sent from, by the name people know it by: "phone"
+    // alone read as the device, for a report sent from the phone app open on
+    // a desktop browser.
     let device = match r.device {
         Device::Kiosk => "kiosk",
-        Device::Phone => "phone",
-        Device::Desk => "desk",
+        Device::Phone => "phone app",
+        Device::Desk => "admin desk",
     };
     let details = json!({
         "pop_version": env!("CARGO_PKG_VERSION"),

@@ -108,7 +108,10 @@ describe('the public guide page', () => {
     const p = render(GuidePage, { slug: 'stringing-on-petg' });
     await waitFor(() => expect(p.getByRole('heading', { level: 1 }).textContent).toBe('Stringing on PETG'));
     expect(p.getByText('Shared under CC BY-SA 4.0.')).toBeTruthy();
-    expect((fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toBe('/api/public/guides/stringing-on-petg');
+    // It asks for that guide by its slug, and nothing else but the version
+    // line's /api/status (#189).
+    const asked = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
+    expect(asked.filter((u) => u !== '/api/status')).toEqual(['/api/public/guides/stringing-on-petg']);
     expect(p.getByRole('link', { name: /All guides/ }).getAttribute('href')).toBe('/guides');
     // And back to the phone app (#72).
     expect(p.getByRole('link', { name: 'Printers' }).getAttribute('href')).toBe('/');
