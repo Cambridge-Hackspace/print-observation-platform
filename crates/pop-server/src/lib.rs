@@ -14,6 +14,7 @@ pub mod events;
 pub mod feedback;
 pub mod guides;
 pub mod health;
+pub mod keys;
 pub mod kiosks;
 pub mod notices;
 pub mod notify;
@@ -301,6 +302,43 @@ pub fn routes() -> Vec<Route> {
             need: Need::Account,
             reach: Reach::Anywhere,
             handler: get(auth::session),
+        },
+        // ---- personal API keys (#13) ----
+        // Each person's own: made, listed and revoked signed in, from
+        // anywhere, as their other account settings are.
+        Route {
+            method: Method::GET,
+            path: "/api/keys",
+            effect: Effect::Read,
+            need: Need::Account,
+            reach: Reach::Anywhere,
+            handler: get(keys::list),
+        },
+        Route {
+            method: Method::POST,
+            path: "/api/keys",
+            effect: Effect::Account,
+            need: Need::Account,
+            reach: Reach::Anywhere,
+            handler: post(keys::create),
+        },
+        Route {
+            method: Method::DELETE,
+            path: "/api/keys/{id}",
+            effect: Effect::Account,
+            need: Need::Account,
+            reach: Reach::Anywhere,
+            handler: delete(keys::revoke),
+        },
+        // What a slicer asks first, with a key, to test the connection
+        // (OctoPrint's; #37). The one route a key reaches so far.
+        Route {
+            method: Method::GET,
+            path: "/api/version",
+            effect: Effect::Read,
+            need: Need::Key,
+            reach: Reach::Anywhere,
+            handler: get(keys::version),
         },
         Route {
             method: Method::GET,

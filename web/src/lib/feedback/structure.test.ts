@@ -14,6 +14,8 @@ import { describe, expect, it } from 'vitest';
 /** An expression that carries a member's details. */
 const SENSITIVE: RegExp[] = [
   /\.(username|email|card|owner|job)\b/,
+  // An API key, shown once when it is made (#13).
+  /\.secret\b/,
   /\b(me|a|user|account|member|owner|who)\.name\b/,
   // A group notice's wording names the print's owner.
   /\btold\.text\b/,

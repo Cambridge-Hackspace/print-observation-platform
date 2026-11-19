@@ -93,6 +93,10 @@ pub enum Need {
     Account,
     /// At least this class.
     Class(Class),
+    /// A live personal API key in `X-Api-Key`, speaking for its owner (#13):
+    /// a slicer's routes, and nothing else. No other need is met by a key,
+    /// and a key meets no other need.
+    Key,
 }
 
 /// From where a route may be reached, beside its [`Need`].
@@ -247,6 +251,9 @@ async fn require(
     mut req: Request,
     next: Next,
 ) -> Response {
+    if need == Need::Key {
+        return with_key(&state, req, next).await;
+    }
     let user = match session_token(req.headers()) {
         None => None,
         Some(t) => match crate::users::session_user(&state.db, &t).await {
@@ -276,6 +283,9 @@ async fn require(
             "this is done at the space: at the print station, or on the space's network",
         )),
         Need::Class(_) => Some((StatusCode::UNAUTHORIZED, "sign in first")),
+        // Answered by with_key above; refused here, never let through, if
+        // that ever changes.
+        Need::Key => Some((StatusCode::UNAUTHORIZED, "this needs your POP API key")),
     };
     if let Some((code, why)) = refused {
         return refuse(code, why);
@@ -284,6 +294,40 @@ async fn require(
         req.extensions_mut().insert(user);
     }
     next.run(req).await
+}
+
+/// A route for keys (#13): its owner, from a live key, or 401. A session
+/// does not stand in for one; a slicer has no session.
+async fn with_key(state: &AppState, mut req: Request, next: Next) -> Response {
+    let key = req
+        .headers()
+        .get("X-Api-Key")
+        .and_then(|v| v.to_str().ok())
+        .map(str::trim)
+        .unwrap_or("");
+    if key.is_empty() {
+        return refuse(
+            StatusCode::UNAUTHORIZED,
+            "this needs your POP API key, as X-Api-Key",
+        );
+    }
+    match crate::keys::user_for(&state.db, key).await {
+        Ok(Some(user)) => {
+            req.extensions_mut().insert(user);
+            next.run(req).await
+        }
+        Ok(None) => refuse(
+            StatusCode::UNAUTHORIZED,
+            "POP does not know that API key, or it was revoked: make a new one in POP's app, under You",
+        ),
+        Err(e) => {
+            tracing::error!("reading an API key: {e:?}");
+            refuse(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "API keys are not working right now",
+            )
+        }
+    }
 }
 
 /// From this machine, directly: a loopback peer and no forwarding header,

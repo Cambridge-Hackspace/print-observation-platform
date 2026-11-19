@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Keys from './Keys.svelte';
   // The phone app's shell (#60): the space's printers, live; the guides; and
   // who you are signed in as. Installable as a web app (index.html's
   // manifest). Watching a print (#61), being told when it is done (#62) and
@@ -124,6 +125,7 @@
           <p>Signed in as <strong use:sensitive={'name'}>{me.name}</strong> (<span use:sensitive={'name'}>{me.username}</span>).</p>
           {#if me.role === 'admin'}<p><a href="/admin">Open the admin desk</a></p>{/if}
           <button type="button" class="action" onclick={signOut}>Sign out</button>
+          <Keys address={screen.status?.public_url ?? location.origin} />
         {:else}
           <p class="muted">Sign in to send prints and hear when they’re done.</p>
           <button type="button" class="action" onclick={() => (signingIn = true)}>Sign in</button>

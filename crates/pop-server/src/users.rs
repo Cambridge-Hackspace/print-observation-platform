@@ -146,12 +146,17 @@ impl From<Row> for User {
             id: r.id,
             username: r.username,
             name: r.name,
-            role: if r.role == "admin" {
-                Role::Admin
-            } else {
-                Role::Member
-            },
+            role: role_from(&r.role),
         }
+    }
+}
+
+/// A role as the database keeps it; anything but "admin" is a member.
+pub(crate) fn role_from(s: &str) -> Role {
+    if s == "admin" {
+        Role::Admin
+    } else {
+        Role::Member
     }
 }
 
@@ -575,7 +580,7 @@ pub async fn set_training(
     account(db, id).await
 }
 
-fn token_hash(token: &str) -> String {
+pub(crate) fn token_hash(token: &str) -> String {
     hex::encode(Sha256::digest(token.as_bytes()))
 }
 

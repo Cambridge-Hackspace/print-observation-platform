@@ -165,6 +165,20 @@ async fn every_route_refuses_whoever_it_does_not_name() {
                     .await;
                 assert_eq!(m.code, StatusCode::FORBIDDEN, "{what}, a member online");
             }
+            // A slicer's route (#13): a key or nothing. Neither signed out
+            // nor signed in (a session is not a key) reaches it.
+            Need::Key => {
+                let anon = pop.send(r.method.clone(), &uri, None, body.clone()).await;
+                assert_eq!(anon.code, StatusCode::UNAUTHORIZED, "{what}, with no key");
+                let a = pop
+                    .send(r.method.clone(), &uri, Some(&admin), body.clone())
+                    .await;
+                assert_eq!(
+                    a.code,
+                    StatusCode::UNAUTHORIZED,
+                    "{what}, an admin's session but no key"
+                );
+            }
             Need::Class(Class::Admin) => {
                 let anon = pop.send(r.method.clone(), &uri, None, body.clone()).await;
                 assert_eq!(anon.code, StatusCode::UNAUTHORIZED, "{what}, signed out");

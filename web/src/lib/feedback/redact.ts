@@ -13,7 +13,7 @@
 //   for whatever a screen forgot to mark.
 
 /** What a marked element holds. */
-export type SensitiveKind = 'name' | 'email' | 'card' | 'file' | 'camera';
+export type SensitiveKind = 'name' | 'email' | 'card' | 'file' | 'camera' | 'secret';
 
 /** The attribute `use:sensitive` sets, and redaction reads. */
 export const ATTRIBUTE = 'data-sensitive';
@@ -24,6 +24,7 @@ const LABEL: Record<SensitiveKind, string> = {
   card: '[card]',
   file: '[file]',
   camera: '[camera]',
+  secret: '[secret]',
 };
 
 /** What the backstop looks for, in text nothing marked. */
@@ -34,6 +35,8 @@ export const PATTERNS: [RegExp, string][] = [
   // spaces or dashes between groups.
   [/\b\d(?:[ -]?\d){11,}\b/g, '[number]'],
   [/\b(?:gh[pousr]_|github_pat_)[A-Za-z0-9_]+/g, '[token]'],
+  // POP's own API keys (#13), digit or none.
+  [/\bpop_[A-Za-z0-9_-]{16,}/g, '[token]'],
   [/\beyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[token]'],
   // A long run of key-like characters with a digit in it.
   [/\b(?=[A-Za-z0-9_+/=-]*\d)[A-Za-z0-9_+/=-]{32,}/g, '[token]'],

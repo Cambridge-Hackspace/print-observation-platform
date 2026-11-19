@@ -192,6 +192,7 @@ factor for admins online is #175 (gap 18).
 | Camera addresses, with their login | go2rtc's configuration file | Plain text, readable by the go2rtc user only (gap 17) |
 | Passwords | Database | Argon2id hash only |
 | Session tokens | Database | SHA-256 hash only |
+| Personal API keys (#13) | Database, `api_keys` | SHA-256 hash only, with a short prefix to tell them apart |
 
 **The secrets key** must be exactly 32 bytes.
 `crates/pop-server/src/config.rs::tests::a_secrets_key_must_be_32_bytes`.
@@ -227,6 +228,26 @@ factor for admins online is #175 (gap 18).
 - Refused without a secrets key, from outside the space, for a printer
   with no camera address, and when it cannot be a login.
   `crates/pop-server/tests/printers.rs::a_camera_login_is_refused_when_it_cannot_be_kept_rightly`.
+
+**Personal API keys (#13).**
+- Shown once, when made, and kept only as their SHA-256: not in the
+  database, the list, or the audit log. On screen they are marked so a
+  feedback screenshot hides them, and the backstop catches one anywhere
+  else (`pop_…`).
+  `crates/pop-server/tests/api_keys.rs::a_key_is_shown_once_and_kept_only_as_a_hash`,
+  `web/src/lib/phone/Keys.test.ts`, `web/src/lib/feedback/redact.test.ts`.
+- Good only on routes marked for keys (`Need::Key`: so far the slicer's
+  connection test). On every other route, a request carrying a live
+  admin's key is answered exactly as the same request without it, inside
+  the space and outside: a key reaches nothing local-only, controls no
+  printer, changes no setting, and a session does not stand in for one.
+  `crates/pop-server/tests/api_keys.rs::a_key_adds_nothing_to_any_route_but_the_slicers`.
+- Refused once revoked, or while their owner's account is deactivated;
+  only their owner can revoke them, and each person has at most twenty.
+  `crates/pop-server/tests/api_keys.rs`.
+- In a slicer's settings and on the space's network as written: the same
+  exposure as an OctoPrint key (gap 20). A key can only send files and read
+  its owner's prints, and its owner can revoke it at once.
 
 **Printer logins (#29, #30).**
 - Entered on the desk by an admin and sealed like a camera login, bound to

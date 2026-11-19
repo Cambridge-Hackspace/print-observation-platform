@@ -295,6 +295,10 @@ pub enum AuditKind {
     PrinterLoginSet,
     /// A printer's own login was removed from POP.
     PrinterLoginCleared,
+    /// Someone made a personal API key (never the key) (#13).
+    ApiKeyCreated,
+    /// Someone revoked one of their API keys.
+    ApiKeyRevoked,
     /// An admin enrolled a kiosk (#12).
     KioskEnrolled,
     /// An admin revoked a kiosk.
@@ -469,6 +473,37 @@ pub struct CameraLoginBody {
     /// Empty for a camera that asks for a password only.
     pub username: String,
     pub password: String,
+}
+
+/// One of a person's API keys, as they see it (#13): never the key itself.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct ApiKey {
+    #[ts(type = "number")]
+    pub id: i64,
+    /// What it is for, as its owner named it.
+    pub name: String,
+    /// Its first characters, to tell it apart.
+    pub prefix: String,
+    #[ts(type = "number")]
+    pub created_at: i64,
+    #[ts(type = "number | null")]
+    pub last_used_at: Option<i64>,
+    /// When it was revoked; it is refused from then on.
+    #[ts(type = "number | null")]
+    pub revoked_at: Option<i64>,
+}
+
+/// `POST /api/keys`.
+#[derive(Debug, Clone, Deserialize, TS)]
+pub struct NewApiKey {
+    pub name: String,
+}
+
+/// `POST /api/keys`'s answer: the only time the key itself is shown.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct CreatedApiKey {
+    pub key: ApiKey,
+    pub secret: String,
 }
 
 /// `PUT /api/admin/printers/{bam_id}/printer-login` (#29, #30): an API key,
