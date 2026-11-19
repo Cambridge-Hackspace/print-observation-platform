@@ -1,7 +1,7 @@
 <script lang="ts">
   // A published guide, for anyone (#94), and at the kiosk (#56).
   import { onMount } from 'svelte';
-  import { Logo } from '../design';
+  import { Logo, Version } from '../design';
   import GuideView from './GuideView.svelte';
   import type { PublicGuide } from '../generated/PublicGuide';
 
@@ -51,6 +51,7 @@
   {:else}
     <p class="muted" role="status">Loading…</p>
   {/if}
+  <Version />
 </main>
 
 <style>

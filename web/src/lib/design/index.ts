@@ -12,4 +12,5 @@ export { default as ProgressBar } from './ProgressBar.svelte';
 export { default as Shroom } from './Shroom.svelte';
 export { default as Spool } from './Spool.svelte';
 export { default as StatusSquare } from './StatusSquare.svelte';
+export { default as Version } from './Version.svelte';
 export { icons, type IconName } from './icons';
