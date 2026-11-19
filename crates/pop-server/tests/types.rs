@@ -17,7 +17,7 @@ use pop_server::api::{
     NotifySettings, PublicGuide, PublicGuideList, ReportTaken, Role, ServerEvent, SignIn, Snapshot,
     Status, TowerPrinter, TowerState, UpdaterStatus, User,
 };
-use pop_server::api::{Kiosk, NewKiosk, SessionInfo};
+use pop_server::api::{ApiKey, CreatedApiKey, Kiosk, NewApiKey, NewKiosk, SessionInfo};
 use ts_rs::TS;
 
 fn generated_dir() -> PathBuf {
@@ -68,6 +68,10 @@ fn export(dir: &Path) {
     pop_printers::PrinterState::export_all_to(dir).unwrap();
     pop_printers::Capabilities::export_all_to(dir).unwrap();
     User::export_all_to(dir).unwrap();
+    // Personal API keys (#13).
+    ApiKey::export_all_to(dir).unwrap();
+    NewApiKey::export_all_to(dir).unwrap();
+    CreatedApiKey::export_all_to(dir).unwrap();
     SignIn::export_all_to(dir).unwrap();
     NewUser::export_all_to(dir).unwrap();
     NewPassword::export_all_to(dir).unwrap();

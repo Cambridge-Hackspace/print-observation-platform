@@ -127,6 +127,16 @@ const WRITE_ROUTES: &[(&str, &str, &str)] = &[
         "tests/printers.rs: a_camera_login_is_entered_kept_sealed_recorded_and_removed",
     ),
     (
+        "POST",
+        "/api/keys",
+        "tests/api_keys.rs: a_key_is_shown_once_and_kept_only_as_a_hash",
+    ),
+    (
+        "DELETE",
+        "/api/keys/{id}",
+        "tests/api_keys.rs: a_key_works_at_the_slicers_route_and_once_revoked_is_refused",
+    ),
+    (
         "PUT",
         "/api/admin/printers/{bam_id}/printer-login",
         "tests/printers.rs: a_prusalink_login_is_entered_kept_sealed_bound_recorded_and_removed",

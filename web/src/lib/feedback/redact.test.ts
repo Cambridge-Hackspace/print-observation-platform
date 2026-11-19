@@ -64,6 +64,8 @@ describe('redaction before capture', () => {
   it('catches each kind of secret by itself', () => {
     expect(backstop('a ghs_x1 b')).toBe('a [token] b');
     expect(backstop('a github_pat_x b')).toBe('a [token] b');
+    // A POP API key (#13), even one with no digit in it.
+    expect(backstop('a pop_AbcdefGhijkLmnopQrstuVwxyzAbcdefGhijkLmno b')).toBe('a [token] b');
     expect(backstop('a eyJhbGc.eyJzdWI.c2ln b')).toBe('a [token] b');
     expect(backstop('a Abcdefghij0123456789abcdefghij0123 b')).toBe('a [token] b');
     expect(backstop('a 123e4567-e89b-12d3-a456-426614174000 b')).toBe('a [id] b');
