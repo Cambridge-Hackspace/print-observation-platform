@@ -150,13 +150,23 @@ pub fn is_public(r: &Route) -> bool {
 }
 
 /// Every public route of `table` that can change something. Signing in is
-/// the one that may: it is how a stranger becomes someone, and it changes
-/// nothing but their own session. Empty is the only other acceptable answer.
+/// the one thing that may: it is how a stranger becomes someone, and it
+/// changes nothing but their own session (and, through a provider, their own
+/// account, #14). Empty is the only other acceptable answer.
 pub fn public_changes(table: &[Route]) -> Vec<Violation> {
     table
         .iter()
         .filter(|r| is_public(r) && r.effect != Effect::Read)
-        .filter(|r| !(r.method == Method::POST && r.path == "/api/session"))
+        .filter(|r| {
+            !matches!(
+                (&r.method, r.path),
+                (&Method::POST, "/api/session")
+                    | (
+                        &Method::GET,
+                        "/api/sign-in/{id}" | "/api/sign-in/{id}/callback"
+                    )
+            )
+        })
         .map(|r| Violation {
             method: r.method.clone(),
             path: r.path,

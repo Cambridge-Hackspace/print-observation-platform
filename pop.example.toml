@@ -123,3 +123,16 @@ branch = "feedback-attachments"
 roles = ["admin"]
 # Reports one person may file in an hour.
 per_hour = 10
+
+# Signing in through OpenID Connect providers (#14), CS:S first (#16):
+# docs/integrations/sign-in.md. None by default; each is a table like this:
+#
+# [[sign_in.providers]]
+# id = "css"                              # in POP's addresses; keep it fixed
+# label = "CS:S"                          # "Sign in with CS:S"
+# issuer = "https://css.example.org"
+# client_id = "pop"
+# # client_secret: give it as POP_SIGN_IN_CSS_CLIENT_SECRET, not here.
+# scopes = ["profile", "roles"]           # beside "openid"
+# roles_claim = "roles"                   # the ID token claim listing roles
+# admin_roles = []                        # any of these makes a POP admin

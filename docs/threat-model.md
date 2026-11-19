@@ -192,6 +192,7 @@ factor for admins online is #175 (gap 18).
 | Camera addresses, with their login | go2rtc's configuration file | Plain text, readable by the go2rtc user only (gap 17) |
 | Passwords | Database | Argon2id hash only |
 | Session tokens | Database | SHA-256 hash only |
+| Sign-in providers' client secrets (#14) | `POP_SIGN_IN_<ID>_CLIENT_SECRET` (or the provider's `client_secret`) | Never in the database or a backup; never in a log |
 | Personal API keys (#13) | Database, `api_keys` | SHA-256 hash only, with a short prefix to tell them apart |
 
 **The secrets key** must be exactly 32 bytes.
@@ -228,6 +229,28 @@ factor for admins online is #175 (gap 18).
 - Refused without a secrets key, from outside the space, for a printer
   with no camera address, and when it cannot be a login.
   `crates/pop-server/tests/printers.rs::a_camera_login_is_refused_when_it_cannot_be_kept_rightly`.
+
+**Signing in through a provider (#14, docs/integrations/sign-in.md).**
+- An ID token signs someone in only if it was signed by a key the provider
+  publishes, for POP, from that issuer, unexpired, with the nonce POP sent.
+  POP checks all of that with the token issued for this exact sign-in.
+  `crates/pop-server/tests/sign_in.rs::a_token_the_provider_did_not_sign_signs_no_one_in`,
+  `crates/pop-server/tests/sign_in.rs::a_token_for_another_client_from_another_issuer_or_expired_signs_no_one_in`.
+  The test provider signs with the `rsa` crate, not the library POP verifies
+  with.
+- A return is accepted only by the browser that began the sign-in, bound by
+  a cookie, and only once; PKCE (S256) binds the code to it as well.
+  `crates/pop-server/tests/sign_in.rs::a_return_this_browser_did_not_begin_is_refused`.
+- An account is linked to the provider's `sub`, never to an email or a
+  username, so no one takes over an account by naming themselves after it.
+  `crates/pop-server/tests/sign_in.rs::an_account_is_never_taken_over_by_naming_yourself_after_it`.
+- The browser goes back only to POP's own screens, never to an address in
+  the request.
+  `crates/pop-server/tests/sign_in.rs::only_pops_own_screens_are_gone_back_to`.
+- A provider's roles make admins only when configured, and take back only
+  what they gave: never an admin made on the desk, never the last admin.
+  `crates/pop-server/tests/sign_in.rs` (the roles tests); gap 21.
+- POP's requests to the provider follow no redirects.
 
 **Personal API keys (#13).**
 - Shown once, when made, and kept only as their SHA-256: not in the
@@ -555,3 +578,13 @@ Each of these is true of POP today, or untested, and none is claimed above.
     who can watch that network. Give the printer an `https://` address where
     its host offers one, keep printers on a network members' devices do not
     share, and use a key that can only watch and print, not administer.
+
+21. **A provider's role taken away reaches POP only at the next sign-in.**
+    POP reads a provider's roles from the ID token at sign-in. Someone made
+    an admin by `admin_roles` stays one, with any session they hold, until
+    they next sign in through that provider. Remove them on the desk too when
+    it matters at once.
+22. **POP's OpenID Connect library depends on the `rsa` crate**, which has a
+    published timing weakness (RUSTSEC-2023-0071) in operations with a
+    private key. POP only verifies signatures with it, using the provider's
+    public key, which that weakness does not touch.

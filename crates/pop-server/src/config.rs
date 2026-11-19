@@ -32,6 +32,85 @@ pub struct Config {
     pub public: Public,
     pub kiosk: Kiosk,
     pub feedback: Feedback,
+    pub sign_in: SignIn,
+}
+
+/// Signing in through OpenID Connect providers (#14), CS:S first (#16),
+/// beside POP's own passwords and cards. None configured: none offered.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Default)]
+#[serde(deny_unknown_fields, default)]
+pub struct SignIn {
+    /// Each a `[[sign_in.providers]]` table.
+    pub providers: Vec<Provider>,
+}
+
+/// One OpenID Connect provider members may sign in with.
+#[derive(Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Provider {
+    /// Its name in POP's addresses and records: lower-case letters, digits
+    /// and dashes, as `css`. Changing it unlinks every account made with it.
+    pub id: String,
+    /// What the button says: "Sign in with {label}".
+    pub label: String,
+    /// The provider's issuer URL; its discovery document is at
+    /// `{issuer}/.well-known/openid-configuration`. https, or http on this
+    /// machine.
+    pub issuer: String,
+    pub client_id: String,
+    /// The client's secret, when the provider gave one. A secret: give it as
+    /// `POP_SIGN_IN_<ID>_CLIENT_SECRET` (the id upper-cased, dashes as
+    /// underscores), not here.
+    #[serde(default)]
+    pub client_secret: String,
+    /// Scopes asked for beside `openid`.
+    #[serde(default = "default_scopes")]
+    pub scopes: Vec<String>,
+    /// The ID token claim that lists the member's roles or groups.
+    #[serde(default = "default_roles_claim")]
+    pub roles_claim: String,
+    /// Holding any of these roles makes a member a POP admin at sign-in,
+    /// and losing all of them takes back what that gave (cal, 2026-11-19).
+    /// Empty: POP's desk alone decides who is an admin.
+    #[serde(default)]
+    pub admin_roles: Vec<String>,
+}
+
+fn default_scopes() -> Vec<String> {
+    vec!["profile".into()]
+}
+
+fn default_roles_claim() -> String {
+    "roles".into()
+}
+
+impl fmt::Debug for Provider {
+    // Never the client secret.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Provider")
+            .field("id", &self.id)
+            .field("issuer", &self.issuer)
+            .field("client_id", &self.client_id)
+            .field(
+                "client_secret",
+                &if self.client_secret.is_empty() {
+                    ""
+                } else {
+                    "****"
+                },
+            )
+            .finish_non_exhaustive()
+    }
+}
+
+impl Provider {
+    /// The environment variable its client secret is given in.
+    pub fn secret_var(&self) -> String {
+        format!(
+            "POP_SIGN_IN_{}_CLIENT_SECRET",
+            self.id.to_ascii_uppercase().replace('-', "_")
+        )
+    }
 }
 
 /// Feedback from any screen, filed as GitHub issues (#96) by a GitHub App
@@ -234,6 +313,82 @@ pub struct Access {
     pub trusted_proxies: Vec<IpNet>,
 }
 
+impl Config {
+    /// The sign-in providers' settings, each named by its place in the list.
+    fn validate_sign_in(&self) -> Result<(), ConfigError> {
+        let mut seen = Vec::new();
+        for (i, p) in self.sign_in.providers.iter().enumerate() {
+            let at = |k: &str| format!("sign_in.providers[{i}].{k}");
+            if p.id.is_empty()
+                || p.id.len() > 32
+                || !p
+                    .id
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+            {
+                return Err(err(
+                    at("id"),
+                    format!("{:?}: lower-case letters, digits and dashes, 1 to 32", p.id),
+                ));
+            }
+            if seen.contains(&p.id) {
+                return Err(err(at("id"), format!("{:?} is used twice", p.id)));
+            }
+            seen.push(p.id.clone());
+            if p.label.trim().is_empty() {
+                return Err(err(
+                    at("label"),
+                    "is empty: what the sign-in button names, as \"CS:S\"",
+                ));
+            }
+            if !secure_or_here(&p.issuer) {
+                return Err(err(
+                    at("issuer"),
+                    format!(
+                        "{:?}: expected the provider's https:// address (http only on this machine)",
+                        p.issuer
+                    ),
+                ));
+            }
+            if p.client_id.is_empty() {
+                return Err(err(
+                    at("client_id"),
+                    "is empty: the client id the provider gave POP",
+                ));
+            }
+            if p.roles_claim.is_empty() {
+                return Err(err(
+                    at("roles_claim"),
+                    "is empty: the claim that lists roles, as \"roles\"",
+                ));
+            }
+        }
+        if !self.sign_in.providers.is_empty() && self.server.public_url.is_empty() {
+            return Err(err(
+                "server.public_url",
+                "is empty, with a sign-in provider: the provider sends members back to POP at it",
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// An https:// address, or an http:// one on this machine.
+fn secure_or_here(u: &str) -> bool {
+    if let Some(rest) = u.strip_prefix("https://") {
+        return !rest.is_empty();
+    }
+    u.strip_prefix("http://").is_some_and(|rest| {
+        if rest.starts_with('[') {
+            // An IPv6 literal: this machine's only.
+            return rest.starts_with("[::1]")
+                && matches!(rest.as_bytes().get(5), None | Some(b'/' | b':'));
+        }
+        let host = rest.split(['/', ':']).next().unwrap_or("");
+        matches!(host, "localhost" | "127.0.0.1")
+    })
+}
+
 /// What is wrong, and where.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConfigError {
@@ -350,6 +505,10 @@ impl Config {
         set("POP_BAM_FIELDS_TRAINING", &mut f.training);
         set("POP_BAM_FIELDS_SERIAL", &mut f.serial);
         set("POP_FEEDBACK_APP_ID", &mut self.feedback.app_id);
+        for p in &mut self.sign_in.providers {
+            let var = p.secret_var();
+            set(&var, &mut p.client_secret);
+        }
         set(
             "POP_FEEDBACK_INSTALLATION_ID",
             &mut self.feedback.installation_id,
@@ -447,6 +606,7 @@ impl Config {
     /// Checks across keys, once the environment's overrides are in: a file
     /// may leave a secret to the environment.
     fn validate_whole(&self) -> Result<(), ConfigError> {
+        self.validate_sign_in()?;
         let u = &self.server.public_url;
         if !u.is_empty() && !is_http(u) {
             return Err(err(
@@ -625,6 +785,80 @@ fn enum_value<T: for<'de> Deserialize<'de>>(var: &str, v: &str) -> Result<T, Con
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_issuer_is_https_or_on_this_machine() {
+        for ok in [
+            "https://css.example.org",
+            "https://css.example.org/realms/space",
+            "http://localhost:8080",
+            "http://127.0.0.1",
+            "http://[::1]:3000/x",
+            "http://[::1]",
+        ] {
+            assert!(secure_or_here(ok), "{ok}");
+        }
+        for bad in [
+            "",
+            "https://",
+            "http://css.example.org",
+            "http://[2001:db8::1]",
+            "http://[::10]",
+            "http://localhost.evil.example",
+            "http://127.0.0.1.evil.example",
+            "ftp://localhost",
+        ] {
+            assert!(!secure_or_here(bad), "{bad}");
+        }
+    }
+
+    #[test]
+    fn a_provider_is_checked_and_needs_the_public_address() {
+        let base = "[server]\npublic_url = \"https://pop.example.org\"\n[[sign_in.providers]]\nid = \"css\"\nlabel = \"CS:S\"\nissuer = \"https://css.example.org\"\nclient_id = \"pop\"\n";
+        let c: Config = toml::from_str(base).unwrap();
+        assert_eq!(c.validate_sign_in(), Ok(()));
+        assert_eq!(c.sign_in.providers[0].scopes, ["profile"]);
+        assert_eq!(c.sign_in.providers[0].roles_claim, "roles");
+        assert_eq!(
+            c.sign_in.providers[0].secret_var(),
+            "POP_SIGN_IN_CSS_CLIENT_SECRET"
+        );
+        for (edit, key) in [
+            (
+                base.replace("id = \"css\"", "id = \"CS S\""),
+                "sign_in.providers[0].id",
+            ),
+            (
+                base.replace("https://css", "http://css"),
+                "sign_in.providers[0].issuer",
+            ),
+            (
+                base.replace("client_id = \"pop\"", "client_id = \"\""),
+                "sign_in.providers[0].client_id",
+            ),
+            (
+                base.replace("label = \"CS:S\"", "label = \" \""),
+                "sign_in.providers[0].label",
+            ),
+            (
+                base.replace("public_url = \"https://pop.example.org\"", ""),
+                "server.public_url",
+            ),
+            (
+                format!(
+                    "{base}[[sign_in.providers]]\nid = \"css\"\nlabel = \"x\"\nissuer = \"https://b.example\"\nclient_id = \"y\"\n"
+                ),
+                "sign_in.providers[1].id",
+            ),
+        ] {
+            let c: Config = toml::from_str(&edit).unwrap();
+            assert_eq!(c.validate_sign_in().unwrap_err().key, key, "{edit}");
+        }
+        // The secret never shows in a log.
+        let mut p = c.sign_in.providers[0].clone();
+        p.client_secret = "s3cret".into();
+        assert!(!format!("{p:?}").contains("s3cret"));
+    }
 
     fn parse_err(text: &str) -> ConfigError {
         Config::parse(text).expect_err(text)

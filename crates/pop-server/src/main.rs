@@ -331,6 +331,16 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
         );
         state = state.with_feedback(feedback);
     }
+    // Signing in through OpenID Connect providers (#14), when configured.
+    if !config.sign_in.providers.is_empty() {
+        for p in &config.sign_in.providers {
+            tracing::info!("members may sign in with {} ({})", p.label, p.issuer);
+        }
+        state = state.with_sign_ins(pop_server::sign_in::SignIns::new(
+            config.sign_in.providers.clone(),
+            &config.server.public_url,
+        ));
+    }
     // Group notices (#68), to the Discord webhook as saved at each one.
     let (notifier, _delivery) = pop_server::notify::spawn(
         state.db.clone(),

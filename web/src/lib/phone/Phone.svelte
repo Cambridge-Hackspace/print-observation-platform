@@ -20,7 +20,8 @@
   let screen = $state(empty());
   let now = $state(new Date());
   let me: User | null = $state(null);
-  let signingIn = $state(false);
+  // Back from a provider without a sign-in (#14): the form says why.
+  let signingIn = $state(new URLSearchParams(location.search).has('sign_in'));
   let tab: Tab = $state(tabFrom(location.hash));
   let watched: string | null = $state(watching(location.hash));
 
@@ -62,6 +63,7 @@
 
 {#if signingIn}
   <SignIn
+    then="/"
     subtitle="Sign in"
     onsignedin={(u) => {
       me = u;

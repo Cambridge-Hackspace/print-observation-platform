@@ -23,6 +23,7 @@ pub mod printers;
 pub mod report;
 pub mod run;
 pub mod secrets;
+pub mod sign_in;
 pub mod tower;
 pub mod updater;
 pub mod users;
@@ -96,6 +97,8 @@ pub struct AppState {
     pub kiosk: config::Kiosk,
     /// Feedback, filed as GitHub issues, when configured (#96).
     pub feedback: Option<Arc<feedback::Feedback>>,
+    /// The providers members may sign in with, when any are configured (#14).
+    pub sign_ins: Option<sign_in::SignIns>,
 }
 
 impl AppState {
@@ -125,6 +128,7 @@ impl AppState {
             public: config::Public::default(),
             kiosk: config::Kiosk::default(),
             feedback: None,
+            sign_ins: None,
         }
     }
 
@@ -142,6 +146,12 @@ impl AppState {
     }
 
     /// File feedback through this (#96).
+    /// Sign in through these providers (#14).
+    pub fn with_sign_ins(mut self, s: sign_in::SignIns) -> Self {
+        self.sign_ins = Some(s);
+        self
+    }
+
     pub fn with_feedback(mut self, feedback: Arc<feedback::Feedback>) -> Self {
         self.feedback = Some(feedback);
         self
@@ -302,6 +312,33 @@ pub fn routes() -> Vec<Route> {
             need: Need::Account,
             reach: Reach::Anywhere,
             handler: get(auth::session),
+        },
+        // ---- signing in through a provider (#14) ----
+        // Anyone, from anywhere: they are how someone signs in. The callback
+        // starts a session only for an ID token the provider signed.
+        Route {
+            method: Method::GET,
+            path: "/api/sign-in/providers",
+            effect: Effect::Read,
+            need: Need::Anyone,
+            reach: Reach::Anywhere,
+            handler: get(sign_in::providers),
+        },
+        Route {
+            method: Method::GET,
+            path: "/api/sign-in/{id}",
+            effect: Effect::Account,
+            need: Need::Anyone,
+            reach: Reach::Anywhere,
+            handler: get(sign_in::start),
+        },
+        Route {
+            method: Method::GET,
+            path: "/api/sign-in/{id}/callback",
+            effect: Effect::Account,
+            need: Need::Anyone,
+            reach: Reach::Anywhere,
+            handler: get(sign_in::callback),
         },
         // ---- personal API keys (#13) ----
         // Each person's own: made, listed and revoked signed in, from

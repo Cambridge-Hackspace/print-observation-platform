@@ -59,7 +59,7 @@ fn body<T>(b: Result<Json<T>, JsonRejection>) -> Result<T, BadBody> {
     b.map(|Json(v)| v).map_err(|e| BadBody(e.body_text()))
 }
 
-fn session_cookie(token: &str, max_age: i64) -> HeaderValue {
+pub(crate) fn session_cookie(token: &str, max_age: i64) -> HeaderValue {
     // HttpOnly: no script reads it. SameSite=Lax: another site's requests do
     // not carry it, except plain navigation. Secure is for a deployment
     // behind HTTPS, and arrives with the remote access guide (#93).
@@ -94,38 +94,54 @@ pub async fn sign_in(
         Err(e) => return e.into_response(),
     };
     let peer = connect.map(|Extension(c)| c.0.ip());
-    let outside = !crate::access::is_local(&state, peer, &headers);
-    // At an enrolled kiosk, a kiosk session: it ends with the screen left
-    // alone (#12), so nobody walks away signed in.
-    let at_kiosk = match crate::kiosks::kiosk_of(&state.db, &headers).await {
-        Ok(k) => k.is_some(),
-        Err(e) => {
-            tracing::error!("kiosks: {e}");
-            return error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "sign-in is not working right now",
-            );
-        }
-    };
-    let idle = at_kiosk.then_some(state.kiosk.idle_secs);
-    match users::start_session_with(&state.db, &user, outside, idle).await {
+    match begin(&state, peer, &headers, &user, None).await {
         Ok(token) => {
-            if outside
-                && user.role == crate::api::Role::Admin
-                && let Some(n) = &state.notifier
-            {
-                n.post(format!(
-                    "{} signed in to POP as an admin from outside the space.",
-                    user.name
-                ));
-            }
             let mut res = Json(user).into_response();
             res.headers_mut()
                 .insert(header::SET_COOKIE, session_cookie(&token, SESSION_SECS));
             res
         }
-        Err(e) => e.into_response(),
+        Err(r) => *r,
     }
+}
+
+/// A session for `user`, however they proved who they are (`via`: the
+/// provider's label, for one signed in through it, #14): a kiosk session at
+/// an enrolled kiosk (#12), an admin from outside told to the group chat.
+pub(crate) async fn begin(
+    state: &AppState,
+    peer: Option<std::net::IpAddr>,
+    headers: &HeaderMap,
+    user: &User,
+    via: Option<&str>,
+) -> Result<String, Box<Response>> {
+    let outside = !crate::access::is_local(state, peer, headers);
+    // At an enrolled kiosk, a kiosk session: it ends with the screen left
+    // alone (#12), so nobody walks away signed in.
+    let at_kiosk = match crate::kiosks::kiosk_of(&state.db, headers).await {
+        Ok(k) => k.is_some(),
+        Err(e) => {
+            tracing::error!("kiosks: {e}");
+            return Err(Box::new(error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "sign-in is not working right now",
+            )));
+        }
+    };
+    let idle = at_kiosk.then_some(state.kiosk.idle_secs);
+    let token = users::start_session_via(&state.db, user, outside, idle, via)
+        .await
+        .map_err(|e| Box::new(e.into_response()))?;
+    if outside
+        && user.role == crate::api::Role::Admin
+        && let Some(n) = &state.notifier
+    {
+        n.post(format!(
+            "{} signed in to POP as an admin from outside the space.",
+            user.name
+        ));
+    }
+    Ok(token)
 }
 
 /// `DELETE /api/session`: sign out.
