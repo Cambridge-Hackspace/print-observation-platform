@@ -16,10 +16,13 @@ pub mod errors;
 #[cfg(feature = "fakes")]
 pub mod fakes;
 pub mod fleet;
+pub mod login;
 pub mod moonraker;
+pub mod prusalink;
 pub mod state;
 
 pub use driver::{Capabilities, Driver, DriverError, Reporter};
 pub use errors::{CatalogEntry, PrinterError, catalog, explain};
 pub use fleet::{Fleet, Printer, Update};
+pub use login::Login;
 pub use state::{Job, Layer, PrinterState, PrinterStatus};

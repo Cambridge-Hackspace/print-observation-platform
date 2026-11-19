@@ -643,6 +643,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "digest_auth"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3054f4e81d395e50822796c5e99ca522e6ba7be98947d6d4b0e5e61640bdb894"
+dependencies = [
+ "digest 0.10.7",
+ "hex",
+ "md-5",
+ "rand 0.8.8",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "displaydoc"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1818,11 +1831,15 @@ dependencies = [
 name = "pop-printers"
 version = "0.1.2"
 dependencies = [
+ "axum",
  "bytes",
+ "digest_auth",
  "futures-util",
  "hex",
+ "md-5",
  "pop-printers",
  "rcgen",
+ "reqwest",
  "rumqttc",
  "rustls",
  "serde",
