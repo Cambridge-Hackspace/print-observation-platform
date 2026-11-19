@@ -19,6 +19,8 @@ use pop_printers::{
     bambu::{Bambu, PinStore},
     fleet::{Backoff, Factory, Printer},
     moonraker::Moonraker,
+    octoprint::OctoPrint,
+    prusalink::PrusaLink,
 };
 use sqlx::SqlitePool;
 use tokio::{
@@ -55,6 +57,9 @@ struct Running {
     access_code: Option<String>,
     /// The login POP keeps for its camera, if any (#150).
     camera_login: Option<crate::secrets::CameraLogin>,
+    /// The login POP keeps for its own host, if any, for its address now
+    /// (#29, #30).
+    printer_login: Option<pop_printers::Login>,
     watched: bool,
 }
 
@@ -62,8 +67,10 @@ struct Running {
 fn factory(
     connection: &Connection,
     access_code: Option<&str>,
+    login: Option<&pop_printers::Login>,
     pins: &Arc<dyn PinStore>,
 ) -> Option<Factory> {
+    let login = login.cloned();
     match connection.clone() {
         Connection::Moonraker { url } => Some(Arc::new(move || {
             Box::new(Moonraker::new(url.clone(), None)) as Box<dyn Driver>
@@ -80,9 +87,20 @@ fn factory(
                 )) as Box<dyn Driver>
             }))
         }
-        Connection::OctoPrint { .. }
-        | Connection::PrusaLink { .. }
-        | Connection::UsbSerial { .. } => None,
+        Connection::OctoPrint { url } => {
+            // OctoPrint's login is its API key; a user and password is not.
+            let key = match login {
+                Some(pop_printers::Login::ApiKey(k)) => Some(k),
+                _ => None,
+            };
+            Some(Arc::new(move || {
+                Box::new(OctoPrint::new(url.clone(), key.clone())) as Box<dyn Driver>
+            }))
+        }
+        Connection::PrusaLink { url } => Some(Arc::new(move || {
+            Box::new(PrusaLink::new(url.clone(), login.clone())) as Box<dyn Driver>
+        })),
+        Connection::UsbSerial { .. } => None,
     }
 }
 
@@ -175,7 +193,30 @@ async fn reconcile(r: &Runner, fleet: &mut Fleet, running: &mut BTreeMap<String,
                     }
                     _ => None,
                 };
-                wanted.insert(a.asset.id.clone(), (config, access_code, camera_login));
+                // The printer's own login, only for the address it was
+                // entered for: one changed in BAM! is not given it.
+                let printer_login = match crate::printers::login_host(&config.connection) {
+                    Some(url) => match r.secrets.printer_login(&r.db, &a.asset.id).await {
+                        Ok(Some(l)) if l.origin == crate::cameras::origin(url) => Some(l.login),
+                        Ok(Some(_)) => {
+                            tracing::warn!(
+                                "{}: its address changed in BAM!, so POP does not sign in to it with the login entered for the old one: enter it again on the desk",
+                                config.name
+                            );
+                            None
+                        }
+                        Ok(None) => None,
+                        Err(e) => {
+                            tracing::error!("{}: its login: {e}", config.name);
+                            None
+                        }
+                    },
+                    None => None,
+                };
+                wanted.insert(
+                    a.asset.id.clone(),
+                    (config, access_code, camera_login, printer_login),
+                );
             }
             Err(problems) => tracing::warn!(
                 "{} is added to the tower but cannot run until it is right in BAM!: {}",
@@ -195,12 +236,18 @@ async fn reconcile(r: &Runner, fleet: &mut Fleet, running: &mut BTreeMap<String,
         }
         keep
     });
-    for (id, (config, access_code, camera_login)) in wanted {
-        let f = factory(&config.connection, access_code.as_deref(), &r.pins);
+    for (id, (config, access_code, camera_login, printer_login)) in wanted {
+        let f = factory(
+            &config.connection,
+            access_code.as_deref(),
+            printer_login.as_ref(),
+            &r.pins,
+        );
         let next = Running {
             config,
             access_code,
             camera_login,
+            printer_login,
             watched: f.is_some(),
         };
         if running.get(&id) == Some(&next) {

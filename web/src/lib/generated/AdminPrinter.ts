@@ -46,4 +46,14 @@ camera_login_fits: boolean,
 /**
  * Whether POP holds a login for its camera (#150).
  */
-camera_login: boolean, };
+camera_login: boolean, 
+/**
+ * Whether it is reached through a host that may ask for a login of its
+ * own: OctoPrint (an API key) or PrusaLink (a user and password, or a
+ * key) (#29, #30).
+ */
+printer_login_fits: boolean, 
+/**
+ * Whether POP holds that login, for the address BAM! gives now.
+ */
+printer_login: boolean, };

@@ -25,6 +25,8 @@ const printer = (name: string, more: Partial<AdminPrinter> = {}): AdminPrinter =
   access_code: false,
   camera_login_fits: false,
   camera_login: false,
+  printer_login_fits: false,
+  printer_login: false,
   ...more,
 });
 
@@ -87,11 +89,11 @@ function pop(start: { me: User | null; printers: AdminPrinter[]; refuse?: string
       if (url === '/api/admin/users' && method === 'GET') return json([]);
       if (url === '/api/admin/kiosks' && method === 'GET') return json([]);
       if (url === '/api/admin/updater') return json({ running: '0.2.0', last: { at: 1, kind: 'rolled_back', version: 'v0.3.0', summary: 'v0.3.0 failed its health check: back to v0.2.0' } });
-      const kept = /^\/api\/admin\/printers\/([^/]+)\/(access-code|camera-login)$/.exec(url);
+      const kept = /^\/api\/admin\/printers\/([^/]+)\/(access-code|camera-login|printer-login)$/.exec(url);
       if (kept) {
         if (start.refuse) return json({ error: start.refuse }, 403);
         const id = decodeURIComponent(kept[1]!);
-        const field = kept[2] === 'access-code' ? 'access_code' : 'camera_login';
+        const field = { 'access-code': 'access_code', 'camera-login': 'camera_login', 'printer-login': 'printer_login' }[kept[2]!]!;
         printers = printers.map((p) =>
           p.bam_id === id ? { ...p, [field]: method === 'PUT', ready: field === 'access_code' ? true : p.ready, problems: [] } : p,
         );
@@ -307,6 +309,57 @@ describe('the admin desk', () => {
     await fireEvent.click(r.getByRole('button', { name: 'Remove the login for Voron 2.4’s camera' }));
     await waitFor(() => expect(r.getAllByTestId('kept')[0]!.textContent).toContain('Camera login: none'));
     expect(calls.filter((c) => c.method === 'DELETE').map((c) => c.url)).toContain('/api/admin/printers/id-Voron%202.4/camera-login');
+  });
+
+  it('enters a PrusaLink login as user and password, or a key for one on a Pi, and removes it (#30)', async () => {
+    const calls = pop({
+      me: ASH,
+      printers: [printer('MK4', { connection: 'prusalink', printer_login_fits: true })],
+    });
+    const r = render(Admin);
+    await waitFor(() => expect(r.getAllByTestId('kept')[0]!.textContent).toContain('Printer login: none'));
+    await fireEvent.click(r.getByRole('button', { name: 'Enter the login for MK4' }));
+    // On the printer, its user is usually "maker": filled in.
+    expect((r.getByLabelText('Username') as HTMLInputElement).value).toBe('maker');
+    expect(r.queryByLabelText('API key')).toBeNull();
+    await fireEvent.input(r.getByLabelText('Password'), { target: { value: 's3cret' } });
+    await fireEvent.submit(r.getByTestId('secret-form'));
+    await waitFor(() => expect(r.getAllByTestId('kept')[0]!.textContent).toContain('Printer login: entered'));
+    expect(calls.find((c) => c.method === 'PUT')).toMatchObject({
+      url: '/api/admin/printers/id-MK4/printer-login',
+      body: { username: 'maker', password: 's3cret' },
+    });
+    // On a Raspberry Pi, a key instead (once the first save has closed its form).
+    await waitFor(() => expect(r.queryByTestId('secret-form')).toBeNull());
+    await fireEvent.click(r.getByRole('button', { name: 'Change the login for MK4' }));
+    await fireEvent.click(r.getByLabelText('On a Raspberry Pi'));
+    expect(r.queryByLabelText('Password')).toBeNull();
+    await fireEvent.input(r.getByLabelText('API key'), { target: { value: 'ABC123' } });
+    await fireEvent.submit(r.getByTestId('secret-form'));
+    await waitFor(() => expect(calls.filter((c) => c.method === 'PUT')).toHaveLength(2));
+    expect(calls.filter((c) => c.method === 'PUT')[1]).toMatchObject({ body: { api_key: 'ABC123' } });
+    await fireEvent.click(r.getByRole('button', { name: 'Remove the login for MK4' }));
+    await waitFor(() => expect(r.getAllByTestId('kept')[0]!.textContent).toContain('Printer login: none'));
+    expect(calls.filter((c) => c.method === 'DELETE').map((c) => c.url)).toContain('/api/admin/printers/id-MK4/printer-login');
+  });
+
+  it('asks an OctoPrint printer for its API key only (#29)', async () => {
+    const calls = pop({
+      me: ASH,
+      printers: [printer('Ender 3', { connection: 'octoprint', printer_login_fits: true })],
+    });
+    const r = render(Admin);
+    await waitFor(() => expect(r.getAllByTestId('kept')[0]!.textContent).toContain('API key: none'));
+    await fireEvent.click(r.getByRole('button', { name: 'Enter the login for Ender 3' }));
+    expect(r.queryByLabelText('Username')).toBeNull();
+    expect(r.queryByLabelText('On a Raspberry Pi')).toBeNull();
+    await fireEvent.input(r.getByLabelText('API key'), { target: { value: ' A1B2C3 ' } });
+    await fireEvent.submit(r.getByTestId('secret-form'));
+    await waitFor(() => expect(r.getAllByTestId('kept')[0]!.textContent).toContain('API key: entered'));
+    expect(calls.find((c) => c.method === 'PUT')).toMatchObject({
+      url: '/api/admin/printers/id-Ender%203/printer-login',
+      body: { api_key: 'A1B2C3' },
+    });
   });
 
   it('keeps the form open and says why when POP refuses a secret', async () => {

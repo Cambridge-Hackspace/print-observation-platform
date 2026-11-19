@@ -56,6 +56,19 @@ pub struct Secrets {
 
 const ACCESS_CODE: &str = "access_code";
 const CAMERA_LOGIN: &str = "camera_login";
+const PRINTER_LOGIN: &str = "printer_login";
+
+/// A printer's own login, as POP keeps it (#29, #30): OctoPrint's API key,
+/// PrusaLink's user and password or key.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct PrinterLogin {
+    /// Its Debug never shows the secret.
+    pub login: pop_printers::Login,
+    /// Where it was entered for, as a camera login's origin is: POP signs
+    /// in to that address only, so changing it in BAM! cannot send the
+    /// login somewhere else.
+    pub origin: String,
+}
 
 /// A camera's login, as POP keeps it for a printer (#150).
 #[derive(Clone, PartialEq, Eq)]
@@ -175,6 +188,66 @@ impl Secrets {
                 .fetch_all(db)
                 .await?,
         )
+    }
+
+    /// Keep a printer's own login (#29, #30).
+    pub async fn set_printer_login(
+        &self,
+        db: &SqlitePool,
+        bam_id: &str,
+        login: &PrinterLogin,
+    ) -> Result<(), SecretError> {
+        let v = match &login.login {
+            pop_printers::Login::Digest { username, password } => serde_json::json!({
+                "kind": "digest", "username": username, "password": password, "origin": login.origin,
+            }),
+            pop_printers::Login::ApiKey(key) => serde_json::json!({
+                "kind": "api_key", "key": key, "origin": login.origin,
+            }),
+        };
+        self.seal_for_printer(db, bam_id, PRINTER_LOGIN, &v.to_string())
+            .await
+    }
+
+    /// A printer's own login, if POP holds one.
+    pub async fn printer_login(
+        &self,
+        db: &SqlitePool,
+        bam_id: &str,
+    ) -> Result<Option<PrinterLogin>, SecretError> {
+        let Some(s) = self.open_for_printer(db, bam_id, PRINTER_LOGIN).await? else {
+            return Ok(None);
+        };
+        let v: serde_json::Value =
+            serde_json::from_str(&s).map_err(|_| SecretError::WillNotOpen)?;
+        let origin = v["origin"]
+            .as_str()
+            .ok_or(SecretError::WillNotOpen)?
+            .to_owned();
+        let login = match (
+            v["kind"].as_str(),
+            v["username"].as_str(),
+            v["password"].as_str(),
+            v["key"].as_str(),
+        ) {
+            (Some("digest"), Some(u), Some(p), _) => pop_printers::Login::Digest {
+                username: u.to_owned(),
+                password: p.to_owned(),
+            },
+            (Some("api_key"), _, _, Some(k)) => pop_printers::Login::ApiKey(k.to_owned()),
+            _ => return Err(SecretError::WillNotOpen),
+        };
+        Ok(Some(PrinterLogin { login, origin }))
+    }
+
+    /// Forget a printer's own login; whether there was one.
+    pub async fn clear_printer_login(db: &SqlitePool, bam_id: &str) -> Result<bool, SecretError> {
+        let done = sqlx::query("DELETE FROM printer_secrets WHERE bam_id = ? AND kind = ?")
+            .bind(bam_id)
+            .bind(PRINTER_LOGIN)
+            .execute(db)
+            .await?;
+        Ok(done.rows_affected() > 0)
     }
 
     async fn seal_for_printer(

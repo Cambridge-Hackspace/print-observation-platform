@@ -136,7 +136,9 @@ In BAM!, give POP a token whose role has only `assets.read` and
 the admin desk, signed in as an admin, each printer in the category is
 offered under **New in BAM!**: add the ones the tower runs. A Bambu printer
 also needs its LAN access code, entered on the desk: **Enter its access code**
-on its banner, or **Enter** in its **Kept in POP** column (docs/printers/bambu.md).
+on its banner, or **Enter** in its **Kept in POP** column (docs/printers/bambu.md). A printer behind OctoPrint or PrusaLink
+needs its API key or login, entered the same way (docs/printers/octoprint.md,
+docs/printers/prusalink.md).
 
 Check it: the tower (`/kiosk`) shows each added printer, live.
 

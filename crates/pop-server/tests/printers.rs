@@ -682,3 +682,246 @@ async fn a_camera_login_is_refused_when_it_cannot_be_kept_rightly() {
         "{body}"
     );
 }
+
+// ---- a printer's own login (#29, #30) ----
+
+impl Pop {
+    async fn enter_printer_login(&self, bam_id: &str, body: Value) -> (StatusCode, Value) {
+        let (c, b, _) = self
+            .send(
+                Method::PUT,
+                &format!("/api/admin/printers/{bam_id}/printer-login"),
+                Some(&self.admin),
+                Some(body),
+                LOCAL,
+            )
+            .await;
+        (c, b)
+    }
+
+    async fn count_secrets(&self) -> i64 {
+        sqlx::query_scalar("SELECT COUNT(*) FROM printer_secrets")
+            .fetch_one(&self.db)
+            .await
+            .unwrap()
+    }
+}
+
+#[tokio::test]
+async fn a_prusalink_login_is_entered_kept_sealed_bound_recorded_and_removed() {
+    let pop = pop().await;
+    let mk4 = pop.fake.id("mk4").to_owned();
+    let row = named(&pop.printers().await, "MK4").clone();
+    assert_eq!(row["printer_login_fits"], true, "{row}");
+    assert_eq!(row["printer_login"], false);
+
+    let (code, body) = pop
+        .enter_printer_login(&mk4, json!({"username": "maker", "password": "s3cret-pw"}))
+        .await;
+    assert_eq!(code, StatusCode::NO_CONTENT, "{body}");
+    assert_eq!(named(&pop.printers().await, "MK4")["printer_login"], true);
+    let opened = Secrets::new(KEY)
+        .printer_login(&pop.db, &mk4)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        opened.login,
+        pop_printers::Login::Digest {
+            username: "maker".into(),
+            password: "s3cret-pw".into()
+        }
+    );
+    assert_eq!(opened.origin, "http://192.168.1.52");
+    assert!(
+        !format!("{opened:?}").contains("s3cret-pw"),
+        "Debug shows the password"
+    );
+    let sealed: Vec<u8> = sqlx::query_scalar("SELECT sealed FROM printer_secrets")
+        .fetch_one(&pop.db)
+        .await
+        .unwrap();
+    assert!(!String::from_utf8_lossy(&sealed).contains("s3cret-pw"));
+    // Moved to be a camera login, it does not open as one: the kind is
+    // sealed in with it.
+    sqlx::query("UPDATE printer_secrets SET kind = 'camera_login'")
+        .execute(&pop.db)
+        .await
+        .unwrap();
+    assert_eq!(
+        Secrets::new(KEY).camera_login(&pop.db, &mk4).await,
+        Err(SecretError::WillNotOpen)
+    );
+    sqlx::query("UPDATE printer_secrets SET kind = 'printer_login'")
+        .execute(&pop.db)
+        .await
+        .unwrap();
+
+    // Given another address in BAM!, the login no longer counts for it.
+    pop.fake
+        .edit_without_event(&mk4, "address", "http://192.168.1.99");
+    assert_eq!(named(&pop.printers().await, "MK4")["printer_login"], false);
+    pop.fake
+        .edit_without_event(&mk4, "address", "http://192.168.1.52");
+    assert_eq!(named(&pop.printers().await, "MK4")["printer_login"], true);
+
+    let uri = format!("/api/admin/printers/{mk4}/printer-login");
+    let (code, _, _) = pop
+        .send(Method::DELETE, &uri, Some(&pop.admin), None, LOCAL)
+        .await;
+    assert_eq!(code, StatusCode::NO_CONTENT);
+    assert_eq!(named(&pop.printers().await, "MK4")["printer_login"], false);
+    let (code, _, _) = pop
+        .send(Method::DELETE, &uri, Some(&pop.admin), None, LOCAL)
+        .await;
+    assert_eq!(code, StatusCode::NOT_FOUND, "nothing left to remove");
+
+    let (_, log, _) = pop
+        .send(
+            Method::GET,
+            "/api/admin/audit",
+            Some(&pop.admin),
+            None,
+            LOCAL,
+        )
+        .await;
+    let said: Vec<_> = log
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["kind"].as_str().unwrap().starts_with("printer_login"))
+        .map(|e| (e["kind"].as_str().unwrap(), e["summary"].as_str().unwrap()))
+        .collect();
+    assert!(
+        said.contains(&("printer_login_set", "Ada entered the login for MK4")),
+        "{said:?}"
+    );
+    assert!(
+        said.contains(&("printer_login_cleared", "Ada removed the login for MK4")),
+        "{said:?}"
+    );
+    assert!(
+        !log.to_string().contains("s3cret-pw"),
+        "the password reached the audit log"
+    );
+}
+
+#[tokio::test]
+async fn octoprint_takes_an_api_key_and_nothing_else() {
+    let pop = pop().await;
+    let voron = pop.fake.id("voron").to_owned();
+    pop.fake
+        .edit_without_event(&voron, "connection", "octoprint");
+    pop.fake
+        .edit_without_event(&voron, "address", "http://octopi.local");
+    assert_eq!(
+        named(&pop.printers().await, "Voron 2.4")["printer_login_fits"],
+        true
+    );
+    let (code, body) = pop
+        .enter_printer_login(&voron, json!({"username": "pi", "password": "raspberry"}))
+        .await;
+    assert_eq!(code, StatusCode::BAD_REQUEST, "{body}");
+    assert!(
+        body["error"].as_str().unwrap().contains("API key"),
+        "{body}"
+    );
+    assert_eq!(pop.count_secrets().await, 0);
+    let (code, body) = pop
+        .enter_printer_login(
+            &voron,
+            json!({"api_key": "A1B2C3D4E5F60718293A4B5C6D7E8F90"}),
+        )
+        .await;
+    assert_eq!(code, StatusCode::NO_CONTENT, "{body}");
+    let opened = Secrets::new(KEY)
+        .printer_login(&pop.db, &voron)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        opened.login,
+        pop_printers::Login::ApiKey("A1B2C3D4E5F60718293A4B5C6D7E8F90".into())
+    );
+    assert_eq!(opened.origin, "http://octopi.local");
+    let (_, log, _) = pop
+        .send(
+            Method::GET,
+            "/api/admin/audit",
+            Some(&pop.admin),
+            None,
+            LOCAL,
+        )
+        .await;
+    assert!(
+        log.to_string()
+            .contains("Ada entered the API key for Voron 2.4"),
+        "{log}"
+    );
+    assert!(
+        !log.to_string().contains("A1B2C3D4E5F6"),
+        "the key reached the audit log"
+    );
+}
+
+#[tokio::test]
+async fn a_printer_login_is_refused_when_it_cannot_be_kept_rightly() {
+    let pop = pop().await;
+    let mk4 = pop.fake.id("mk4").to_owned();
+    // Signed out.
+    let (code, _, _) = pop
+        .send(
+            Method::PUT,
+            &format!("/api/admin/printers/{mk4}/printer-login"),
+            None,
+            Some(json!({"api_key": "k"})),
+            REMOTE,
+        )
+        .await;
+    assert_eq!(code, StatusCode::UNAUTHORIZED);
+    // What cannot be one.
+    for bad in [
+        json!({}),
+        json!({"api_key": "k", "username": "maker", "password": "pw"}),
+        json!({"username": "maker"}),
+        json!({"password": "pw"}),
+        json!({"api_key": "has a space"}),
+        json!({"api_key": "k".repeat(129)}),
+        json!({"username": "maker", "password": "line\nbreak"}),
+        json!({"username": "u".repeat(65), "password": "pw"}),
+    ] {
+        let (code, body) = pop.enter_printer_login(&mk4, bad.clone()).await;
+        assert_eq!(code, StatusCode::BAD_REQUEST, "{bad} {body}");
+    }
+    // Printers whose connection takes no such login.
+    for (name, said) in [("x1", "bambu"), ("voron", "moonraker")] {
+        let (code, body) = pop
+            .enter_printer_login(pop.fake.id(name), json!({"api_key": "k"}))
+            .await;
+        assert_eq!(code, StatusCode::CONFLICT, "{name} {body}");
+        assert!(body["error"].as_str().unwrap().contains(said), "{body}");
+    }
+    // A printer BAM! does not have.
+    let (code, _) = pop
+        .enter_printer_login(
+            "00000000-0000-4000-8000-000000000000",
+            json!({"api_key": "k"}),
+        )
+        .await;
+    assert_eq!(code, StatusCode::NOT_FOUND);
+    assert_eq!(pop.count_secrets().await, 0, "kept one it refused");
+    // Without a secrets key: refused, never kept in plain text.
+    let pop = pop_with(TOKEN, "", true).await;
+    let (code, body) = pop
+        .enter_printer_login(
+            pop.fake.id("mk4"),
+            json!({"username": "maker", "password": "pw"}),
+        )
+        .await;
+    assert_eq!(code, StatusCode::CONFLICT);
+    assert!(
+        body["error"].as_str().unwrap().contains("POP_SECRETS_KEY"),
+        "{body}"
+    );
+    assert_eq!(pop.count_secrets().await, 0);
+}

@@ -20,6 +20,8 @@ const VORON: AdminPrinter = {
   access_code: false,
   camera_login_fits: false,
   camera_login: false,
+  printer_login_fits: false,
+  printer_login: false,
 };
 
 interface Call {
