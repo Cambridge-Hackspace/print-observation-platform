@@ -97,7 +97,15 @@ pub enum Need {
     /// a slicer's routes, and nothing else. No other need is met by a key,
     /// and a key meets no other need.
     Key,
+    /// An enrolled, unrevoked kiosk's own credential (#19): the kiosk's
+    /// routes, such as a card tap at its reader, which is for that kiosk and
+    /// for nobody else. The kiosk's id goes to the handler as a [`KioskId`].
+    Kiosk,
 }
+
+/// The kiosk a [`Need::Kiosk`] route's request came from, by its id.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct KioskId(pub i64);
 
 /// From where a route may be reached, beside its [`Need`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -264,6 +272,25 @@ async fn require(
     if need == Need::Key {
         return with_key(&state, req, next).await;
     }
+    if need == Need::Kiosk {
+        return match crate::kiosks::kiosk_of(&state.db, req.headers()).await {
+            Ok(Some(id)) => {
+                req.extensions_mut().insert(KioskId(id));
+                next.run(req).await
+            }
+            Ok(None) => refuse(
+                StatusCode::UNAUTHORIZED,
+                "this screen is not an enrolled kiosk",
+            ),
+            Err(e) => {
+                tracing::error!("kiosks: {e}");
+                refuse(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "POP is not working right now",
+                )
+            }
+        };
+    }
     let user = match session_token(req.headers()) {
         None => None,
         Some(t) => match crate::users::session_user(&state.db, &t).await {
@@ -296,6 +323,10 @@ async fn require(
         // Answered by with_key above; refused here, never let through, if
         // that ever changes.
         Need::Key => Some((StatusCode::UNAUTHORIZED, "this needs your POP API key")),
+        Need::Kiosk => Some((
+            StatusCode::UNAUTHORIZED,
+            "this screen is not an enrolled kiosk",
+        )),
     };
     if let Some((code, why)) = refused {
         return refuse(code, why);

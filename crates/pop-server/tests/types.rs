@@ -17,7 +17,10 @@ use pop_server::api::{
     NotifySettings, PublicGuide, PublicGuideList, ReportTaken, Role, ServerEvent, SignIn, Snapshot,
     Status, TowerPrinter, TowerState, UpdaterStatus, User,
 };
-use pop_server::api::{ApiKey, CreatedApiKey, Kiosk, NewApiKey, NewKiosk, SessionInfo};
+use pop_server::api::{
+    ApiKey, CreatedApiKey, Kiosk, KioskCardReader, NewApiKey, NewKiosk, SessionInfo,
+};
+use pop_server::card_sign_in::{KioskTap, TakeTap, TapView};
 use ts_rs::TS;
 
 fn generated_dir() -> PathBuf {
@@ -87,6 +90,10 @@ fn export(dir: &Path) {
     // Kiosks (#12).
     Kiosk::export_all_to(dir).unwrap();
     NewKiosk::export_all_to(dir).unwrap();
+    KioskCardReader::export_all_to(dir).unwrap();
+    KioskTap::export_all_to(dir).unwrap();
+    TapView::export_all_to(dir).unwrap();
+    TakeTap::export_all_to(dir).unwrap();
     SessionInfo::export_all_to(dir).unwrap();
 }
 

@@ -21,8 +21,16 @@ function pop(start: Kiosk[]) {
       calls.push({ method, url, body });
       if (url === '/api/admin/kiosks' && method === 'GET') return json(kiosks);
       if (url === '/api/admin/kiosks' && method === 'POST') {
-        kiosks = [...kiosks, { id: kiosks.length + 1, name: body.name, enrolled_at: 1, revoked: false, last_seen_at: null, last_address: null }];
+        kiosks = [...kiosks, { id: kiosks.length + 1, name: body.name, enrolled_at: 1, revoked: false, last_seen_at: null, last_address: null, card_resource: null }];
         return json({ id: kiosks.length }, 201);
+      }
+      const r = /^\/api\/admin\/kiosks\/(\d+)\/card-reader$/.exec(url);
+      if (r && method === 'PUT') {
+        if (kiosks.some((k) => k.card_resource === body.resource && k.id !== Number(r[1]))) {
+          return json({ error: 'another kiosk already has that card reader: take it off that one first' }, 409);
+        }
+        kiosks = kiosks.map((k) => (k.id === Number(r[1]) ? { ...k, card_resource: body.resource || null } : k));
+        return new Response(null, { status: 204 });
       }
       const m = /^\/api\/admin\/kiosks\/(\d+)$/.exec(url);
       if (m && method === 'DELETE') {
@@ -63,8 +71,8 @@ describe('the desk’s kiosks', () => {
 
   it('shows where and when each kiosk last checked in, and revokes one', async () => {
     const calls = pop([
-      { id: 1, name: 'The tower', enrolled_at: 1, revoked: false, last_seen_at: SEEN, last_address: '192.168.1.5' },
-      { id: 2, name: 'Old screen', enrolled_at: 1, revoked: true, last_seen_at: null, last_address: null },
+      { id: 1, name: 'The tower', enrolled_at: 1, revoked: false, last_seen_at: SEEN, last_address: '192.168.1.5', card_resource: null },
+      { id: 2, name: 'Old screen', enrolled_at: 1, revoked: true, last_seen_at: null, last_address: null, card_resource: null },
     ]);
     const r = render(Kiosks);
     await waitFor(() => expect(r.getAllByTestId('kiosk')).toHaveLength(2));
@@ -75,6 +83,37 @@ describe('the desk’s kiosks', () => {
     await fireEvent.click(r.getByRole('button', { name: 'Revoke the kiosk The tower' }));
     await waitFor(() => expect(r.getAllByTestId('kiosk')[0]!.textContent).toContain('Revoked'));
     expect(calls.filter((c) => c.method === 'DELETE').map((c) => c.url)).toEqual(['/api/admin/kiosks/1']);
+  });
+
+  it('sets, shows and clears a kiosk’s card reader, and says when another has it (#19)', async () => {
+    const calls = pop([
+      { id: 1, name: 'The tower', enrolled_at: 1, revoked: false, last_seen_at: SEEN, last_address: '192.168.1.5', card_resource: null },
+      { id: 2, name: 'Spare', enrolled_at: 1, revoked: false, last_seen_at: null, last_address: null, card_resource: 'tower-2' },
+      { id: 3, name: 'Old screen', enrolled_at: 1, revoked: true, last_seen_at: null, last_address: null, card_resource: null },
+    ]);
+    const r = render(Kiosks);
+    await waitFor(() => expect(r.getAllByTestId('kiosk')).toHaveLength(3));
+    const fields = () => r.getAllByTestId('kiosk-reader') as HTMLInputElement[];
+    // A revoked kiosk has no reader to set.
+    expect(fields().map((f) => f.value)).toEqual(['', 'tower-2']);
+
+    await fireEvent.input(fields()[0]!, { target: { value: ' tower-1 ' } });
+    await fireEvent.click(r.getByRole('button', { name: 'Save the card reader of The tower' }));
+    await waitFor(() => expect(r.getByRole('status').textContent).toBe('A card tap at tower-1 now signs in at The tower.'));
+    expect(calls.find((c) => c.method === 'PUT')).toMatchObject({ url: '/api/admin/kiosks/1/card-reader', body: { resource: 'tower-1' } });
+    await waitFor(() => expect(fields()[0]!.value).toBe('tower-1'));
+
+    // Another kiosk's reader: POP's words, and nothing changed.
+    await fireEvent.input(fields()[0]!, { target: { value: 'tower-2' } });
+    await fireEvent.click(r.getByRole('button', { name: 'Save the card reader of The tower' }));
+    await waitFor(() => expect(r.getByRole('alert').textContent).toContain('another kiosk already has that card reader'));
+    await waitFor(() => expect(fields()[0]!.value).toBe('tower-1'));
+
+    // Emptied, it is cleared.
+    await fireEvent.input(fields()[1]!, { target: { value: '' } });
+    await fireEvent.click(r.getByRole('button', { name: 'Save the card reader of Spare' }));
+    await waitFor(() => expect(r.getByRole('status').textContent).toBe('Spare has no card reader now.'));
+    expect(calls.filter((c) => c.method === 'PUT').at(-1)).toMatchObject({ url: '/api/admin/kiosks/2/card-reader', body: { resource: '' } });
   });
 
   it('says how long ago, in words', () => {

@@ -303,6 +303,8 @@ pub enum AuditKind {
     KioskEnrolled,
     /// An admin revoked a kiosk.
     KioskRevoked,
+    /// An admin set or cleared a kiosk's card reader (#19).
+    KioskReaderSet,
     /// The updater looked for a release (#148).
     UpdateChecked,
     /// The updater found one, and waited: a print, or outside its hours.
@@ -583,6 +585,15 @@ pub struct Kiosk {
     #[ts(type = "number | null")]
     pub last_seen_at: Option<i64>,
     pub last_address: Option<String>,
+    /// The CS:S resource its card reader is (#19), if it has one.
+    pub card_resource: Option<String>,
+}
+
+/// `PUT /api/admin/kiosks/{id}/card-reader` (#19): the CS:S resource a
+/// kiosk's card reader is, as the reader names it; empty for none.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, TS)]
+pub struct KioskCardReader {
+    pub resource: String,
 }
 
 /// The body of every API error.

@@ -11,4 +11,8 @@ enrolled_at: number, revoked: boolean,
 /**
  * Its last check-in, in Unix seconds, and the address it came from.
  */
-last_seen_at: number | null, last_address: string | null, };
+last_seen_at: number | null, last_address: string | null, 
+/**
+ * The CS:S resource its card reader is (#19), if it has one.
+ */
+card_resource: string | null, };

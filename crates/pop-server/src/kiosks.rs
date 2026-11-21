@@ -165,14 +165,22 @@ pub async fn enroll(
 }
 
 /// A kiosk as the table holds it: id, name, enrolled_at, revoked_at,
-/// last_seen_at, last_address.
-type KioskRow = (i64, String, i64, Option<i64>, Option<i64>, Option<String>);
+/// last_seen_at, last_address, card_resource.
+type KioskRow = (
+    i64,
+    String,
+    i64,
+    Option<i64>,
+    Option<i64>,
+    Option<String>,
+    Option<String>,
+);
 
 /// `GET /api/admin/kiosks`: every kiosk ever enrolled, revoked ones included.
 pub async fn list(State(state): State<AppState>) -> Response {
     let rows: Result<Vec<KioskRow>, _> =
         sqlx::query_as(
-            "SELECT id, name, enrolled_at, revoked_at, last_seen_at, last_address FROM kiosks ORDER BY id",
+            "SELECT id, name, enrolled_at, revoked_at, last_seen_at, last_address, card_resource FROM kiosks ORDER BY id",
         )
         .fetch_all(&state.db)
         .await;
@@ -180,13 +188,24 @@ pub async fn list(State(state): State<AppState>) -> Response {
         Ok(rows) => Json(
             rows.into_iter()
                 .map(
-                    |(id, name, enrolled_at, revoked_at, last_seen_at, last_address)| Kiosk {
+                    |(
                         id,
                         name,
                         enrolled_at,
-                        revoked: revoked_at.is_some(),
+                        revoked_at,
                         last_seen_at,
                         last_address,
+                        card_resource,
+                    )| {
+                        Kiosk {
+                            id,
+                            name,
+                            enrolled_at,
+                            revoked: revoked_at.is_some(),
+                            last_seen_at,
+                            last_address,
+                            card_resource,
+                        }
                     },
                 )
                 .collect::<Vec<_>>(),
@@ -194,6 +213,75 @@ pub async fn list(State(state): State<AppState>) -> Response {
         .into_response(),
         Err(e) => error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
     }
+}
+
+/// `PUT /api/admin/kiosks/{id}/card-reader` (#19): which CS:S resource this
+/// kiosk's card reader is, as the reader names it (its id, or its external
+/// id); empty for none. A reader belongs to one enrolled kiosk at a time.
+pub async fn set_card_reader(
+    State(state): State<AppState>,
+    Extension(admin): Extension<User>,
+    Path(id): Path<i64>,
+    body: Result<Json<crate::api::KioskCardReader>, axum::extract::rejection::JsonRejection>,
+) -> Response {
+    let Json(body) = match body {
+        Ok(b) => b,
+        Err(e) => return error(StatusCode::BAD_REQUEST, e.body_text()),
+    };
+    let resource = body.resource.trim();
+    if resource.chars().count() > 128 || resource.chars().any(char::is_control) {
+        return error(
+            StatusCode::BAD_REQUEST,
+            "resource: the CS:S resource the reader is, as it names it, at most 128 characters",
+        );
+    }
+    let resource = (!resource.is_empty()).then_some(resource);
+    let done = async {
+        let mut tx = state.db.begin().await?;
+        let name: Option<String> = sqlx::query_scalar(
+            "UPDATE kiosks SET card_resource = ? WHERE id = ? AND revoked_at IS NULL RETURNING name",
+        )
+        .bind(resource)
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?;
+        if let Some(name) = &name {
+            audit::record(
+                &mut tx,
+                &Actor::user(admin.id, &admin.name),
+                Event {
+                    kind: AuditKind::KioskReaderSet,
+                    printer: None,
+                    subject: None,
+                    summary: match resource {
+                        Some(r) => format!("{} set the kiosk {name}'s card reader to {r}", admin.name),
+                        None => format!("{} took the card reader off the kiosk {name}", admin.name),
+                    },
+                },
+            )
+            .await?;
+        }
+        tx.commit().await?;
+        Ok::<Option<String>, sqlx::Error>(name)
+    }
+    .await;
+    match done {
+        Ok(Some(_)) => StatusCode::NO_CONTENT.into_response(),
+        Ok(None) => error(StatusCode::NOT_FOUND, "no such kiosk, or it is revoked"),
+        Err(sqlx::Error::Database(e)) if e.is_unique_violation() => error(
+            StatusCode::CONFLICT,
+            "another kiosk already has that card reader: take it off that one first",
+        ),
+        Err(e) => error(StatusCode::SERVICE_UNAVAILABLE, e.to_string()),
+    }
+}
+
+/// The enrolled kiosk whose card reader is `resource` (#19), if any.
+pub async fn with_card_reader(db: &SqlitePool, resource: &str) -> Result<Option<i64>, sqlx::Error> {
+    sqlx::query_scalar("SELECT id FROM kiosks WHERE card_resource = ? AND revoked_at IS NULL")
+        .bind(resource)
+        .fetch_optional(db)
+        .await
 }
 
 /// `DELETE /api/admin/kiosks/{id}`: revoke a kiosk. Its credential stops

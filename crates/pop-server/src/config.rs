@@ -33,6 +33,40 @@ pub struct Config {
     pub kiosk: Kiosk,
     pub feedback: Feedback,
     pub sign_in: SignIn,
+    pub card_sign_in: CardSignIn,
+}
+
+/// A card tap at a kiosk's reader signs the member in (#19), where CS:S
+/// signs members in by card (Cambridge-Hackspace/cooperative-systems-spaces#241):
+/// docs/integrations/card-sign-in.md. Off while `broker` is empty.
+#[derive(Clone, PartialEq, Eq, Deserialize, Default)]
+#[serde(deny_unknown_fields, default)]
+pub struct CardSignIn {
+    /// The `[[sign_in.providers]]` a tap is redeemed with, by its id: CS:S,
+    /// with POP's client secret.
+    pub provider: String,
+    /// The space's broker, where CS:S's edge answers each tap:
+    /// `mqtt://host[:port]` or `mqtts://host[:port]`.
+    pub broker: String,
+    /// POP's login on the broker, if it asks for one.
+    pub username: String,
+    /// A secret: give it as `POP_CARD_SIGN_IN_PASSWORD`, not here.
+    pub password: String,
+}
+
+impl fmt::Debug for CardSignIn {
+    // Never the password.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CardSignIn")
+            .field("provider", &self.provider)
+            .field("broker", &self.broker)
+            .field("username", &self.username)
+            .field(
+                "password",
+                &if self.password.is_empty() { "" } else { "****" },
+            )
+            .finish()
+    }
 }
 
 /// Signing in through OpenID Connect providers (#14), CS:S first (#16),
@@ -315,6 +349,37 @@ pub struct Access {
 
 impl Config {
     /// The sign-in providers' settings, each named by its place in the list.
+    /// A card sign-in needs a broker that parses, and a provider that exists
+    /// and can keep a secret: CS:S gives card sign-ins only to an app that
+    /// has one.
+    fn validate_card_sign_in(&self) -> Result<(), ConfigError> {
+        let c = &self.card_sign_in;
+        if c.broker.is_empty() {
+            return Ok(());
+        }
+        pop_integrations::card_taps::Broker::parse(&c.broker, &c.username, &c.password)
+            .map_err(|e| err("card_sign_in.broker", e))?;
+        let Some(p) = self.sign_in.providers.iter().find(|p| p.id == c.provider) else {
+            return Err(err(
+                "card_sign_in.provider",
+                format!(
+                    "{:?}: expected the id of one of the [[sign_in.providers]], as \"css\"",
+                    c.provider
+                ),
+            ));
+        };
+        if p.client_secret.is_empty() {
+            return Err(err(
+                p.secret_var(),
+                format!(
+                    "is not set, with card sign-in through {}: a card sign-in is redeemed with POP's client secret",
+                    p.label
+                ),
+            ));
+        }
+        Ok(())
+    }
+
     fn validate_sign_in(&self) -> Result<(), ConfigError> {
         let mut seen = Vec::new();
         for (i, p) in self.sign_in.providers.iter().enumerate() {
@@ -363,6 +428,7 @@ impl Config {
                 ));
             }
         }
+        self.validate_card_sign_in()?;
         if !self.sign_in.providers.is_empty() && self.server.public_url.is_empty() {
             return Err(err(
                 "server.public_url",
@@ -509,6 +575,10 @@ impl Config {
             let var = p.secret_var();
             set(&var, &mut p.client_secret);
         }
+        set("POP_CARD_SIGN_IN_PROVIDER", &mut self.card_sign_in.provider);
+        set("POP_CARD_SIGN_IN_BROKER", &mut self.card_sign_in.broker);
+        set("POP_CARD_SIGN_IN_USERNAME", &mut self.card_sign_in.username);
+        set("POP_CARD_SIGN_IN_PASSWORD", &mut self.card_sign_in.password);
         set(
             "POP_FEEDBACK_INSTALLATION_ID",
             &mut self.feedback.installation_id,
@@ -810,6 +880,41 @@ mod tests {
         ] {
             assert!(!secure_or_here(bad), "{bad}");
         }
+    }
+
+    #[test]
+    fn a_card_sign_in_needs_a_broker_and_a_provider_with_a_secret() {
+        let base = "[server]\npublic_url = \"https://pop.example.org\"\n[[sign_in.providers]]\nid = \"css\"\nlabel = \"CS:S\"\nissuer = \"https://css.example.org\"\nclient_id = \"pop\"\nclient_secret = \"s\"\n[card_sign_in]\nprovider = \"css\"\nbroker = \"mqtt://192.168.1.20\"\n";
+        let c: Config = toml::from_str(base).unwrap();
+        assert_eq!(c.validate_sign_in(), Ok(()));
+        // Off unless a broker is named, whatever else is set.
+        let off: Config =
+            toml::from_str(&base.replace("broker = \"mqtt://192.168.1.20\"\n", "")).unwrap();
+        assert_eq!(off.validate_sign_in(), Ok(()));
+        for (edit, key) in [
+            (
+                base.replace("mqtt://192.168.1.20", "tcp://192.168.1.20"),
+                "card_sign_in.broker",
+            ),
+            (
+                base.replace("provider = \"css\"", "provider = \"bam\""),
+                "card_sign_in.provider",
+            ),
+            (
+                base.replace("client_secret = \"s\"\n", ""),
+                "POP_SIGN_IN_CSS_CLIENT_SECRET",
+            ),
+        ] {
+            let c: Config = toml::from_str(&edit).unwrap();
+            assert_eq!(
+                c.validate_sign_in().map_err(|e| e.key),
+                Err(key.to_owned()),
+                "{edit}"
+            );
+        }
+        // The password is never shown.
+        let c: Config = toml::from_str(&format!("{base}password = \"hunter2\"\n")).unwrap();
+        assert!(!format!("{c:?}").contains("hunter2"));
     }
 
     #[test]

@@ -4,7 +4,7 @@ Members can sign in to POP with an account they already have elsewhere,
 through OpenID Connect (#14): CS:S first (#16), or any provider that speaks
 it. Their POP username and password keep working beside it. The kiosk does
 not offer it, since a provider's own page needs a keyboard; there, members
-tap their card (#18).
+tap their card (#19, docs/integrations/card-sign-in.md).
 
 ## How it works
 

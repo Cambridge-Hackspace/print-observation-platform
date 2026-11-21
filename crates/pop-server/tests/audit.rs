@@ -156,6 +156,23 @@ const WRITE_ROUTES: &[(&str, &str, &str)] = &[
         "/api/admin/kiosks/{id}",
         "tests/kiosks.rs: a_revoked_kiosk_vouches_for_nothing_at_once",
     ),
+    // #19: a card tap's sign-in is recorded as any sign-in is; its card
+    // reader's setting is recorded; a tap set aside is deliberately not.
+    (
+        "POST",
+        "/api/kiosk/tap",
+        "tests/card_sign_in.rs: a_tap_at_a_kiosks_reader_signs_the_member_in_there",
+    ),
+    (
+        "DELETE",
+        "/api/kiosk/tap",
+        "tests/card_sign_in.rs: a_refusal_is_shown_and_set_aside",
+    ),
+    (
+        "PUT",
+        "/api/admin/kiosks/{id}/card-reader",
+        "tests/card_sign_in.rs: a_card_reader_belongs_to_one_kiosk_and_is_recorded",
+    ),
     // A check-in every half minute is deliberately NOT an audit entry.
     (
         "POST",
