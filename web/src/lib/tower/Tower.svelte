@@ -13,6 +13,9 @@
   import { startCheckins } from './checkin';
   import KioskSignIn from './KioskSignIn.svelte';
   import KioskSession from './KioskSession.svelte';
+  import CardTap from './CardTap.svelte';
+  import { watchTaps } from './taps';
+  import type { TapView } from '../generated/TapView';
 
   let connection: Connection = $state('connecting');
   let screen = $state(empty());
@@ -24,6 +27,10 @@
   /** Who is signed in here (#12), and whether the sign-in screen is up. */
   let session: SessionInfo | null = $state(null);
   let signingIn = $state(false);
+  /** A card tap at this kiosk's reader (#19), while it is being shown. */
+  let tap: TapView | null = $state(null);
+  /** Bumped at each tap, so a new one replaces what is up rather than adding to it. */
+  let tapN = $state(0);
 
   // A reload keeps a session that is still going.
   onMount(async () => {
@@ -38,10 +45,16 @@
   const tick = setInterval(() => (now = new Date()), 15_000);
   // This screen vouches for the space's network, if it is an enrolled kiosk (#12).
   const stopCheckins = startCheckins();
+  // A tap at its card reader signs a member in here (#19).
+  const stopTaps = watchTaps((t) => {
+    tap = t;
+    tapN += 1;
+  });
   onDestroy(() => {
     stop();
     clearInterval(tick);
     stopCheckins();
+    stopTaps();
   });
 </script>
 
@@ -63,6 +76,20 @@
     told={toldAbout(screen.told, open)}
     onback={() => (open = null)}
   />
+{/if}
+
+{#if tap !== null}
+  {#key tapN}
+    <CardTap
+      {tap}
+      onsignedin={(s) => {
+        session = s;
+        signingIn = false;
+        tap = null;
+      }}
+      ondone={() => (tap = null)}
+    />
+  {/key}
 {/if}
 
 {#if session !== null && !signingIn}

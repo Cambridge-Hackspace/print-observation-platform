@@ -136,3 +136,17 @@ per_hour = 10
 # scopes = ["profile", "roles"]           # beside "openid"
 # roles_claim = "roles"                   # the ID token claim listing roles
 # admin_roles = []                        # any of these makes a POP admin
+
+# A card tap at a kiosk's reader signs the member in (#19), where CS:S signs
+# members in by card: docs/integrations/card-sign-in.md. Off while broker is
+# empty. Each kiosk's card reader is set on the admin desk.
+[card_sign_in]
+# The [[sign_in.providers]] a tap is redeemed with, by its id, as "css". It
+# needs a client secret.
+provider = ""
+# The space's broker, where CS:S's edge answers each tap:
+# mqtt://host[:port] (1883) or mqtts://host[:port] (8883).
+broker = ""
+# POP's login on the broker, if it asks for one.
+username = ""
+# password: give it as POP_CARD_SIGN_IN_PASSWORD, not here.

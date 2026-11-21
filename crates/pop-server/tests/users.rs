@@ -179,6 +179,20 @@ async fn every_route_refuses_whoever_it_does_not_name() {
                     "{what}, an admin's session but no key"
                 );
             }
+            // A kiosk's own route (#19): its enrolled credential or nothing.
+            // A session, even an admin's, is not a kiosk.
+            Need::Kiosk => {
+                let anon = pop.send(r.method.clone(), &uri, None, body.clone()).await;
+                assert_eq!(anon.code, StatusCode::UNAUTHORIZED, "{what}, from no kiosk");
+                let a = pop
+                    .send(r.method.clone(), &uri, Some(&admin), body.clone())
+                    .await;
+                assert_eq!(
+                    a.code,
+                    StatusCode::UNAUTHORIZED,
+                    "{what}, an admin's session but no kiosk"
+                );
+            }
             Need::Class(Class::Admin) => {
                 let anon = pop.send(r.method.clone(), &uri, None, body.clone()).await;
                 assert_eq!(anon.code, StatusCode::UNAUTHORIZED, "{what}, signed out");

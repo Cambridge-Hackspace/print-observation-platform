@@ -174,14 +174,20 @@ async fn next_json(ws: &mut Socket) -> Option<Value> {
 /// of public authorities compiled into POP left the live connection failing
 /// where every request beside it worked.
 pub(crate) fn connector() -> Result<Connector, rustls::Error> {
+    Ok(Connector::Rustls(Arc::new(rustls_config()?)))
+}
+
+/// TLS that trusts what this machine trusts, for every connection POP opens
+/// that is not an HTTP request: BAM!'s WebSocket, and the space's broker
+/// (crate::card_taps).
+pub(crate) fn rustls_config() -> Result<rustls::ClientConfig, rustls::Error> {
     use rustls_platform_verifier::BuilderVerifierExt;
-    let cfg = rustls::ClientConfig::builder_with_provider(Arc::new(
+    Ok(rustls::ClientConfig::builder_with_provider(Arc::new(
         rustls::crypto::aws_lc_rs::default_provider(),
     ))
     .with_safe_default_protocol_versions()?
     .with_platform_verifier()?
-    .with_no_client_auth();
-    Ok(Connector::Rustls(Arc::new(cfg)))
+    .with_no_client_auth())
 }
 
 /// Keep `category`'s printers in sync, until the returned task is aborted.

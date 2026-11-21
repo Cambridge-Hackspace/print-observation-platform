@@ -581,6 +581,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "css_wire"
+version = "0.2.0"
+source = "git+https://github.com/Cambridge-Hackspace/cooperative-systems-spaces?tag=css_wire-v0.2.0#7fb3db5ff0a0be028a27e3086b4a233ce24fa088"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "ctutils"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2134,10 +2142,13 @@ dependencies = [
  "aws-lc-rs",
  "axum",
  "base64 0.22.1",
+ "bytes",
+ "css_wire",
  "futures-util",
  "pop-integrations",
  "rcgen",
  "reqwest",
+ "rumqttc",
  "rustls",
  "rustls-platform-verifier",
  "serde",
@@ -2145,6 +2156,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-tungstenite",
+ "tracing",
 ]
 
 [[package]]

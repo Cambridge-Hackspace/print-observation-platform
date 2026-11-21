@@ -8,6 +8,7 @@ pub mod audit;
 pub mod auth;
 pub mod backup;
 pub mod cameras;
+pub mod card_sign_in;
 pub mod config;
 pub mod db;
 pub mod events;
@@ -99,6 +100,8 @@ pub struct AppState {
     pub feedback: Option<Arc<feedback::Feedback>>,
     /// The providers members may sign in with, when any are configured (#14).
     pub sign_ins: Option<sign_in::SignIns>,
+    /// Card taps at kiosks' readers, when card sign-in is configured (#19).
+    pub card_sign_ins: Option<card_sign_in::CardSignIns>,
 }
 
 impl AppState {
@@ -129,6 +132,7 @@ impl AppState {
             kiosk: config::Kiosk::default(),
             feedback: None,
             sign_ins: None,
+            card_sign_ins: None,
         }
     }
 
@@ -150,6 +154,17 @@ impl AppState {
     pub fn with_sign_ins(mut self, s: sign_in::SignIns) -> Self {
         self.sign_ins = Some(s);
         self
+    }
+
+    /// Sign members in by card at kiosks' readers (#19), and say on /healthz
+    /// whether POP hears the broker.
+    pub fn with_card_sign_ins(
+        mut self,
+        c: card_sign_in::CardSignIns,
+        hearing: pop_integrations::card_taps::Hearing,
+    ) -> Self {
+        self.card_sign_ins = Some(c);
+        self.with_check(card_sign_in::BrokerHealth(hearing))
     }
 
     pub fn with_feedback(mut self, feedback: Arc<feedback::Feedback>) -> Self {
@@ -738,6 +753,41 @@ pub fn routes() -> Vec<Route> {
             need: Need::Anyone,
             reach: Reach::Anywhere,
             handler: post(kiosks::checkin),
+        },
+        // ---- a card tap at a kiosk's reader (#19) ----
+        // Each needs the kiosk's own credential: a tap is for the kiosk whose
+        // reader it was, and for nobody else.
+        Route {
+            method: Method::GET,
+            path: "/api/kiosk/tap",
+            effect: Effect::Read,
+            need: Need::Kiosk,
+            reach: Reach::Anywhere,
+            handler: get(card_sign_in::waiting),
+        },
+        Route {
+            method: Method::POST,
+            path: "/api/kiosk/tap",
+            effect: Effect::Account,
+            need: Need::Kiosk,
+            reach: Reach::Anywhere,
+            handler: post(card_sign_in::take),
+        },
+        Route {
+            method: Method::DELETE,
+            path: "/api/kiosk/tap",
+            effect: Effect::Account,
+            need: Need::Kiosk,
+            reach: Reach::Anywhere,
+            handler: delete(card_sign_in::dismiss),
+        },
+        Route {
+            method: Method::PUT,
+            path: "/api/admin/kiosks/{id}/card-reader",
+            effect: Effect::Settings,
+            need: Need::Class(Class::Admin),
+            reach: Reach::Anywhere,
+            handler: put(kiosks::set_card_reader),
         },
         Route {
             method: Method::GET,

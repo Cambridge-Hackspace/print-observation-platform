@@ -341,6 +341,23 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
             &config.server.public_url,
         ));
     }
+    // A card tap at a kiosk's reader signs the member in (#19), when CS:S
+    // signs members in by card.
+    let _card_taps = if config.card_sign_in.broker.is_empty() {
+        None
+    } else {
+        let c = &config.card_sign_in;
+        let broker =
+            pop_integrations::card_taps::Broker::parse(&c.broker, &c.username, &c.password)
+                .map_err(|e| format!("card_sign_in.broker: {e}"))?;
+        tracing::info!("card taps: listening on {}:{}", broker.host, broker.port);
+        let (tx, rx) = tokio::sync::mpsc::channel(64);
+        let (hearing, listener) = pop_integrations::card_taps::spawn(broker, tx);
+        let cards = pop_server::card_sign_in::CardSignIns::new(&c.provider);
+        let keeper = cards.clone().spawn(state.db.clone(), rx);
+        state = state.with_card_sign_ins(cards, hearing);
+        Some((listener, keeper))
+    };
     // Group notices (#68), to the Discord webhook as saved at each one.
     let (notifier, _delivery) = pop_server::notify::spawn(
         state.db.clone(),
