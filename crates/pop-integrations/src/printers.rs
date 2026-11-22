@@ -24,6 +24,9 @@ pub struct FieldMap {
     pub training: String,
     /// A Bambu printer's serial number.
     pub serial: String,
+    /// The CS:S tool whose training this printer needs, by its id or its
+    /// external id, where training comes from CS:S (#17).
+    pub css_tool: String,
 }
 
 impl Default for FieldMap {
@@ -36,6 +39,7 @@ impl Default for FieldMap {
             materials: "materials".into(),
             training: "training".into(),
             serial: "serial".into(),
+            css_tool: "css_tool".into(),
         }
     }
 }
@@ -114,6 +118,23 @@ pub struct PrinterConfig {
     pub model: Option<String>,
     pub materials: Vec<String>,
     pub training: Option<String>,
+    /// The CS:S tool whose training it needs (#17).
+    pub css_tool: Option<String>,
+}
+
+/// What training a printer needs (#17): its training level, and its CS:S
+/// tool, from BAM! alone. A printer whose other fields are wrong still needs
+/// what these say.
+pub fn needs(asset: &Asset, map: &FieldMap) -> (Option<String>, Option<String>) {
+    let value = |key: &str| {
+        asset
+            .field_values
+            .get(key)
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .map(str::to_owned)
+    };
+    (value(&map.training), value(&map.css_tool))
 }
 
 /// One thing wrong with a printer, naming the field.
@@ -363,6 +384,7 @@ pub fn printer_from(
             })
             .unwrap_or_default(),
         training: value(&map.training).map(str::to_owned),
+        css_tool: value(&map.css_tool).map(str::to_owned),
     })
 }
 

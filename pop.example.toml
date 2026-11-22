@@ -59,8 +59,8 @@ category = ""
 [bam.fields]
 # Which field of the printer category, by its key, gives each printer's
 # connection (moonraker, octoprint, prusalink, bambu or usb_serial), address,
-# camera, model, materials (comma-separated), training level, and a Bambu
-# printer's serial number.
+# camera, model, materials (comma-separated), training level, a Bambu
+# printer's serial number, and the CS:S tool whose training it needs.
 connection = "connection"
 address = "address"
 camera = "camera"
@@ -68,6 +68,7 @@ model = "model"
 materials = "materials"
 training = "training"
 serial = "serial"
+css_tool = "css_tool"
 
 [go2rtc]
 # The go2rtc that serves the printers' cameras, as its own service
@@ -150,3 +151,13 @@ broker = ""
 # POP's login on the broker, if it asks for one.
 username = ""
 # password: give it as POP_CARD_SIGN_IN_PASSWORD, not here.
+
+# Where training comes from (#17): docs/integrations/training.md.
+[training]
+# "local": admins tick each account's training on POP's desk, and a printer
+# needs its BAM! training level. "css": CS:S says, asked at each use, and a
+# printer needs its BAM! CS:S tool.
+source = "local"
+# With source = "css": the [[sign_in.providers]] that is CS:S, by its id. It
+# needs a client secret, and the training:members scope in CS:S.
+provider = ""

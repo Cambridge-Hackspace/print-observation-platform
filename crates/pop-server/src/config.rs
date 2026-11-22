@@ -34,6 +34,28 @@ pub struct Config {
     pub feedback: Feedback,
     pub sign_in: SignIn,
     pub card_sign_in: CardSignIn,
+    pub training: Training,
+}
+
+/// Where training comes from (#17): which printers a member may use.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Default)]
+#[serde(deny_unknown_fields, default)]
+pub struct Training {
+    pub source: TrainingSource,
+    /// With `source = "css"`: the `[[sign_in.providers]]` that is CS:S, by
+    /// its id. POP asks it with its own client secret.
+    pub provider: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum TrainingSource {
+    /// Admins tick each account's training on POP's desk; a printer needs
+    /// its BAM! training field's level.
+    #[default]
+    Local,
+    /// CS:S says, asked at each use: a printer needs its BAM! CS:S tool.
+    Css,
 }
 
 /// A card tap at a kiosk's reader signs the member in (#19), where CS:S
@@ -352,6 +374,32 @@ impl Config {
     /// A card sign-in needs a broker that parses, and a provider that exists
     /// and can keep a secret: CS:S gives card sign-ins only to an app that
     /// has one.
+    fn validate_training(&self) -> Result<(), ConfigError> {
+        let t = &self.training;
+        if t.source == TrainingSource::Local {
+            return Ok(());
+        }
+        let Some(p) = self.sign_in.providers.iter().find(|p| p.id == t.provider) else {
+            return Err(err(
+                "training.provider",
+                format!(
+                    "{:?}: expected the id of one of the [[sign_in.providers]], as \"css\", with training from CS:S",
+                    t.provider
+                ),
+            ));
+        };
+        if p.client_secret.is_empty() {
+            return Err(err(
+                p.secret_var(),
+                format!(
+                    "is not set, with training from {}: POP asks it with its own client secret",
+                    p.label
+                ),
+            ));
+        }
+        Ok(())
+    }
+
     fn validate_card_sign_in(&self) -> Result<(), ConfigError> {
         let c = &self.card_sign_in;
         if c.broker.is_empty() {
@@ -429,6 +477,7 @@ impl Config {
             }
         }
         self.validate_card_sign_in()?;
+        self.validate_training()?;
         if !self.sign_in.providers.is_empty() && self.server.public_url.is_empty() {
             return Err(err(
                 "server.public_url",
@@ -570,6 +619,11 @@ impl Config {
         set("POP_BAM_FIELDS_MATERIALS", &mut f.materials);
         set("POP_BAM_FIELDS_TRAINING", &mut f.training);
         set("POP_BAM_FIELDS_SERIAL", &mut f.serial);
+        set("POP_BAM_FIELDS_CSS_TOOL", &mut f.css_tool);
+        if let Some(v) = env("POP_TRAINING_SOURCE") {
+            self.training.source = enum_value("POP_TRAINING_SOURCE", &v)?;
+        }
+        set("POP_TRAINING_PROVIDER", &mut self.training.provider);
         set("POP_FEEDBACK_APP_ID", &mut self.feedback.app_id);
         for p in &mut self.sign_in.providers {
             let var = p.secret_var();
@@ -714,6 +768,7 @@ impl Config {
             ("bam.fields.materials", &f.materials),
             ("bam.fields.training", &f.training),
             ("bam.fields.serial", &f.serial),
+            ("bam.fields.css_tool", &f.css_tool),
         ] {
             if v.is_empty() {
                 return Err(err(
@@ -880,6 +935,40 @@ mod tests {
         ] {
             assert!(!secure_or_here(bad), "{bad}");
         }
+    }
+
+    #[test]
+    fn training_from_cs_s_needs_a_provider_with_a_secret() {
+        let base = "[server]\npublic_url = \"https://pop.example.org\"\n[[sign_in.providers]]\nid = \"css\"\nlabel = \"CS:S\"\nissuer = \"https://css.example.org\"\nclient_id = \"pop\"\nclient_secret = \"s\"\n[training]\nsource = \"css\"\nprovider = \"css\"\n";
+        let c: Config = toml::from_str(base).unwrap();
+        assert_eq!(c.training.source, TrainingSource::Css);
+        assert_eq!(c.validate_sign_in(), Ok(()));
+        // The desk's training, the default, needs nothing.
+        let local: Config =
+            toml::from_str(&base.replace("source = \"css\"\nprovider = \"css\"\n", "")).unwrap();
+        assert_eq!(local.training.source, TrainingSource::Local);
+        assert_eq!(local.validate_sign_in(), Ok(()));
+        for (edit, key) in [
+            (
+                base.replace("provider = \"css\"\n", "provider = \"bam\"\n"),
+                "training.provider",
+            ),
+            (
+                base.replace("client_secret = \"s\"\n", ""),
+                "POP_SIGN_IN_CSS_CLIENT_SECRET",
+            ),
+        ] {
+            let c: Config = toml::from_str(&edit).unwrap();
+            assert_eq!(
+                c.validate_sign_in().map_err(|e| e.key),
+                Err(key.to_owned()),
+                "{edit}"
+            );
+        }
+        assert!(
+            toml::from_str::<Config>(&base.replace("\"css\"\nprovider", "\"saml\"\nprovider"))
+                .is_err()
+        );
     }
 
     #[test]

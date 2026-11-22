@@ -84,6 +84,9 @@ pub struct SignIns {
     public_url: String,
     http: reqwest::Client,
     pending: Arc<Mutex<HashMap<String, Pending>>>,
+    /// POP's own access token at each provider, by its id, and when it
+    /// stops being good (#17). Never a member's.
+    app_tokens: Arc<Mutex<HashMap<String, (String, Instant)>>>,
 }
 
 impl SignIns {
@@ -98,6 +101,7 @@ impl SignIns {
                 .build()
                 .expect("an HTTP client"),
             pending: Arc::new(Mutex::new(HashMap::new())),
+            app_tokens: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -639,5 +643,152 @@ mod tests {
         assert!(roles_in(&jwt(r#"{"roles":[1,2]}"#), "roles").is_empty());
         assert!(roles_in(&jwt(r#"{}"#), "roles").is_empty());
         assert!(roles_in("not a jwt", "roles").is_empty());
+    }
+}
+
+// ---- a member's training, asked as POP itself (#17) -------------------------
+
+/// The scope CS:S gives an app that asks about any member's training
+/// (Cambridge-Hackspace/cooperative-systems-spaces#247, CS:S 0.5.1).
+pub(crate) const TRAINING_SCOPE: &str = "training:members";
+
+/// One tool, as CS:S says of a member.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub(crate) struct CssTool {
+    pub id: String,
+    pub external_id: Option<String>,
+    pub name: String,
+    /// The member may start it: trained on it, or it needs no training.
+    pub authorized: bool,
+}
+
+/// Why CS:S could not say.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum ToolsFailed {
+    /// CS:S has no active member by that `sub`.
+    NoMember,
+    /// POP could not ask, or CS:S would not answer: POP's to fix.
+    Broken(String),
+}
+
+/// A token answer's lifetime, less a margin so it is never used at its end.
+fn good_for(expires_in: Option<u64>) -> Duration {
+    Duration::from_secs(expires_in.unwrap_or(300).saturating_sub(30).max(1))
+}
+
+impl SignIns {
+    /// POP's own access token at provider `p`, through the client-credentials
+    /// grant with `training:members`: kept until shortly before it expires.
+    async fn app_token(&self, p: &Provider) -> Result<String, String> {
+        if let Some((t, until)) = self.app_tokens.lock().unwrap().get(&p.id)
+            && Instant::now() < *until
+        {
+            return Ok(t.clone());
+        }
+        let client = client(self, p).await?;
+        let token_url = client
+            .token_uri()
+            .ok_or("its discovery document names no token endpoint")?
+            .url()
+            .clone();
+        let form = {
+            let mut f = openidconnect::url::form_urlencoded::Serializer::new(String::new());
+            f.append_pair("grant_type", "client_credentials");
+            f.append_pair("scope", TRAINING_SCOPE);
+            f.finish()
+        };
+        // RFC 6749 2.3.1: each half form-encoded before the two are joined.
+        let enc = |v: &str| {
+            openidconnect::url::form_urlencoded::byte_serialize(v.as_bytes()).collect::<String>()
+        };
+        let res = self
+            .http
+            .post(token_url)
+            .basic_auth(enc(&p.client_id), Some(enc(&p.client_secret)))
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .header(header::ACCEPT, "application/json")
+            .body(form)
+            .send()
+            .await
+            .map_err(|e| format!("its token endpoint: {e}"))?;
+        let ok = res.status().is_success();
+        let body: Value = res
+            .json()
+            .await
+            .map_err(|e| format!("its token endpoint's answer: {e}"))?;
+        if !ok {
+            let words = body
+                .get("error_description")
+                .or_else(|| body.get("error"))
+                .and_then(Value::as_str)
+                .unwrap_or("refused");
+            return Err(format!(
+                "its token endpoint refused POP's own token ({TRAINING_SCOPE}): {words}"
+            ));
+        }
+        let token = body
+            .get("access_token")
+            .and_then(Value::as_str)
+            .ok_or("its token answer had no access token")?
+            .to_owned();
+        let until = Instant::now() + good_for(body.get("expires_in").and_then(Value::as_u64));
+        self.app_tokens
+            .lock()
+            .unwrap()
+            .insert(p.id.clone(), (token.clone(), until));
+        Ok(token)
+    }
+
+    /// Every tool provider `id` knows, and whether the member it calls
+    /// `subject` may use each, asked now with POP's own token. Nothing is
+    /// kept, so a member who loses training is refused at the next ask.
+    pub(crate) async fn member_tools(
+        &self,
+        id: &str,
+        subject: &str,
+    ) -> Result<Vec<CssTool>, ToolsFailed> {
+        let p = self
+            .provider(id)
+            .ok_or_else(|| ToolsFailed::Broken(format!("no sign-in provider {id:?}")))?;
+        let url = format!(
+            "{}/api/oauth/members/{}/tools",
+            p.issuer.trim_end_matches('/'),
+            openidconnect::url::form_urlencoded::byte_serialize(subject.as_bytes())
+                .collect::<String>()
+        );
+        // A token CS:S stopped believing before it expired (the scope taken
+        // away, say) is dropped, and a new one asked for once.
+        for fresh in [false, true] {
+            if fresh {
+                self.app_tokens.lock().unwrap().remove(&p.id);
+            }
+            let token = self.app_token(p).await.map_err(ToolsFailed::Broken)?;
+            let res = self
+                .http
+                .get(&url)
+                .bearer_auth(&token)
+                .header(header::ACCEPT, "application/json")
+                .send()
+                .await
+                .map_err(|e| ToolsFailed::Broken(format!("its training: {e}")))?;
+            match res.status() {
+                StatusCode::NOT_FOUND => return Err(ToolsFailed::NoMember),
+                StatusCode::UNAUTHORIZED if !fresh => continue,
+                s if s.is_success() => {
+                    let body: Value = res
+                        .json()
+                        .await
+                        .map_err(|e| ToolsFailed::Broken(format!("its training: {e}")))?;
+                    return serde_json::from_value(body.get("data").cloned().unwrap_or_default())
+                        .map_err(|e| ToolsFailed::Broken(format!("its training: {e}")));
+                }
+                s => {
+                    return Err(ToolsFailed::Broken(format!("its training answered {s}")));
+                }
+            }
+        }
+        Err(ToolsFailed::Broken(
+            "its training refused POP's token".into(),
+        ))
     }
 }

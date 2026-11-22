@@ -18,7 +18,8 @@ use pop_server::api::{
     Status, TowerPrinter, TowerState, UpdaterStatus, User,
 };
 use pop_server::api::{
-    ApiKey, CreatedApiKey, Kiosk, KioskCardReader, NewApiKey, NewKiosk, SessionInfo,
+    ApiKey, CreatedApiKey, Kiosk, KioskCardReader, NewApiKey, NewKiosk, PrinterTraining,
+    SessionInfo,
 };
 use pop_server::card_sign_in::{KioskTap, TakeTap, TapView};
 use ts_rs::TS;
@@ -39,6 +40,7 @@ fn export(dir: &Path) {
     AuditKind::export_all_to(dir).unwrap();
     AuditEntry::export_all_to(dir).unwrap();
     AdminPrinter::export_all_to(dir).unwrap();
+    PrinterTraining::export_all_to(dir).unwrap();
     // "Something looks wrong" (#63).
     NewReport::export_all_to(dir).unwrap();
     ReportTaken::export_all_to(dir).unwrap();

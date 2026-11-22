@@ -26,6 +26,7 @@ pub mod run;
 pub mod secrets;
 pub mod sign_in;
 pub mod tower;
+pub mod training;
 pub mod updater;
 pub mod users;
 
@@ -102,6 +103,8 @@ pub struct AppState {
     pub sign_ins: Option<sign_in::SignIns>,
     /// Card taps at kiosks' readers, when card sign-in is configured (#19).
     pub card_sign_ins: Option<card_sign_in::CardSignIns>,
+    /// Where training comes from (#17).
+    pub training: config::Training,
 }
 
 impl AppState {
@@ -133,6 +136,7 @@ impl AppState {
             feedback: None,
             sign_ins: None,
             card_sign_ins: None,
+            training: config::Training::default(),
         }
     }
 
@@ -151,6 +155,12 @@ impl AppState {
 
     /// File feedback through this (#96).
     /// Sign in through these providers (#14).
+    /// Where training comes from (#17). Without this, POP's desk.
+    pub fn with_training(mut self, training: config::Training) -> Self {
+        self.training = training;
+        self
+    }
+
     pub fn with_sign_ins(mut self, s: sign_in::SignIns) -> Self {
         self.sign_ins = Some(s);
         self
@@ -493,6 +503,16 @@ pub fn routes() -> Vec<Route> {
             need: Need::Account,
             reach: Reach::Anywhere,
             handler: get(feedback::status),
+        },
+        // ---- whether a member may use a printer, by their training (#17) ----
+        // Their own answer, asked now: from anywhere, as /api/me is.
+        Route {
+            method: Method::GET,
+            path: "/api/printers/{bam_id}/training",
+            effect: Effect::Read,
+            need: Need::Account,
+            reach: Reach::Anywhere,
+            handler: get(training::check),
         },
         // ---- "something looks wrong" (#63): told to the group, never the printer ----
         Route {
