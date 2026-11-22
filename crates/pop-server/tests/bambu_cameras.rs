@@ -176,6 +176,7 @@ fn config(camera: Option<PrinterCamera>, connection: Connection) -> PrinterConfi
         model: None,
         materials: vec![],
         training: None,
+        css_tool: None,
     }
 }
 

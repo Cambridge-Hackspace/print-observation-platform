@@ -177,6 +177,22 @@ factor for admins online is #175 (gap 18).
   request forgery.
   `crates/pop-server/tests/users.rs::a_request_that_changes_something_must_be_json`.
 
+## Training
+
+Which printers a member may use, by their training (#17):
+docs/integrations/training.md.
+
+- **A member who loses training is refused at their next check**, from
+  either source, in the same session.
+  `crates/pop-server/tests/training.rs::on_the_desk_a_member_who_loses_training_is_refused_at_the_next_check`,
+  `crates/pop-server/tests/training.rs::from_cs_s_a_member_who_loses_training_is_refused_at_the_next_check`.
+- **POP keeps no member's CS:S tokens.** It asks CS:S with its own token,
+  from the client-credentials grant with `training:members`, and keeps only
+  that. `crates/pop-server/tests/training.rs::pop_asks_with_its_own_token_and_keeps_only_that`.
+- **Training is never assumed.** A member CS:S can't be asked about, or a
+  CS:S that doesn't answer, is refused, in words.
+  `crates/pop-server/tests/training.rs::a_member_cs_s_cannot_be_asked_about_is_refused_in_words`.
+
 ## Secrets
 
 | Secret | Where it lives | How it is kept |
@@ -610,3 +626,12 @@ Each of these is true of POP today, or untested, and none is claimed above.
     secret. The edge trusts the same broker to switch tools. Give the broker
     logins, let only the edge publish `resource/response/scan`, and use
     `mqtts://` where it is offered (docs/integrations/card-sign-in.md).
+
+**Training.**
+24. **POP's own CS:S token reads every member's training.** That is what
+    `training:members` is for, and why POP keeps no member's tokens; but
+    whoever reads POP's client secret, in `/etc/pop/pop.env`, can read every
+    member's training too. Grant the scope to POP alone.
+25. **Nothing runs a printer yet, so nothing calls the check but its own
+    route** (`GET /api/printers/{bam_id}/training`). Each printer action, as
+    it comes, must call `training::may_use` before acting, and test it.

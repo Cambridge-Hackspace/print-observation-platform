@@ -341,6 +341,17 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
             &config.server.public_url,
         ));
     }
+    // Where training comes from (#17): the desk, or CS:S asked at each use.
+    match config.training.source {
+        pop_server::config::TrainingSource::Local => {
+            tracing::info!("training is ticked on POP's desk")
+        }
+        pop_server::config::TrainingSource::Css => tracing::info!(
+            "training comes from {}, asked at each use",
+            config.training.provider
+        ),
+    }
+    state = state.with_training(config.training.clone());
     // A card tap at a kiosk's reader signs the member in (#19), when CS:S
     // signs members in by card.
     let _card_taps = if config.card_sign_in.broker.is_empty() {

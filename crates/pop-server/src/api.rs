@@ -53,6 +53,14 @@ pub struct GroupNotice {
     pub without_owner: String,
 }
 
+/// `GET /api/printers/{bam_id}/training`: whether the signed-in member may
+/// use a printer, by its training (#17), and if not, why, in words for them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct PrinterTraining {
+    pub may_use: bool,
+    pub reason: Option<String>,
+}
+
 /// A printer the tower runs, as every screen shows it (#49).
 #[derive(Debug, Clone, PartialEq, Serialize, TS)]
 pub struct TowerPrinter {

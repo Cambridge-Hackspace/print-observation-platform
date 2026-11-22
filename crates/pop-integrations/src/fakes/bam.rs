@@ -295,6 +295,18 @@ impl FakeBam {
         });
     }
 
+    /// Move an asset to other categories, by id, as an admin recategorizing
+    /// it in BAM! does.
+    pub fn recategorize(&self, id: &str, categories: &[&str]) {
+        let cats: Vec<Value> = categories
+            .iter()
+            .map(|c| json!({ "id": c, "name": format!("Category {c}") }))
+            .collect();
+        self.change(id, "asset.edited", true, |a| {
+            a["categories"] = json!(cats);
+        });
+    }
+
     pub fn archive(&self, id: &str) {
         let at = now();
         self.change(id, "asset.archived", true, |a| {

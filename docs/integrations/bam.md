@@ -43,7 +43,8 @@ of the printer category that gives each printer's settings
 | camera | `camera` | an rtsp, rtsps, http or https address, without its password, or `built-in` for a Bambu printer's own camera (optional; docs/printers/bambu.md). A camera's login is entered on POP's desk |
 | model | `model` | the model, as people say it (optional) |
 | materials | `materials` | the materials it prints, comma-separated (optional) |
-| training | `training` | the training level it needs (optional) |
+| training | `training` | the training level it needs, where training is ticked on POP's desk (optional) |
+| css_tool | `css_tool` | the CS:S tool whose training it needs, by its id or external id, where training comes from CS:S (optional; docs/integrations/training.md) |
 | serial | `serial` | a Bambu printer's serial number |
 
 A printer whose fields are missing or wrong is not run: POP's admin list
