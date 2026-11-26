@@ -138,14 +138,14 @@ per_hour = 10
 # roles_claim = "roles"                   # the ID token claim listing roles
 # admin_roles = []                        # any of these makes a POP admin
 
-# A card tap at a kiosk's reader signs the member in (#19), where CS:S signs
-# members in by card: docs/integrations/card-sign-in.md. Off while broker is
-# empty. Each kiosk's card reader is set on the admin desk.
+# A card tap at a kiosk's reader signs the member in (#18): POP is a CS:S
+# device, registered once with `popctl css-device register`, and needs the
+# secrets key to keep that identity: docs/integrations/card-sign-in.md. Off
+# while broker is empty. Each kiosk's card reader is set on the admin desk.
 [card_sign_in]
-# The [[sign_in.providers]] a tap is redeemed with, by its id, as "css". It
-# needs a client secret.
+# The [[sign_in.providers]] whose accounts taps sign in to, by its id, as "css".
 provider = ""
-# The space's broker, where CS:S's edge answers each tap:
+# The space's broker, where CS:S's edge leases its devices:
 # mqtt://host[:port] (1883) or mqtts://host[:port] (8883).
 broker = ""
 # POP's login on the broker, if it asks for one.

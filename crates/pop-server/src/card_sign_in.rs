@@ -1,24 +1,28 @@
-//! A card tap at a kiosk's reader signs the member in there (#19), where
-//! CS:S signs members in by card (Cambridge-Hackspace/cooperative-systems-spaces#241).
+//! A card tap at a kiosk's reader signs the member in there (#18), where POP
+//! is a CS:S device (pop_integrations::css_device).
 //!
-//! 1. The tap goes from the reader to CS:S. Its answer, on the space's
-//!    broker, names the resource the reader is; POP hears it
-//!    (pop_integrations::card_taps) and finds the enrolled kiosk whose card
-//!    reader that is (kiosks::with_card_reader). A tap at a reader no kiosk
-//!    has is no sign-in anywhere.
-//! 2. The tap waits for that kiosk, in memory, briefly: CS:S's code is good
-//!    for a minute, its ticket for two. A newer tap there replaces it.
+//! 1. The tap goes from the reader to CS:S's edge. On a yes, the edge leases
+//!    POP, bound as `power` on that resource, and on a resource set to
+//!    identify its member the lease says who, sealed with POP's command key.
+//!    POP finds the enrolled kiosk whose card reader that resource is
+//!    (kiosks::with_card_reader). A tap at a reader no kiosk has is no
+//!    sign-in anywhere.
+//! 2. The tap waits for that kiosk, in memory, for [`TAP_FOR`]. A newer tap
+//!    there replaces it.
 //! 3. The kiosk asks for it ([`waiting`], `GET /api/kiosk/tap`, which waits
 //!    up to [`LONG_POLL`] for one) with its own enrolled credential (the
-//!    routes' need, `Need::Kiosk`, crate::access), and
-//!    never sees the code or the ticket: only what to show. It is never on
-//!    the live stream, which is public.
-//! 4. The kiosk takes it ([`take`], `POST /api/kiosk/tap`, with the TOTP
-//!    code when CS:S asked for one): POP redeems it with CS:S with its own
-//!    secret (sign_in::SignIns::redeem_card), and the account the ID token
-//!    names is signed in as a browser sign-in's would be, a kiosk session.
-//!    A wrong TOTP code may be tried again, as CS:S allows, three times.
+//!    routes' need, `Need::Kiosk`, crate::access), and is told only whom to
+//!    welcome. It is never on the live stream, which is public.
+//! 4. The kiosk takes it ([`take`], `POST /api/kiosk/tap`): the account the
+//!    member's CS:S id names is signed in as a browser sign-in's would be, a
+//!    kiosk session, and made on their first tap as on a first sign-in.
 //! 5. Or the kiosk sets it aside ([`dismiss`], `DELETE /api/kiosk/tap`).
+//!
+//! **What POP believes, and why.** The member is CS:S's word, sealed: the
+//! edge seals each lease with the key CS:S gave POP alone, so a lease forged
+//! on the broker signs nobody in (crate::css_device). POP believes the edge
+//! as far as CS:S does. A card sign-in carries no roles, so it never makes or
+//! unmakes an admin: only a browser sign-in, whose ID token names them, does.
 
 use std::{
     collections::HashMap,
@@ -32,47 +36,32 @@ use axum::{
     http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Response},
 };
-use pop_integrations::card_taps::{LocalSignIn, Outcome, Tap};
-use serde::{Deserialize, Serialize};
+use pop_integrations::css_device::{LocalMember, Tap};
+use serde::Serialize;
 use tokio::{
     sync::{mpsc, watch},
     task::JoinHandle,
 };
 use ts_rs::TS;
 
-use crate::{
-    AppState,
-    access::KioskId,
-    api::ApiError,
-    sign_in::{CardFailed, CardGrant, NoAccount},
-};
+use crate::{AppState, access::KioskId, api::ApiError, sign_in::NoAccount};
 
 /// How long the kiosk's ask waits for a tap before answering that there is none.
 pub const LONG_POLL: Duration = Duration::from_secs(25);
-/// How long a code waits: CS:S's minute, less the time to redeem it.
-const CODE_FOR: Duration = Duration::from_secs(50);
-/// How long a ticket waits for its TOTP code: CS:S's two minutes, less the same.
-const TICKET_FOR: Duration = Duration::from_secs(110);
-/// How long a refusal stays up for the member to read.
-const REFUSAL_FOR: Duration = Duration::from_secs(15);
-/// A ticket's tries, as CS:S counts them.
-const TRIES: u8 = 3;
+/// How long a tap waits for its kiosk to take it: long enough for a screen
+/// that was asleep, short enough that the next member is not signed in as
+/// the last one.
+pub const TAP_FOR: Duration = Duration::from_secs(60);
 
-/// What the kiosk shows for its tap, never with the code or ticket in it.
+/// What the kiosk shows for its tap.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum TapView {
-    /// A sign-in, ready: take it at once.
-    SignIn,
-    /// CS:S asks this member for their authenticator code first.
-    SecondFactor {
-        /// What went wrong with the last code typed, for a try again.
-        #[ts(optional)]
-        #[serde(skip_serializing_if = "Option::is_none")]
-        problem: Option<String>,
+    /// A member's sign-in, ready: welcome them by `name`, and take it.
+    SignIn {
+        /// Their first name, as CS:S holds their name.
+        name: String,
     },
-    /// No sign-in for this tap, and why, for the member to read.
-    Refused { reason: String },
 }
 
 /// `GET /api/kiosk/tap`'s answer: the kiosk's tap, or none yet.
@@ -81,44 +70,25 @@ pub struct KioskTap {
     pub tap: Option<TapView>,
 }
 
-/// `POST /api/kiosk/tap`'s body.
-#[derive(Debug, Clone, Default, Deserialize, TS)]
-pub struct TakeTap {
-    /// The member's TOTP code, when CS:S asked for one.
-    #[serde(default)]
-    #[ts(optional)]
-    pub totp: Option<String>,
+/// The first word of a member's name, which is how a kiosk greets them:
+/// CS:S keeps one full name and no given name apart.
+pub fn first_name(full: &str) -> String {
+    full.split_whitespace().next().unwrap_or("").to_owned()
 }
 
 struct Waiting {
-    outcome: Outcome,
+    member: LocalMember,
     at: Instant,
-    tries: u8,
-    /// What the last wrong code was told.
-    problem: Option<String>,
 }
 
 impl Waiting {
     fn fresh(&self) -> bool {
-        let for_ = match &self.outcome {
-            Outcome::SignIn(LocalSignIn::Code { .. }) => CODE_FOR,
-            Outcome::SignIn(LocalSignIn::Totp { .. }) => TICKET_FOR,
-            _ => REFUSAL_FOR,
-        };
-        self.at.elapsed() < for_
+        self.at.elapsed() < TAP_FOR
     }
 
     fn view(&self) -> TapView {
-        match &self.outcome {
-            Outcome::SignIn(LocalSignIn::Code { .. }) => TapView::SignIn,
-            Outcome::SignIn(LocalSignIn::Totp { .. }) => TapView::SecondFactor {
-                problem: self.problem.clone(),
-            },
-            Outcome::SignIn(LocalSignIn::Refused { reason }) | Outcome::NotSignedIn(reason) => {
-                TapView::Refused {
-                    reason: reason.clone(),
-                }
-            }
+        TapView::SignIn {
+            name: first_name(&self.member.name),
         }
     }
 }
@@ -126,7 +96,7 @@ impl Waiting {
 /// The taps waiting for each kiosk, by its id.
 #[derive(Clone)]
 pub struct CardSignIns {
-    /// The `[[sign_in.providers]]` taps are redeemed with.
+    /// The `[[sign_in.providers]]` whose `sub` a member's CS:S id is.
     provider: String,
     waiting: Arc<Mutex<HashMap<i64, Waiting>>>,
     /// Bumped at every tap, for the kiosks waiting to hear of one.
@@ -151,7 +121,8 @@ impl CardSignIns {
         self
     }
 
-    /// A tap CS:S answered (step 1), kept for the kiosk whose reader it was.
+    /// A tap the edge leased POP for (step 1), kept for the kiosk whose
+    /// reader it was.
     pub async fn heard(&self, db: &sqlx::SqlitePool, tap: Tap) {
         let kiosk = match crate::kiosks::with_card_reader(db, &tap.resource).await {
             Ok(Some(k)) => k,
@@ -167,10 +138,8 @@ impl CardSignIns {
         self.waiting.lock().unwrap().insert(
             kiosk,
             Waiting {
-                outcome: tap.outcome,
+                member: tap.member,
                 at: Instant::now(),
-                tries: 0,
-                problem: None,
             },
         );
         self.changed.send_modify(|n| *n += 1);
@@ -192,8 +161,8 @@ impl CardSignIns {
     }
 }
 
-/// Whether POP hears the space's broker, on `/healthz` (#19).
-pub struct BrokerHealth(pub pop_integrations::card_taps::Hearing);
+/// Whether POP hears the space's broker, on `/healthz` (#18, #19).
+pub struct BrokerHealth(pub pop_integrations::css_device::Hearing);
 
 impl crate::health::HealthCheck for BrokerHealth {
     fn name(&self) -> &'static str {
@@ -263,82 +232,34 @@ pub async fn take(
     Extension(KioskId(kiosk)): Extension<KioskId>,
     connect: Option<Extension<ConnectInfo<std::net::SocketAddr>>>,
     headers: HeaderMap,
-    body: Result<Json<TakeTap>, axum::extract::rejection::JsonRejection>,
 ) -> Response {
     let Some(cards) = state.card_sign_ins.as_ref() else {
         return no_cards();
     };
-    // No body, or none POP can read, carries no TOTP code: a ticket then
-    // says so in words below, and a code needs none.
-    let totp = body
-        .ok()
-        .and_then(|Json(b)| b.totp)
-        .map(|t| t.trim().to_owned());
-    // Taken out while it is redeemed, so two screens' worth of taps cannot
-    // spend one code twice; a ticket's wrong code puts it back.
+    // Taken out as it is used, so two screens' worth of taps cannot sign in
+    // with one tap twice.
     let w = {
         let mut all = cards.waiting.lock().unwrap();
         all.retain(|_, w| w.fresh());
         all.remove(&kiosk)
     };
-    let Some(mut w) = w else {
+    let Some(w) = w else {
         return error(
             StatusCode::NOT_FOUND,
             "there is no card tap to sign in with: tap again",
         );
     };
-    let grant = match (&w.outcome, totp) {
-        (Outcome::SignIn(LocalSignIn::Code { code }), _) => CardGrant::Code(code.clone()),
-        (Outcome::SignIn(LocalSignIn::Totp { ticket }), Some(t))
-            if t.len() == 6 && t.bytes().all(|b| b.is_ascii_digit()) =>
-        {
-            CardGrant::Ticket {
-                ticket: ticket.clone(),
-                totp: t,
-            }
-        }
-        (Outcome::SignIn(LocalSignIn::Totp { .. }), _) => {
-            cards.waiting.lock().unwrap().insert(kiosk, w);
-            return error(
-                StatusCode::BAD_REQUEST,
-                "totp: the six digits your authenticator app shows",
-            );
-        }
-        _ => return error(StatusCode::CONFLICT, "this tap signs nobody in"),
-    };
-    let Some(sign_ins) = state.sign_ins.as_ref() else {
+    let Some(p) = state
+        .sign_ins
+        .as_ref()
+        .and_then(|s| s.provider_of(&cards.provider))
+    else {
         return error(
             StatusCode::SERVICE_UNAVAILABLE,
             "POP signs in with no provider",
         );
     };
-    let ticket = matches!(grant, CardGrant::Ticket { .. });
-    let signed = match sign_ins.redeem_card(&cards.provider, grant).await {
-        Ok(s) => s,
-        Err(CardFailed::Refused(why)) => {
-            w.tries += 1;
-            if ticket && w.tries < TRIES && w.fresh() {
-                w.problem = Some(why.clone());
-                cards.waiting.lock().unwrap().insert(kiosk, w);
-                cards.changed.send_modify(|n| *n += 1);
-            }
-            return error(StatusCode::BAD_REQUEST, why);
-        }
-        Err(CardFailed::Broken(why)) => {
-            tracing::warn!("card sign-in: {why}");
-            return error(
-                StatusCode::BAD_GATEWAY,
-                "POP could not finish signing you in with your card: sign in another way",
-            );
-        }
-    };
-    let Some(p) = sign_ins.provider_of(&cards.provider) else {
-        return error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "POP signs in with no provider",
-        );
-    };
-    let user = match crate::sign_in::account(&state, p, &signed).await {
+    let user = match crate::sign_in::member_account(&state, p, &w.member.id, &w.member.name).await {
         Ok(u) => u,
         Err(NoAccount::Deactivated) => {
             return error(StatusCode::FORBIDDEN, "this account is deactivated in POP");

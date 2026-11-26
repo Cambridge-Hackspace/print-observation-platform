@@ -21,7 +21,7 @@ use pop_server::api::{
     ApiKey, CreatedApiKey, Kiosk, KioskCardReader, NewApiKey, NewKiosk, PrinterTraining,
     SessionInfo,
 };
-use pop_server::card_sign_in::{KioskTap, TakeTap, TapView};
+use pop_server::card_sign_in::{KioskTap, TapView};
 use ts_rs::TS;
 
 fn generated_dir() -> PathBuf {
@@ -95,7 +95,6 @@ fn export(dir: &Path) {
     KioskCardReader::export_all_to(dir).unwrap();
     KioskTap::export_all_to(dir).unwrap();
     TapView::export_all_to(dir).unwrap();
-    TakeTap::export_all_to(dir).unwrap();
     SessionInfo::export_all_to(dir).unwrap();
 }
 

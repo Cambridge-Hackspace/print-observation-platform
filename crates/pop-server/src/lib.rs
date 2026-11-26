@@ -10,6 +10,7 @@ pub mod backup;
 pub mod cameras;
 pub mod card_sign_in;
 pub mod config;
+pub mod css_device;
 pub mod db;
 pub mod events;
 pub mod feedback;
@@ -171,7 +172,7 @@ impl AppState {
     pub fn with_card_sign_ins(
         mut self,
         c: card_sign_in::CardSignIns,
-        hearing: pop_integrations::card_taps::Hearing,
+        hearing: pop_integrations::css_device::Hearing,
     ) -> Self {
         self.card_sign_ins = Some(c);
         self.with_check(card_sign_in::BrokerHealth(hearing))
