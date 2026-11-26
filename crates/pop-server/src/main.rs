@@ -44,6 +44,34 @@ enum Command {
     /// Work with accounts.
     #[command(subcommand)]
     User(UserCommand),
+    /// POP as a CS:S device, for card sign-in at a kiosk's reader (#18).
+    #[command(subcommand)]
+    CssDevice(CssDeviceCommand),
+}
+
+#[derive(Subcommand)]
+enum CssDeviceCommand {
+    /// Register POP with CS:S, with an invite an administrator minted there,
+    /// and keep the identity it gives, sealed. Once: CS:S's bindings name it.
+    Register {
+        /// The CS:S server, as https://css.example.org.
+        #[arg(long)]
+        server: String,
+        /// The invite code.
+        #[arg(long)]
+        invite: String,
+        /// The name CS:S shows for POP.
+        #[arg(long, default_value = "POP")]
+        name: String,
+        /// This machine's MAC address, which CS:S records. Defaults to the
+        /// first interface's.
+        #[arg(long)]
+        mac: Option<String>,
+    },
+    /// Say whether POP is registered, and as which device.
+    Status,
+    /// Forget POP's CS:S identity, so it can be registered again.
+    Forget,
 }
 
 #[derive(Subcommand)]
@@ -123,6 +151,16 @@ async fn main() -> ExitCode {
                 }
             }
         }
+        Command::CssDevice(c) => match css_device(&config, c).await {
+            Ok(said) => {
+                println!("{said}");
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("pop: css-device: {e}");
+                ExitCode::FAILURE
+            }
+        },
         Command::Serve => {
             init_logs(&config);
             match serve(config).await {
@@ -132,6 +170,84 @@ async fn main() -> ExitCode {
                     ExitCode::FAILURE
                 }
             }
+        }
+    }
+}
+
+/// 16 bytes from the operating system, as hex: a nonce for POP's end of the
+/// local wire.
+fn nonce() -> String {
+    use rand::RngCore;
+    let mut b = [0u8; 16];
+    rand::rngs::OsRng.fill_bytes(&mut b);
+    hex::encode(b)
+}
+
+/// `pop css-device ...`: what to tell the person who ran it.
+async fn css_device(config: &Config, c: CssDeviceCommand) -> Result<String, String> {
+    use pop_server::{css_device, secrets::Secrets};
+    tokio::fs::create_dir_all(&config.storage.data_dir)
+        .await
+        .map_err(|e| e.to_string())?;
+    let db = db::open(&config.database_path())
+        .await
+        .map_err(|e| format!("cannot open the database: {e}"))?;
+    let secrets = Secrets::new(&config.secrets.key);
+    match c {
+        CssDeviceCommand::Register {
+            server,
+            invite,
+            name,
+            mac,
+        } => {
+            let mac = match mac {
+                Some(m) => m,
+                None => mac_address::get_mac_address()
+                    .map_err(|e| format!("reading this machine's MAC address: {e}"))?
+                    .ok_or("this machine has no interface with a MAC address: give one with --mac")?
+                    .to_string(),
+            };
+            let http = reqwest::Client::new();
+            let id =
+                css_device::register(&db, &secrets, &http, &server, &invite, &name, &mac).await?;
+            Ok(match id.command_key {
+                Some(_) => format!(
+                    "Registered with CS:S as device {}. Now bind it in CS:S as power on each \
+                     kiosk's reader resource, with \"Identify the member on a scan\" on.",
+                    id.device_id
+                ),
+                None => format!(
+                    "Registered with CS:S as device {}, but CS:S minted no command key, so \
+                     POP cannot sign anyone in by card: CS:S needs its card cipher configured. \
+                     Run `pop css-device forget` and register again once it has one.",
+                    id.device_id
+                ),
+            })
+        }
+        CssDeviceCommand::Status => Ok(
+            match css_device::load(&db, &secrets)
+                .await
+                .map_err(|e| e.to_string())?
+            {
+                Some(id) if id.command_key.is_some() => {
+                    format!("Registered with CS:S as device {}.", id.device_id)
+                }
+                Some(id) => format!(
+                    "Registered with CS:S as device {}, with no command key: card sign-in is off.",
+                    id.device_id
+                ),
+                None => "Not registered with CS:S.".to_owned(),
+            },
+        ),
+        CssDeviceCommand::Forget => {
+            let gone = Secrets::clear_setting(&db, css_device::SETTING)
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok(if gone {
+                "Forgot POP's CS:S identity. Delete the old device in CS:S too.".to_owned()
+            } else {
+                "POP had no CS:S identity to forget.".to_owned()
+            })
         }
     }
 }
@@ -352,22 +468,38 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
         ),
     }
     state = state.with_training(config.training.clone());
-    // A card tap at a kiosk's reader signs the member in (#19), when CS:S
-    // signs members in by card.
+    // A card tap at a kiosk's reader signs the member in (#18): POP as a
+    // CS:S device, believing only the leases its edge seals for it.
     let _card_taps = if config.card_sign_in.broker.is_empty() {
         None
     } else {
         let c = &config.card_sign_in;
         let broker =
-            pop_integrations::card_taps::Broker::parse(&c.broker, &c.username, &c.password)
+            pop_integrations::css_device::Broker::parse(&c.broker, &c.username, &c.password)
                 .map_err(|e| format!("card_sign_in.broker: {e}"))?;
-        tracing::info!("card taps: listening on {}:{}", broker.host, broker.port);
+        let id = pop_server::css_device::load(&state.db, &state.secrets)
+            .await
+            .map_err(|e| format!("card sign-in: POP's CS:S identity: {e}"))?
+            .ok_or(
+                "card sign-in: POP is not registered with CS:S: run `pop css-device register`",
+            )?;
+        let key = id.command_key.as_deref().ok_or(
+            "card sign-in: CS:S gave POP no command key when it registered, and a lease POP \
+             cannot check signs nobody in: run `pop css-device forget`, then register again",
+        )?;
+        tracing::info!(
+            "card taps: CS:S device {} on {}:{}",
+            id.device_id,
+            broker.host,
+            broker.port
+        );
+        let wire = pop_integrations::css_device::Wire::new(&id.device_id, key, nonce);
         let (tx, rx) = tokio::sync::mpsc::channel(64);
-        let (hearing, listener) = pop_integrations::card_taps::spawn(broker, tx);
+        let (hearing, device) = pop_integrations::css_device::spawn(broker, wire, tx);
         let cards = pop_server::card_sign_in::CardSignIns::new(&c.provider);
         let keeper = cards.clone().spawn(state.db.clone(), rx);
         state = state.with_card_sign_ins(cards, hearing);
-        Some((listener, keeper))
+        Some((device, keeper))
     };
     // Group notices (#68), to the Discord webhook as saved at each one.
     let (notifier, _delivery) = pop_server::notify::spawn(

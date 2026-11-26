@@ -1,9 +1,9 @@
-//! A fake of the space's broker (#19), as CS:S's edge uses it: plain MQTT on
-//! a real port, a login it checks when given one, and the scan replies a test
-//! tells it to send to everyone subscribed to them.
+//! A fake of the space's broker (#18, #19), as CS:S's edge uses it: plain
+//! MQTT on a real port, a login it checks when given one, the messages a test
+//! tells it to send to everyone subscribed to them, and what POP published.
 //!
 //! What it does not do: retain, QoS above 0, or wildcards. POP subscribes to
-//! one topic exactly, so a subscription to anything else is recorded and
+//! topics exactly, so a subscription to anything else is recorded and
 //! answered but delivers nothing.
 
 use std::{
@@ -34,7 +34,7 @@ struct Shared {
     login: Option<(String, String)>,
     connections: Mutex<u32>,
     subscriptions: Mutex<Vec<String>>,
-    publishes: Mutex<Vec<String>>,
+    publishes: Mutex<Vec<(String, Vec<u8>)>>,
     pushes: broadcast::Sender<Push>,
 }
 
@@ -87,10 +87,27 @@ impl FakeBroker {
         self.shared.subscriptions.lock().unwrap().clone()
     }
 
-    /// The topics of everything a client published: POP should publish
-    /// nothing.
+    /// The topics of everything a client published, in order.
     pub fn publishes(&self) -> Vec<String> {
-        self.shared.publishes.lock().unwrap().clone()
+        self.shared
+            .publishes
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(t, _)| t.clone())
+            .collect()
+    }
+
+    /// The payloads a client published on `topic`, in order.
+    pub fn published(&self, topic: &str) -> Vec<Vec<u8>> {
+        self.shared
+            .publishes
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(t, _)| t == topic)
+            .map(|(_, p)| p.clone())
+            .collect()
     }
 
     /// Send `payload` on `topic` to every client subscribed to it.
@@ -147,7 +164,11 @@ async fn serve(mut tcp: tokio::net::TcpStream, s: Arc<Shared>) {
                         .collect();
                     let _ = SubAck::new(sub.pkid, codes).write(&mut out);
                 }
-                Ok(Packet::Publish(p)) => s.publishes.lock().unwrap().push(p.topic.clone()),
+                Ok(Packet::Publish(p)) => s
+                    .publishes
+                    .lock()
+                    .unwrap()
+                    .push((p.topic.clone(), p.payload.to_vec())),
                 Ok(Packet::PingReq) => {
                     let _ = PingResp.write(&mut out);
                 }

@@ -418,18 +418,25 @@ Anyone in the space can touch the kiosk, so it is treated as public.
   untouched, but not while someone is using it.
   `web/src/lib/tower/HandView.test.ts › "goes back when asked, and when left alone"`,
   `web/src/lib/tower/HandView.test.ts › "is not sent back while someone is using it"`.
-- **A card tap signs in only at the kiosk whose reader it was** (#19), and a
-  tap at a reader no kiosk has signs in nowhere.
+- **A card tap signs in only at the kiosk whose reader it was** (#18, #19),
+  and a tap at a reader no kiosk has signs in nowhere.
   `crates/pop-server/tests/card_sign_in.rs::a_tap_is_for_its_own_kiosk_and_for_no_other`.
-- **The kiosk never holds CS:S's code or ticket.** POP keeps them, and tells
-  the kiosk only what to show; the tap's routes answer only an enrolled
-  kiosk's credential, and a session, even an admin's, is not one.
-  `crates/pop-server/tests/card_sign_in.rs::a_tap_at_a_kiosks_reader_signs_the_member_in_there`,
-  `crates/pop-server/tests/card_sign_in.rs::a_second_factor_is_asked_for_tried_again_and_signs_in`,
+- **Only a lease the edge sealed for POP signs anyone in** (#18). One that
+  is unsigned, sealed with another key, or a copy of one already had, signs
+  nobody in, on the broker as in POP's own code.
+  `crates/pop-integrations/src/css_device.rs::tests::an_unsigned_or_wrongly_sealed_or_replayed_lease_signs_nobody_in`,
+  `crates/pop-integrations/tests/css_device.rs::an_unsigned_lease_on_the_broker_is_no_tap`,
+  `crates/pop-server/tests/card_sign_in.rs::a_sealed_lease_on_the_broker_reaches_its_kiosk_and_a_forged_one_does_not`.
+- **The tap's routes answer only an enrolled kiosk's credential**, and a
+  session, even an admin's, is not one.
   `crates/pop-server/tests/users.rs::every_route_refuses_whoever_it_does_not_name`.
-- **A tap signs nobody in that CS:S did not sign in.** Its code is redeemed
-  only with POP's own client secret, and one CS:S never issued is refused.
-  `crates/pop-server/tests/card_sign_in.rs::a_code_cs_s_never_issued_signs_nobody_in`.
+- **A card sign-in never makes or takes away an admin.** A lease names no
+  roles; only a browser sign-in's ID token does.
+  `crates/pop-server/tests/card_sign_in.rs::a_card_sign_in_never_makes_or_unmakes_an_admin`.
+- **POP's command key is kept sealed**, with its other secrets, and never
+  shown.
+  `crates/pop-server/tests/card_sign_in.rs::pops_identity_is_kept_sealed_and_never_replaced`,
+  `crates/pop-server/src/css_device.rs::tests::the_token_and_key_are_never_shown`.
 
 ## Guides
 
@@ -617,15 +624,14 @@ Each of these is true of POP today, or untested, and none is claimed above.
     private key. POP only verifies signatures with it, using the provider's
     public key, which that weakness does not touch.
 
-**Card sign-in (#19).**
-23. **POP believes the broker about which reader a tap was at.** Whoever can
-    publish on the space's broker can show a made-up refusal at a kiosk, and
-    whoever can also read it can send a real member's reply on to another
-    kiosk's reader within its minute, signing that member in there instead.
-    Neither makes a sign-in CS:S did not: a code is redeemed only with POP's
-    secret. The edge trusts the same broker to switch tools. Give the broker
-    logins, let only the edge publish `resource/response/scan`, and use
-    `mqtts://` where it is offered (docs/integrations/card-sign-in.md).
+**Card sign-in (#18).**
+23. **POP believes CS:S's edge about who tapped, and where.** A lease is
+    sealed with POP's command key, which CS:S hands the edge so that it can
+    seal for POP. Whoever holds the edge, or CS:S, can sign any member in at
+    any kiosk. Whoever can only publish on the space's broker can sign nobody
+    in, and can only stop POP hearing the edge. Keep the edge's machine as
+    you keep CS:S's, and give the broker logins
+    (docs/integrations/card-sign-in.md).
 
 **Training.**
 24. **POP's own CS:S token reads every member's training.** That is what

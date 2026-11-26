@@ -179,7 +179,7 @@ pub(crate) fn connector() -> Result<Connector, rustls::Error> {
 
 /// TLS that trusts what this machine trusts, for every connection POP opens
 /// that is not an HTTP request: BAM!'s WebSocket, and the space's broker
-/// (crate::card_taps).
+/// (crate::css_device).
 pub(crate) fn rustls_config() -> Result<rustls::ClientConfig, rustls::Error> {
     use rustls_platform_verifier::BuilderVerifierExt;
     Ok(rustls::ClientConfig::builder_with_provider(Arc::new(

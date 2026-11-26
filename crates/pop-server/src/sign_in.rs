@@ -411,34 +411,20 @@ impl NoAccount {
 }
 
 /// The account `signed` is, made on its first sign-in (cal, 2026-11-19),
-/// and an admin or not as the provider's roles say when it maps them: the
-/// same for a sign-in in a browser and one by card (#19).
+/// and an admin or not as the provider's roles say when it maps them.
 pub(crate) async fn account(
     state: &AppState,
     p: &Provider,
     signed: &Signed,
 ) -> Result<crate::api::User, NoAccount> {
-    let user = match users::by_identity(&state.db, &p.id, &signed.subject).await {
-        Ok(Some((_, false))) => return Err(NoAccount::Deactivated),
-        Ok(Some((u, true))) => u,
-        Ok(None) => users::create_from_provider(
-            &state.db,
-            &p.id,
-            &p.label,
-            &signed.subject,
-            signed.username.as_deref().unwrap_or(""),
-            signed.name.as_deref().unwrap_or(""),
-        )
-        .await
-        .map_err(|e| {
-            tracing::error!("signing in with {}: making the account: {e:?}", p.label);
-            NoAccount::Failed
-        })?,
-        Err(e) => {
-            tracing::error!("signing in with {}: {e:?}", p.label);
-            return Err(NoAccount::Failed);
-        }
-    };
+    let user = linked(
+        state,
+        p,
+        &signed.subject,
+        signed.username.as_deref().unwrap_or(""),
+        signed.name.as_deref().unwrap_or(""),
+    )
+    .await?;
     if p.admin_roles.is_empty() {
         return Ok(user);
     }
@@ -451,113 +437,46 @@ pub(crate) async fn account(
         })
 }
 
-/// What a card tap gives POP to redeem with the provider (#19): CS:S's
-/// one-time code, or its ticket and the TOTP code the member typed.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CardGrant {
-    Code(String),
-    Ticket { ticket: String, totp: String },
+/// The account a card tap's member is (#18): the one linked to their CS:S id
+/// as the provider's `sub`, the same account a browser sign-in reaches, and
+/// made on their first tap as on a first sign-in. A lease names no roles, so
+/// this never makes or unmakes an admin.
+pub(crate) async fn member_account(
+    state: &AppState,
+    p: &Provider,
+    subject: &str,
+    name: &str,
+) -> Result<crate::api::User, NoAccount> {
+    linked(state, p, subject, "", name).await
 }
 
-/// The grant CS:S redeems a card tap's code or ticket at its token endpoint.
-pub const CARD_GRANT: &str = "urn:css:card-sign-in";
-
-/// Why a card sign-in did not complete.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CardFailed {
-    /// The provider said no: its words, for the member ("that code is not
-    /// right").
-    Refused(String),
-    /// POP could not ask, or could not believe the answer: for the log.
-    Broken(String),
+/// The account linked to `subject` at `p`, made if there is none.
+async fn linked(
+    state: &AppState,
+    p: &Provider,
+    subject: &str,
+    username: &str,
+    name: &str,
+) -> Result<crate::api::User, NoAccount> {
+    match users::by_identity(&state.db, &p.id, subject).await {
+        Ok(Some((_, false))) => Err(NoAccount::Deactivated),
+        Ok(Some((u, true))) => Ok(u),
+        Ok(None) => {
+            users::create_from_provider(&state.db, &p.id, &p.label, subject, username, name)
+                .await
+                .map_err(|e| {
+                    tracing::error!("signing in with {}: making the account: {e:?}", p.label);
+                    NoAccount::Failed
+                })
+        }
+        Err(e) => {
+            tracing::error!("signing in with {}: {e:?}", p.label);
+            Err(NoAccount::Failed)
+        }
+    }
 }
 
 impl SignIns {
-    /// Redeem a card tap through provider `id` (#19): at its token endpoint,
-    /// with `grant_type=urn:css:card-sign-in` and POP's own client id and
-    /// secret, and believe the ID token in the answer only as a browser
-    /// sign-in's is believed: signed by a key the provider publishes, for
-    /// this client, from this issuer, unexpired. There is no nonce: no
-    /// browser began this sign-in to hold one, and the code is good once.
-    pub(crate) async fn redeem_card(&self, id: &str, g: CardGrant) -> Result<Signed, CardFailed> {
-        let p = self
-            .provider(id)
-            .ok_or_else(|| CardFailed::Broken(format!("no sign-in provider {id:?}")))?;
-        let client = client(self, p).await.map_err(CardFailed::Broken)?;
-        let token_url = client
-            .token_uri()
-            .ok_or_else(|| {
-                CardFailed::Broken("its discovery document names no token endpoint".into())
-            })?
-            .url()
-            .clone();
-        // Built whole before the request: the serializer is not Send.
-        let form = {
-            let mut f = openidconnect::url::form_urlencoded::Serializer::new(String::new());
-            f.append_pair("grant_type", CARD_GRANT);
-            match &g {
-                CardGrant::Code(code) => {
-                    f.append_pair("code", code);
-                }
-                CardGrant::Ticket { ticket, totp } => {
-                    f.append_pair("ticket", ticket);
-                    f.append_pair("totp", totp);
-                }
-            }
-            f.finish()
-        };
-        // RFC 6749 2.3.1: each half form-encoded before the two are joined.
-        let enc = |v: &str| {
-            openidconnect::url::form_urlencoded::byte_serialize(v.as_bytes()).collect::<String>()
-        };
-        let res = self
-            .http
-            .post(token_url)
-            .basic_auth(enc(&p.client_id), Some(enc(&p.client_secret)))
-            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .header(header::ACCEPT, "application/json")
-            .body(form)
-            .send()
-            .await
-            .map_err(|e| CardFailed::Broken(format!("its token endpoint: {e}")))?;
-        let ok = res.status().is_success();
-        let body: Value = res
-            .json()
-            .await
-            .map_err(|e| CardFailed::Broken(format!("its token endpoint's answer: {e}")))?;
-        if !ok {
-            let words = body
-                .get("error_description")
-                .and_then(Value::as_str)
-                .unwrap_or("the sign-in was refused");
-            return Err(match body.get("error").and_then(Value::as_str) {
-                // What the member did, or what became of the tap: theirs to read.
-                Some("invalid_grant") => CardFailed::Refused(words.to_owned()),
-                // POP's own setup: an admin's to fix, not the member's.
-                _ => CardFailed::Broken(format!("its token endpoint refused: {words}")),
-            });
-        }
-        let raw = body
-            .get("id_token")
-            .and_then(Value::as_str)
-            .ok_or_else(|| CardFailed::Broken("its answer had no ID token".into()))?;
-        let id_token: openidconnect::core::CoreIdToken = raw
-            .parse()
-            .map_err(|e| CardFailed::Broken(format!("its ID token: {e}")))?;
-        let claims = id_token
-            .claims(&client.id_token_verifier(), |_: Option<&Nonce>| Ok(()))
-            .map_err(|e| CardFailed::Broken(format!("its ID token: {e}")))?;
-        Ok(Signed {
-            subject: claims.subject().as_str().to_owned(),
-            username: claims.preferred_username().map(|u| u.as_str().to_owned()),
-            name: claims
-                .name()
-                .and_then(|n| n.get(None))
-                .map(|n| n.as_str().to_owned()),
-            roles: roles_in(raw, &p.roles_claim),
-        })
-    }
-
     pub(crate) fn provider_of(&self, id: &str) -> Option<&Provider> {
         self.provider(id)
     }

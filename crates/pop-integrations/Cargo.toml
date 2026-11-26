@@ -29,10 +29,13 @@ tokio-tungstenite = { version = "0.29", features = ["rustls-tls-native-roots"] }
 # The machine's own trusted certificates, as reqwest uses them: a BAM! behind
 # the space's own certificate authority is trusted once the system is told.
 rustls-platform-verifier = "0.7"
-# Card taps at a kiosk's reader, from the space's broker (#19): CS:S's own
-# wire types, MIT-licensed on their own and pinned by tag, and the MQTT client
-# the Bambu driver uses.
-css_wire = { git = "https://github.com/Cambridge-Hackspace/cooperative-systems-spaces", tag = "css_wire-v0.2.0" }
+# POP as a CS:S device (#18): CS:S's own wire types and the seal code its edge
+# uses, both MIT-licensed on their own, and the MQTT client the Bambu driver
+# uses. Both crates by the ONE CS:S release tag: css_wire_sign names css_wire
+# by path within that checkout, so a second tag would build css_wire twice and
+# its seal traits would not be the same traits.
+css_wire = { git = "https://github.com/Cambridge-Hackspace/cooperative-systems-spaces", tag = "v0.6.0" }
+css_wire_sign = { git = "https://github.com/Cambridge-Hackspace/cooperative-systems-spaces", tag = "v0.6.0" }
 rumqttc = { version = "0.25", default-features = false, features = ["use-rustls"] }
 bytes = { version = "1", optional = true }
 tracing = "0.1"

@@ -1,4 +1,4 @@
-// The kiosk watches for card taps (#19), and stops when it never will get one.
+// The kiosk watches for card taps (#18, #19), and stops when it never will get one.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { watchTaps } from './taps';
 
@@ -32,13 +32,16 @@ describe('watching for card taps', () => {
     vi.useFakeTimers();
     const urls = fake([
       { status: 200, body: { tap: null } },
-      { status: 200, body: { tap: { kind: 'sign_in' } } },
-      { status: 200, body: { tap: { kind: 'refused', reason: 'Unknown card' } } },
+      { status: 200, body: { tap: { kind: 'sign_in', name: 'Alex' } } },
+      { status: 200, body: { tap: { kind: 'sign_in', name: 'Sam' } } },
     ]);
     const seen: unknown[] = [];
     const stop = watchTaps((t) => seen.push(t));
     await flush();
-    expect(seen).toEqual([{ kind: 'sign_in' }, { kind: 'refused', reason: 'Unknown card' }]);
+    expect(seen).toEqual([
+      { kind: 'sign_in', name: 'Alex' },
+      { kind: 'sign_in', name: 'Sam' },
+    ]);
     expect(urls).toEqual(['/api/kiosk/tap', '/api/kiosk/tap', '/api/kiosk/tap', '/api/kiosk/tap']);
     stop();
   });
@@ -72,7 +75,7 @@ describe('watching for card taps', () => {
     const stop = watchTaps((t) => seen.push(t));
     await flush();
     stop();
-    answer(new Response(JSON.stringify({ tap: { kind: 'sign_in' } }), { status: 200 }));
+    answer(new Response(JSON.stringify({ tap: { kind: 'sign_in', name: 'Alex' } }), { status: 200 }));
     await flush();
     expect(seen).toEqual([]);
   });

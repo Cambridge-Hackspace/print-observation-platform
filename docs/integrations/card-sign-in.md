@@ -1,58 +1,72 @@
 # Signing in with a card
 
 Where the space runs CS:S, a member can sign in at the tower by tapping their
-card on the tower's reader (#19). It is a CS:S sign-in like the phone's
-(docs/integrations/sign-in.md), with no keyboard: the same account, linked
-by the same CS:S id, and an admin or not by the same roles. CS:S can also ask
-for the code from the member's authenticator app first, for everyone or for
-admins only, which the kiosk takes on a pad.
+card on the tower's reader (#18). The tower greets them by name ("Welcome,
+Alex!") and signs them in to their own account: the same account a CS:S
+sign-in on their phone reaches (docs/integrations/sign-in.md), linked by
+the same CS:S id.
 
 ## How it works
 
-1. **The member taps their card on the tower's reader.** The reader is a CS:S
-   device, and the tap goes to CS:S, as at any tool or door.
-2. **CS:S answers on the space's broker**, naming the reader's resource. For
-   a resource set to sign in to POP, its answer carries a one-time code, or a
-   ticket that wants the member's authenticator code, or why not.
-3. **POP hears the answer** and finds the kiosk whose card reader that is.
-   POP only listens on the broker: it never asks and never publishes.
-4. **The kiosk shows it.** POP keeps the code or ticket itself; the kiosk is
-   told only what to show. For a code, the kiosk signs in at once. For a
-   ticket, it shows a pad for the six digits, and a wrong code may be tried
-   again, three times in all, as CS:S allows.
-5. **POP redeems it with CS:S**, with POP's own client secret, and believes
-   the ID token as it believes a phone sign-in's: signed by CS:S's published
-   keys, for POP, from CS:S, unexpired. The member is signed in to a kiosk
-   session, which ends when the screen is left alone (#12).
+POP is a CS:S device, like the ToolGuard on a printer or the plug on a fan.
+CS:S's edge treats it as one.
 
-A refusal ("Unknown card", or "set up an authenticator app first") shows in
-CS:S's words, and goes by itself after a few seconds.
+1. **The member taps their card on the tower's reader.** The reader is a CS:S
+   device, and the tap goes to the edge, as at any tool or door.
+2. **On a yes, the edge leases POP.** POP is bound to the reader's resource
+   as `power`, the role the edge leases. On a resource set to identify its
+   member, the lease says who tapped: their CS:S id and name.
+3. **POP checks the lease is the edge's own.** The edge seals every lease it
+   sends POP with the key CS:S gave POP when it registered, and no one else
+   holds that key. POP acts on no lease that is unsigned, sealed with another
+   key, or a copy of one it has already had.
+4. **The kiosk whose card reader that resource is welcomes the member and
+   signs them in**, to a kiosk session, which ends when the screen is left
+   alone (#12). Their first tap makes their account in POP, as a first
+   sign-in in a browser does.
+
+A refusal ("Unknown card", "Training required") shows on the reader itself.
+The edge leases nobody on a no, so POP never hears of one.
+
+A card sign-in never makes or takes away an admin. A lease carries no roles,
+so only a sign-in in a browser, whose ID token names them, does that.
 
 ## Setting up CS:S
 
-POP must already sign members in through CS:S (docs/integrations/sign-in.md),
-with a secret, as "the space's own app": CS:S gives card sign-ins to no other
-kind of app.
+You need CS:S 0.6.1 or later. An older edge does not seal its leases, so
+POP believes none of them.
 
-In CS:S's **Resource wiring**, for the tower's reader's resource:
-
-- **Identify the member on a scan:** on.
-- **A tap signs in to:** POP.
-- **Also ask for an authenticator code from:** nobody, admins, or everyone.
-  Asked and not set up, a member is refused in words and told where to set
-  one up.
-
-The tower's reader is bound to that resource like any reader, and to an edge
-on the space's broker.
+1. POP must already sign members in through CS:S
+   (docs/integrations/sign-in.md), so that a tap's CS:S id is the `sub` of
+   an account POP knows.
+2. Mint a device invite in CS:S, and register POP with it (below).
+3. In CS:S's **Resource wiring**, for the tower's reader's resource:
+   - **Identify the member on a scan:** on. Without it, a lease names nobody
+     and POP's log says to switch this on.
+   - Bind **POP** to it as **power**. The tower's reader stays bound as
+     **reader**, and the resource stays bound to the space's edge.
 
 ## Setting up POP
 
-In `/etc/pop/pop.toml`:
+POP keeps its CS:S identity sealed with its other secrets, so it needs a
+secrets key (`POP_SECRETS_KEY`, docs/deployment.md). Register it once,
+with the invite:
+
+```sh
+sudo popctl css-device register --server https://css.example.org --invite <code>
+```
+
+This prints the device id to bind in CS:S. `popctl css-device status` says
+whether POP is registered, and `popctl css-device forget` forgets the
+identity, so POP can be registered again. Delete the old device in CS:S
+then too.
+
+Then, in `/etc/pop/pop.toml`:
 
 ```toml
 [card_sign_in]
 provider = "css"                      # the [[sign_in.providers]] id
-broker = "mqtt://192.168.1.20:1883"   # the space's broker, where the edge answers taps
+broker = "mqtt://192.168.1.20:1883"   # the space's broker, where the edge leases its devices
 username = "pop"                      # POP's login there, if it asks for one
 ```
 
@@ -67,31 +81,34 @@ other connections do. A broker whose certificate the space's own authority
 signed is trusted once that authority is installed: on Debian, copy it to
 `/usr/local/share/ca-certificates/` and run `sudo update-ca-certificates`.
 
-Check it with `sudo popctl config check` and restart POP. `/healthz` then has
-a `card_reader` check, which fails while POP cannot hear the broker.
+Check it with `sudo popctl config check` and restart POP. POP refuses to
+start with card sign-in on and no CS:S identity, and says how to register.
+`/healthz` then has a `card_reader` check, which fails while POP cannot hear
+the broker.
 
 Then, on the admin desk, under **Kiosks**, give the tower's kiosk its **card
-reader**: the resource its reader is, as the reader names it (its CS:S id, or
-its external id, as `tower-1`). A tap at a reader no kiosk has signs nobody
-in anywhere, and a reader belongs to one kiosk at a time.
+reader**: the CS:S id of the reader's resource, the UUID CS:S shows for it.
+A lease always names its resource by that id, never by an external id. A
+tap at a reader no kiosk has signs nobody in anywhere, and a reader belongs
+to one kiosk at a time.
 
 ## What it trusts
 
-The broker. POP believes a reply about which reader a tap was at, so
-whoever can publish on the space's broker can show a made-up refusal at a
-kiosk, or send a real member's reply to another kiosk within its minute.
-They cannot make a sign-in: a code is redeemed only with POP's secret, and
-one CS:S never issued is refused. Give the broker logins, let only the edge
-publish scan replies, and use `mqtts://` where the broker offers it
+The edge, as far as CS:S does. A lease POP acts on was sealed by whoever
+holds POP's command key: CS:S, and the edge it gave POP's key to. Whoever
+can only publish on the space's broker can sign nobody in. What they can
+still do is stop POP hearing the edge, which signs nobody in either
 (docs/threat-model.md, gap 23).
 
 ## When it does not work
 
-- **Nothing happens at a tap.** Check `/healthz` for `card_reader`, then that
-  the kiosk's card reader on the desk is exactly what the reader names, then
-  that the resource in CS:S is set to sign in to POP.
-- **"CS:S could not sign you in just now."** The edge allowed the tap but
-  could not reach CS:S for a sign-in. Sign in another way, and look at the
-  edge.
-- **"POP could not finish signing you in with your card."** POP's own setup:
-  its log says why, usually the client secret, or CS:S unreachable.
+- **Nothing happens at a tap.** Check, in this order:
+  - `/healthz` for `card_reader`.
+  - POP's log: "names no member" means the resource isn't set to identify
+    its member, and "not believed" means a lease came that was not sealed
+    for POP. That usually means an edge older than CS:S 0.6.1, or a POP
+    registered again whose old device is still bound.
+  - That the kiosk's card reader on the desk is the resource's CS:S id.
+  - That POP is bound to that resource as power.
+- **"This account is deactivated in POP."** An admin deactivated the
+  member's account in POP. Reactivate it on the desk.

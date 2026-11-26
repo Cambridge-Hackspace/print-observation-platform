@@ -58,16 +58,18 @@ pub enum TrainingSource {
     Css,
 }
 
-/// A card tap at a kiosk's reader signs the member in (#19), where CS:S
-/// signs members in by card (Cambridge-Hackspace/cooperative-systems-spaces#241):
-/// docs/integrations/card-sign-in.md. Off while `broker` is empty.
+/// A card tap at a kiosk's reader signs the member in (#18): POP is a CS:S
+/// device on the space's broker, and acts on the sealed leases CS:S's edge
+/// sends it. docs/integrations/card-sign-in.md. Off while `broker` is empty;
+/// on, it needs POP registered (`pop css-device register`) and a secrets key
+/// to keep that identity sealed.
 #[derive(Clone, PartialEq, Eq, Deserialize, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct CardSignIn {
-    /// The `[[sign_in.providers]]` a tap is redeemed with, by its id: CS:S,
-    /// with POP's client secret.
+    /// The `[[sign_in.providers]]` whose accounts a member's taps sign in to,
+    /// by its id: CS:S, whose `sub` is the member's id a lease carries.
     pub provider: String,
-    /// The space's broker, where CS:S's edge answers each tap:
+    /// The space's broker, where CS:S's edge leases its devices:
     /// `mqtt://host[:port]` or `mqtts://host[:port]`.
     pub broker: String,
     /// POP's login on the broker, if it asks for one.
@@ -405,7 +407,7 @@ impl Config {
         if c.broker.is_empty() {
             return Ok(());
         }
-        pop_integrations::card_taps::Broker::parse(&c.broker, &c.username, &c.password)
+        pop_integrations::css_device::Broker::parse(&c.broker, &c.username, &c.password)
             .map_err(|e| err("card_sign_in.broker", e))?;
         let Some(p) = self.sign_in.providers.iter().find(|p| p.id == c.provider) else {
             return Err(err(
@@ -416,11 +418,11 @@ impl Config {
                 ),
             ));
         };
-        if p.client_secret.is_empty() {
+        if self.secrets.key.is_empty() {
             return Err(err(
-                p.secret_var(),
+                "secrets.key",
                 format!(
-                    "is not set, with card sign-in through {}: a card sign-in is redeemed with POP's client secret",
+                    "is not set, with card sign-in through {}: POP keeps its CS:S device identity sealed with it",
                     p.label
                 ),
             ));
@@ -972,8 +974,8 @@ mod tests {
     }
 
     #[test]
-    fn a_card_sign_in_needs_a_broker_and_a_provider_with_a_secret() {
-        let base = "[server]\npublic_url = \"https://pop.example.org\"\n[[sign_in.providers]]\nid = \"css\"\nlabel = \"CS:S\"\nissuer = \"https://css.example.org\"\nclient_id = \"pop\"\nclient_secret = \"s\"\n[card_sign_in]\nprovider = \"css\"\nbroker = \"mqtt://192.168.1.20\"\n";
+    fn a_card_sign_in_needs_a_broker_a_provider_and_a_secrets_key() {
+        let base = "[server]\npublic_url = \"https://pop.example.org\"\n[[sign_in.providers]]\nid = \"css\"\nlabel = \"CS:S\"\nissuer = \"https://css.example.org\"\nclient_id = \"pop\"\nclient_secret = \"s\"\n[secrets]\nkey = \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\"\n[card_sign_in]\nprovider = \"css\"\nbroker = \"mqtt://192.168.1.20\"\n";
         let c: Config = toml::from_str(base).unwrap();
         assert_eq!(c.validate_sign_in(), Ok(()));
         // Off unless a broker is named, whatever else is set.
@@ -990,8 +992,11 @@ mod tests {
                 "card_sign_in.provider",
             ),
             (
-                base.replace("client_secret = \"s\"\n", ""),
-                "POP_SIGN_IN_CSS_CLIENT_SECRET",
+                base.replace(
+                    "key = \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\"\n",
+                    "",
+                ),
+                "secrets.key",
             ),
         ] {
             let c: Config = toml::from_str(&edit).unwrap();

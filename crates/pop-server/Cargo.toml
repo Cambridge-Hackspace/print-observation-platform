@@ -25,6 +25,8 @@ flate2 = "1"
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 hex = "0.4"
 ipnet = { version = "2", features = ["serde"] }
+# This machine's MAC address, which CS:S records when POP registers (#18).
+mac_address = "1.1"
 pop-integrations = { version = "0.1.2", path = "../pop-integrations" }
 pop-printers = { version = "0.1.2", path = "../pop-printers" }
 rand = "0.8"
@@ -47,6 +49,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"]
 ts-rs = "11"
 
 [dev-dependencies]
+# The card sign-in tests play CS:S's edge with its own seal code (#18), by
+# the one CS:S tag pop-integrations uses, so there is one css_wire.
+css_wire = { git = "https://github.com/Cambridge-Hackspace/cooperative-systems-spaces", tag = "v0.6.0" }
+css_wire_sign = { git = "https://github.com/Cambridge-Hackspace/cooperative-systems-spaces", tag = "v0.6.0" }
 http-body-util = "0.1"
 pop-integrations = { path = "../pop-integrations", features = ["fakes"] }
 pop-printers = { path = "../pop-printers", features = ["fakes"] }

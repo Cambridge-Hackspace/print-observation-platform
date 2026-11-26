@@ -582,10 +582,20 @@ dependencies = [
 
 [[package]]
 name = "css_wire"
-version = "0.2.0"
-source = "git+https://github.com/Cambridge-Hackspace/cooperative-systems-spaces?tag=css_wire-v0.2.0#7fb3db5ff0a0be028a27e3086b4a233ce24fa088"
+version = "0.3.0"
+source = "git+https://github.com/Cambridge-Hackspace/cooperative-systems-spaces?tag=v0.6.0#347c3ca48582b8ca8972c5d814c3c88df1bc0769"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "css_wire_sign"
+version = "0.1.0"
+source = "git+https://github.com/Cambridge-Hackspace/cooperative-systems-spaces?tag=v0.6.0#347c3ca48582b8ca8972c5d814c3c88df1bc0769"
+dependencies = [
+ "css_wire",
+ "hmac 0.12.1",
+ "sha2 0.10.9",
 ]
 
 [[package]]
@@ -1721,6 +1731,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4050469837a6ff301cd14c1f8f24f88549e6d548f24f64e2148eb0f72cebc51f"
 
 [[package]]
+name = "mac_address"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3d0581a75c45969c63afd2bb87b1d8b25cfcc556c7a918cf9bb13b0fe8d2381"
+dependencies = [
+ "nix",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "matchers"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1750,6 +1770,15 @@ name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+
+[[package]]
+name = "memoffset"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a"
+dependencies = [
+ "autocfg",
+]
 
 [[package]]
 name = "mime"
@@ -1813,6 +1842,19 @@ dependencies = [
  "ctutils",
  "hybrid-array",
  "num-traits",
+]
+
+[[package]]
+name = "nix"
+version = "0.31.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf20d2fde8ff38632c426f1165ed7436270b44f199fc55284c38276f9db47c3d"
+dependencies = [
+ "bitflags 2.13.2",
+ "cfg-if",
+ "cfg_aliases",
+ "libc",
+ "memoffset",
 ]
 
 [[package]]
@@ -2144,6 +2186,7 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "css_wire",
+ "css_wire_sign",
  "futures-util",
  "pop-integrations",
  "rcgen",
@@ -2203,11 +2246,14 @@ dependencies = [
  "base64 0.22.1",
  "chacha20poly1305",
  "clap",
+ "css_wire",
+ "css_wire_sign",
  "flate2",
  "futures-util",
  "hex",
  "http-body-util",
  "ipnet",
+ "mac_address",
  "openidconnect",
  "pop-integrations",
  "pop-printers",
@@ -3530,7 +3576,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",

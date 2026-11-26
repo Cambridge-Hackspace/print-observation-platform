@@ -4,7 +4,7 @@
 //! for inventory, and Throne for funding.
 
 pub mod bam;
-pub mod card_taps;
+pub mod css_device;
 pub mod github;
 pub mod go2rtc;
 pub mod printers;
