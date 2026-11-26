@@ -7,5 +7,13 @@ license.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+[dependencies]
+# A .gcode.3mf is a zip archive of deflated entries: read with a reader of
+# POP's own (src/zip.rs), which reads only what a sliced 3MF needs.
+crc32fast = "1.5"
+flate2 = "1"
+# Bambu Studio's and OrcaSlicer's slice_info.config.
+roxmltree = "0.21.2"
+
 [lints]
 workspace = true

@@ -15,8 +15,11 @@
 //! file that says it weighs 0 g while using filament has no weight.
 
 mod read;
+pub mod threemf;
+mod zip;
 
 pub use read::{MAX_LINE, Scanner};
+pub use threemf::{Limits, Plate, read_3mf};
 
 /// What a slicer wrote about a print.
 #[derive(Debug, Clone, Default, PartialEq)]

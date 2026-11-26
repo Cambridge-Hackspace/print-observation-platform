@@ -358,7 +358,7 @@ fn is_version(s: &str) -> bool {
 }
 
 /// A string value: trimmed, unquoted, and missing when empty.
-fn text(s: &str) -> Option<String> {
+pub(crate) fn text(s: &str) -> Option<String> {
     let s = s.trim();
     let s = s
         .strip_prefix('"')
@@ -389,7 +389,7 @@ fn numbers(list: Option<&str>, unit: &str) -> Vec<Option<f64>> {
 }
 
 /// A quantity: finite and not negative.
-fn amount(s: &str) -> Option<f64> {
+pub(crate) fn amount(s: &str) -> Option<f64> {
     s.trim()
         .parse::<f64>()
         .ok()
@@ -427,7 +427,7 @@ fn duration(s: &str) -> Option<u64> {
 }
 
 /// `#RRGGBB` or `#RRGGBBAA`, upper case.
-fn color(s: &str) -> Option<String> {
+pub(crate) fn color(s: &str) -> Option<String> {
     let hex = s.trim().strip_prefix('#')?;
     ((hex.len() == 6 || hex.len() == 8) && hex.chars().all(|c| c.is_ascii_hexdigit()))
         .then(|| format!("#{}", hex.to_ascii_uppercase()))
