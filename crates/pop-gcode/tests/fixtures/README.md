@@ -16,6 +16,9 @@ no one else's license.
 | `bambustudio-a1mini-two-filaments.gcode` | Bambu Studio 02.09.01.70 | as above | as above, with Bambu PETG HF @BBL A1M loaded in slot 2 and unused |
 | `cura-ender3.gcode` | Cura 5.14.0's engine | Creality Ender-3 (Marlin flavor) | the machine's definition defaults |
 | `cura-s5.gcode` | Cura 5.14.0's engine | UltiMaker S5 (Griffin flavor) | the machine's definition defaults |
+| `orcaslicer-ender3v2.gcode.3mf` | OrcaSlicer 2.5.0 | as its `.gcode` | as its `.gcode`, whose G-code it holds byte for byte, with a picture of the plate |
+| `bambustudio-a1mini.gcode.3mf` | Bambu Studio 02.09.01.70 | as its `.gcode` | as its `.gcode`, which it holds; no picture |
+| `bambustudio-a1mini-two-filaments.gcode.3mf` | Bambu Studio 02.09.01.70 | as its `.gcode` | as its `.gcode`, which it holds; no picture |
 
 ## How they differ from a member's
 
@@ -37,8 +40,8 @@ clicking **Export** or **Upload** gets.
   exported from Cura itself also ends with `;SETTING_3` lines of the profile,
   and a Griffin header from Cura names each extruder's material by GUID.
   This reader uses neither, since a GUID is not a material's name.
-- **No thumbnails.** The guest had no display for the slicers to render one
-  on.
+- **Bambu Studio drew no picture.** It found no display to render one on, so
+  its archives have none; OrcaSlicer's do.
 
 ## Making them again
 
@@ -48,6 +51,6 @@ On a throwaway Ubuntu 26.04 machine, as root:
 tools/slicer-fixtures/make.sh /tank/work /tank/out
 ```
 
-then copy `/tank/out/*.gcode` here. Each AppImage is pinned by its hash. A
+then copy `/tank/out/*` here. Each AppImage is pinned by its hash. A
 new slicer version is a new fixture beside the old one, not a replacement,
 so a format that changes keeps a test of both.
