@@ -333,6 +333,12 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
         data_dir.clone(),
         std::time::Duration::from_secs(30),
     );
+    // Prints that waited unsent too long are deleted, and their owners
+    // told (#40).
+    pop_server::prints::spawn(
+        pool.clone(),
+        config.storage.data_dir.join(pop_server::backup::FILES_DIR),
+    );
     let mut state = AppState::new(pool, Arc::new(Embedded))
         .with_access(config.access.clone())
         .with_secrets(pop_server::secrets::Secrets::new(&config.secrets.key))
@@ -340,7 +346,8 @@ async fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
         .with_files_dir(config.storage.data_dir.join(pop_server::backup::FILES_DIR))
         .with_guides(config.guides.clone())
         .with_public(config.public.clone())
-        .with_kiosk(config.kiosk.clone());
+        .with_kiosk(config.kiosk.clone())
+        .with_prints(config.prints.clone());
     if !config.bam.url.is_empty() {
         let client = pop_integrations::bam::Bam::new(&config.bam.url, &config.bam.token)
             .map_err(|e| format!("BAM!: {e}"))?;

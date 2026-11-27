@@ -22,6 +22,7 @@ pub mod notices;
 pub mod notify;
 pub mod pins;
 pub mod printers;
+pub mod prints;
 pub mod report;
 pub mod run;
 pub mod secrets;
@@ -98,6 +99,8 @@ pub struct AppState {
     pub public: config::Public,
     /// How kiosk sessions behave (#12).
     pub kiosk: config::Kiosk,
+    /// How large, how many and how long prints wait (#40).
+    pub prints: config::Prints,
     /// Feedback, filed as GitHub issues, when configured (#96).
     pub feedback: Option<Arc<feedback::Feedback>>,
     /// The providers members may sign in with, when any are configured (#14).
@@ -134,6 +137,7 @@ impl AppState {
             jpegs: cameras::Jpegs::default(),
             public: config::Public::default(),
             kiosk: config::Kiosk::default(),
+            prints: config::Prints::default(),
             feedback: None,
             sign_ins: None,
             card_sign_ins: None,
@@ -187,6 +191,12 @@ impl AppState {
     /// Kiosk sessions as configured (#12).
     pub fn with_kiosk(mut self, kiosk: config::Kiosk) -> Self {
         self.kiosk = kiosk;
+        self
+    }
+
+    /// Keep prints within these limits (#40).
+    pub fn with_prints(mut self, prints: config::Prints) -> Self {
+        self.prints = prints;
         self
     }
 
@@ -392,6 +402,49 @@ pub fn routes() -> Vec<Route> {
             need: Need::Account,
             reach: Reach::Anywhere,
             handler: delete(keys::revoke),
+        },
+        // ---- prints waiting to be sent (#40) ----
+        // Each member's own, from anywhere they are signed in; someone
+        // else's is not found. Admins see and delete everyone's.
+        Route {
+            method: Method::GET,
+            path: "/api/prints",
+            effect: Effect::Read,
+            need: Need::Account,
+            reach: Reach::Anywhere,
+            handler: get(prints::mine),
+        },
+        Route {
+            method: Method::GET,
+            path: "/api/prints/{id}",
+            effect: Effect::Read,
+            need: Need::Account,
+            reach: Reach::Anywhere,
+            handler: get(prints::one),
+        },
+        Route {
+            method: Method::GET,
+            path: "/api/prints/{id}/plates/{index}/thumbnail",
+            effect: Effect::Read,
+            need: Need::Account,
+            reach: Reach::Anywhere,
+            handler: get(prints::thumbnail),
+        },
+        Route {
+            method: Method::DELETE,
+            path: "/api/prints/{id}",
+            effect: Effect::Upload,
+            need: Need::Account,
+            reach: Reach::Anywhere,
+            handler: delete(prints::delete),
+        },
+        Route {
+            method: Method::GET,
+            path: "/api/admin/prints",
+            effect: Effect::Read,
+            need: Need::Class(Class::Admin),
+            reach: Reach::Anywhere,
+            handler: get(prints::everyone),
         },
         // What a slicer asks first, with a key, to test the connection
         // (OctoPrint's; #37). The one route a key reaches so far.

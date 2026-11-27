@@ -45,6 +45,14 @@ impl Actor {
         }
     }
 
+    /// POP itself, deleting prints that waited too long (#40).
+    pub fn expiry() -> Self {
+        Self {
+            id: None,
+            name: Some("POP, as prints expire".to_owned()),
+        }
+    }
+
     /// The updater service (#148).
     pub fn updater() -> Self {
         Self {
@@ -103,6 +111,9 @@ pub fn kind_str(k: AuditKind) -> &'static str {
         AuditKind::TrainingChanged => "training_changed",
         AuditKind::FeedbackFiled => "feedback_filed",
         AuditKind::ProblemReported => "problem_reported",
+        AuditKind::PrintStored => "print_stored",
+        AuditKind::PrintDeleted => "print_deleted",
+        AuditKind::PrintExpired => "print_expired",
         AuditKind::Other => "other",
     }
 }
@@ -149,6 +160,9 @@ fn kind_from(s: &str) -> AuditKind {
         AuditKind::TrainingChanged,
         AuditKind::FeedbackFiled,
         AuditKind::ProblemReported,
+        AuditKind::PrintStored,
+        AuditKind::PrintDeleted,
+        AuditKind::PrintExpired,
     ]
     .into_iter()
     .find(|k| kind_str(*k) == s)

@@ -31,6 +31,7 @@ pub struct Config {
     pub guides: Guides,
     pub public: Public,
     pub kiosk: Kiosk,
+    pub prints: Prints,
     pub feedback: Feedback,
     pub sign_in: SignIn,
     pub card_sign_in: CardSignIn,
@@ -232,6 +233,45 @@ pub struct Kiosk {
 impl Default for Kiosk {
     fn default() -> Self {
         Self { idle_secs: 90 }
+    }
+}
+
+/// Prints waiting to be sent (#40): how large, how many, and for how long.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct Prints {
+    /// The largest one file may be, in megabytes. 1 to 4000.
+    pub max_file_mb: u64,
+    /// All of one member's waiting prints together, in megabytes. At least
+    /// `max_file_mb`.
+    pub member_mb: u64,
+    /// How many prints one member may have waiting. 1 to 1000.
+    pub max_waiting: u32,
+    /// How many days a print waits unsent before it is deleted and its owner
+    /// told. 1 to 365.
+    pub keep_days: u32,
+}
+
+impl Default for Prints {
+    fn default() -> Self {
+        Self {
+            max_file_mb: 200,
+            member_mb: 1000,
+            max_waiting: 20,
+            keep_days: 14,
+        }
+    }
+}
+
+impl Prints {
+    pub fn max_file_bytes(&self) -> u64 {
+        self.max_file_mb * 1024 * 1024
+    }
+    pub fn member_bytes(&self) -> u64 {
+        self.member_mb * 1024 * 1024
+    }
+    pub fn keep_secs(&self) -> i64 {
+        i64::from(self.keep_days) * 86_400
     }
 }
 
@@ -855,6 +895,38 @@ impl Config {
                 ),
             ));
         }
+        let p = &self.prints;
+        if !(1..=4000).contains(&p.max_file_mb) {
+            return Err(err(
+                "prints.max_file_mb",
+                format!("{}: a file may be 1 to 4000 MB", p.max_file_mb),
+            ));
+        }
+        if p.member_mb < p.max_file_mb || p.member_mb > 1_000_000 {
+            return Err(err(
+                "prints.member_mb",
+                format!(
+                    "{}: a member's prints together are at least prints.max_file_mb ({}), \
+                     so one largest file fits, and at most 1000000 MB",
+                    p.member_mb, p.max_file_mb
+                ),
+            ));
+        }
+        if !(1..=1000).contains(&p.max_waiting) {
+            return Err(err(
+                "prints.max_waiting",
+                format!(
+                    "{}: a member may have 1 to 1000 prints waiting",
+                    p.max_waiting
+                ),
+            ));
+        }
+        if !(1..=365).contains(&p.keep_days) {
+            return Err(err(
+                "prints.keep_days",
+                format!("{}: a print waits 1 to 365 days", p.keep_days),
+            ));
+        }
         if self.storage.data_dir.as_os_str().is_empty() {
             return Err(err(
                 "storage.data_dir",
@@ -1107,6 +1179,40 @@ mod tests {
     fn a_listen_address_without_a_port_names_the_key() {
         let e = parse_err("[server]\nlisten = \"0.0.0.0\"\n");
         assert_eq!(e.key, "server.listen");
+    }
+
+    #[test]
+    fn prints_limits_have_defaults_and_bounds() {
+        let p = Config::default().prints;
+        assert_eq!(
+            (p.max_file_mb, p.member_mb, p.max_waiting, p.keep_days),
+            (200, 1000, 20, 14)
+        );
+        let c = Config::parse(
+            "[prints]\nmax_file_mb = 50\nmember_mb = 50\nmax_waiting = 3\nkeep_days = 2\n",
+        )
+        .unwrap();
+        assert_eq!(c.prints.max_file_bytes(), 50 << 20);
+        assert_eq!(c.prints.keep_secs(), 2 * 86_400);
+        for (toml, key) in [
+            ("max_file_mb = 0", "prints.max_file_mb"),
+            ("max_file_mb = 4001\nmember_mb = 5000", "prints.max_file_mb"),
+            ("member_mb = 199", "prints.member_mb"),
+            ("max_waiting = 0", "prints.max_waiting"),
+            ("max_waiting = 1001", "prints.max_waiting"),
+            ("keep_days = 0", "prints.keep_days"),
+            ("keep_days = 366", "prints.keep_days"),
+        ] {
+            assert_eq!(parse_err(&format!("[prints]\n{toml}\n")).key, key, "{toml}");
+        }
+        for ok in [
+            "max_file_mb = 4000\nmember_mb = 4000",
+            "member_mb = 200",
+            "max_waiting = 1000",
+            "keep_days = 365",
+        ] {
+            assert!(Config::parse(&format!("[prints]\n{ok}\n")).is_ok(), "{ok}");
+        }
     }
 
     #[test]

@@ -27,6 +27,7 @@ hex = "0.4"
 ipnet = { version = "2", features = ["serde"] }
 # This machine's MAC address, which CS:S records when POP registers (#18).
 mac_address = "1.1"
+pop-gcode = { version = "0.1.2", path = "../pop-gcode" }
 pop-integrations = { version = "0.1.2", path = "../pop-integrations" }
 pop-printers = { version = "0.1.2", path = "../pop-printers" }
 rand = "0.8"
