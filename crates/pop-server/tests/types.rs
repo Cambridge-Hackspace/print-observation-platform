@@ -18,7 +18,7 @@ use pop_server::api::{
     Status, TowerPrinter, TowerState, UpdaterStatus, User,
 };
 use pop_server::api::{
-    ApiKey, CreatedApiKey, Kiosk, KioskCardReader, NewApiKey, NewKiosk, PrinterTraining,
+    ApiKey, CreatedApiKey, Kiosk, KioskCardReader, NewApiKey, NewKiosk, Print, PrinterTraining,
     SessionInfo,
 };
 use pop_server::card_sign_in::{KioskTap, TapView};
@@ -76,6 +76,8 @@ fn export(dir: &Path) {
     // Signing in through a provider (#14).
     pop_server::sign_in::SignInProvider::export_all_to(dir).unwrap();
     // Personal API keys (#13).
+    // Prints waiting to be sent (#40).
+    Print::export_all_to(dir).unwrap();
     ApiKey::export_all_to(dir).unwrap();
     NewApiKey::export_all_to(dir).unwrap();
     CreatedApiKey::export_all_to(dir).unwrap();

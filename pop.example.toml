@@ -99,6 +99,17 @@ indexable = false
 # seconds (#12): the countdown it shows. 15 to 3600.
 idle_secs = 90
 
+[prints]
+# Prints waiting to be sent (#40), kept under the data directory's files/prints.
+# The largest one file may be, in MB. 1 to 4000.
+max_file_mb = 200
+# All of one member's waiting prints together, in MB: at least max_file_mb.
+member_mb = 1000
+# How many prints one member may have waiting. 1 to 1000.
+max_waiting = 20
+# Days a print waits unsent before it is deleted and its owner told. 1 to 365.
+keep_days = 14
+
 [public]
 # What the live stream (/api/events) carries to anyone who is neither signed
 # in nor on the space's network: the public, watching from outside. Whether

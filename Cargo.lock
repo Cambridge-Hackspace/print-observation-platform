@@ -2260,6 +2260,7 @@ dependencies = [
  "ipnet",
  "mac_address",
  "openidconnect",
+ "pop-gcode",
  "pop-integrations",
  "pop-printers",
  "rand 0.8.8",

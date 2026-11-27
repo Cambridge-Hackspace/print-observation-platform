@@ -457,6 +457,33 @@ Anyone in the space can touch the kiosk, so it is treated as public.
   `crates/pop-server/tests/server.rs::no_screen_is_indexed_but_the_public_guides_when_allowed`,
   `crates/pop-server/tests/public_guides.rs::the_license_is_shown_and_indexing_is_off_unless_allowed`.
 
+## Prints waiting to be sent
+
+- **A member sees, and deletes, only their own prints; an admin, everyone's.**
+  Someone else's print, and its picture, are not found, with the same
+  answer as a print that does not exist.
+  `crates/pop-server/tests/prints.rs::a_member_sees_and_deletes_only_their_own`.
+- **A print's file is named by a random id, never by its upload's name**,
+  which is kept only to show, its last path part alone, so an uploaded name
+  cannot reach outside `files/prints/`.
+  `crates/pop-server/src/prints.rs::tests::a_name_is_its_last_part_and_says_what_it_is`,
+  `crates/pop-server/tests/prints.rs::a_print_is_kept_whole_with_what_its_slicer_wrote`.
+- **A member's waiting prints are limited in size, number and total**, and
+  two uploads at once cannot both take the last place.
+  `crates/pop-server/tests/prints.rs::a_member_may_have_so_many_waiting_and_so_much`,
+  `crates/pop-server/tests/prints.rs::two_uploads_at_once_cannot_both_take_the_last_place`.
+- **An archive cannot make POP decompress more than it allows.** Each size
+  is checked before decompressing, and an entry that grows past what it
+  says is refused one byte past it.
+  `crates/pop-gcode/tests/threemf.rs::a_zip_bomb_is_refused_when_it_says_too_much_and_when_it_lies`,
+  `crates/pop-gcode/tests/threemf.rs::the_gcode_limit_is_for_all_plates_together`,
+  `crates/pop-gcode/tests/threemf.rs::the_reader_survives_whatever_an_archive_holds`.
+- **What a slicer wrote is its uploader's claim.** The printer model,
+  material and grams are read from comments anyone can write. They choose
+  what to offer and say what a print needs; nothing trusts them further.
+- **A print waiting too long is deleted, and its owner told.**
+  `crates/pop-server/tests/prints.rs::a_print_waiting_too_long_is_deleted_and_its_owner_told`.
+
 ## The audit log
 
 Only an admin reads it. Every route that changes something is listed in

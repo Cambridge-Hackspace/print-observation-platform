@@ -360,6 +360,13 @@ pub enum AuditKind {
     /// Someone watching flagged that something looks wrong with a printer
     /// (#63), and the group chat was told.
     ProblemReported,
+    /// A member's print was stored, to wait until they send it (#40).
+    PrintStored,
+    /// A waiting print was deleted, by its owner or an admin.
+    PrintDeleted,
+    /// A print waited unsent longer than prints.keep_days: its file was
+    /// deleted and its owner told.
+    PrintExpired,
     /// A kind this build does not know, written by a newer POP. Shown, never
     /// hidden.
     Other,
@@ -483,6 +490,72 @@ pub struct CameraLoginBody {
     /// Empty for a camera that asks for a password only.
     pub username: String,
     pub password: String,
+}
+
+/// A print waiting to be sent (#40), or one that expired unsent, as its
+/// owner sees it and as admins do.
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+pub struct Print {
+    pub id: String,
+    pub owner: PrintOwner,
+    /// As it was uploaded.
+    pub filename: String,
+    pub format: PrintFormat,
+    #[ts(type = "number")]
+    pub bytes: u64,
+    #[ts(type = "number")]
+    pub created_at: i64,
+    /// When it is deleted if it has not been sent.
+    #[ts(type = "number")]
+    pub expires_at: i64,
+    /// When it expired unsent and its file was deleted. It is listed, to
+    /// tell its owner, until they dismiss it.
+    #[ts(type = "number | null")]
+    pub expired_at: Option<i64>,
+    pub plates: Vec<PrintPlate>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+pub struct PrintOwner {
+    #[ts(type = "number")]
+    pub id: i64,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+pub enum PrintFormat {
+    #[serde(rename = "gcode")]
+    Gcode,
+    #[serde(rename = "gcode.3mf")]
+    Gcode3mf,
+}
+
+/// One plate of a print: plain G-code is one plate. What its slicer wrote,
+/// each value missing where the file does not say (pop_gcode).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+pub struct PrintPlate {
+    pub index: u32,
+    /// The slicer and its version: "PrusaSlicer 2.9.4".
+    pub slicer: Option<String>,
+    pub printer_model: Option<String>,
+    pub nozzles_mm: Vec<f64>,
+    #[ts(type = "number | null")]
+    pub estimated_seconds: Option<u64>,
+    pub filaments: Vec<PrintFilament>,
+    pub total_grams: Option<f64>,
+    /// Whether the slicer drew a picture of the plate: GET
+    /// /api/prints/{id}/plates/{index}/thumbnail.
+    pub has_thumbnail: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+pub struct PrintFilament {
+    /// The extruder or slot, from 0.
+    pub slot: u32,
+    pub material: Option<String>,
+    /// `#RRGGBB` or `#RRGGBBAA`.
+    pub color: Option<String>,
+    pub grams: Option<f64>,
 }
 
 /// One of a person's API keys, as they see it (#13): never the key itself.
