@@ -237,11 +237,15 @@ pub async fn revoke(
 
 /// `GET /api/version`, as OctoPrint answers it: what a slicer asks first,
 /// with the key, to test the connection (#37). It says the key works.
+///
+/// PrusaSlicer, SuperSlicer and OrcaSlicer refuse a host whose `text` does
+/// not start "OctoPrint" (their `OctoPrint::validate_version_text`), and ask
+/// this before every upload, so it does; POP's own name follows.
 pub async fn version() -> Response {
     Json(serde_json::json!({
         "api": "0.1",
         "server": "1.10.0",
-        "text": format!("POP {}", env!("CARGO_PKG_VERSION")),
+        "text": format!("OctoPrint 1.10.0 (POP {})", env!("CARGO_PKG_VERSION")),
     }))
     .into_response()
 }

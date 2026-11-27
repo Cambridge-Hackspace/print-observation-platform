@@ -226,10 +226,13 @@ async fn a_key_works_at_the_slicers_route_and_once_revoked_is_refused() {
     let (id, key) = pop.make(&pop.grace, "Orca").await;
     let ok = pop.version(&key).await;
     assert_eq!(ok.code, StatusCode::OK, "{}", ok.body);
+    // The slicers refuse a host whose text does not start "OctoPrint"
+    // (tests/slicer_uploads.rs replays their requests); POP names itself
+    // after it.
+    let text = ok.body["text"].as_str().unwrap();
     assert!(
-        ok.body["text"].as_str().unwrap().starts_with("POP "),
-        "{}",
-        ok.body
+        text.starts_with("OctoPrint ") && text.contains("(POP "),
+        "{text}"
     );
     let list = pop
         .send(Method::GET, "/api/keys", Some(&pop.grace), None, None)

@@ -176,6 +176,13 @@ factor for admins online is #175 (gap 18).
   `SameSite=Lax` and no CORS, that is POP's defence against cross-site
   request forgery.
   `crates/pop-server/tests/users.rs::a_request_that_changes_something_must_be_json`.
+  The one exception is the slicer's upload (`POST /api/files/local`, #37),
+  a form, as slicers send it. It answers only a personal API key in
+  `X-Api-Key`, a header another site's form cannot set, and a member's
+  cookie does not stand in for the key; no other route a cookie reaches
+  takes a form.
+  `crates/pop-server/tests/slicer_uploads.rs::without_its_key_an_upload_stores_nothing`,
+  `crates/pop-server/tests/slicer_uploads.rs::only_a_key_route_takes_a_form`.
 
 ## Training
 
@@ -468,6 +475,10 @@ Anyone in the space can touch the kiosk, so it is treated as public.
   cannot reach outside `files/prints/`.
   `crates/pop-server/src/prints.rs::tests::a_name_is_its_last_part_and_says_what_it_is`,
   `crates/pop-server/tests/prints.rs::a_print_is_kept_whole_with_what_its_slicer_wrote`.
+- **An upload is refused as soon as it passes the size limit**, and leaves
+  nothing behind, whole or cut short.
+  `crates/pop-server/tests/slicer_uploads.rs::a_print_past_the_limit_is_refused_as_it_arrives_and_leaves_nothing`,
+  `crates/pop-server/tests/slicer_uploads.rs::an_upload_cut_short_leaves_nothing`.
 - **A member's waiting prints are limited in size, number and total**, and
   two uploads at once cannot both take the last place.
   `crates/pop-server/tests/prints.rs::a_member_may_have_so_many_waiting_and_so_much`,

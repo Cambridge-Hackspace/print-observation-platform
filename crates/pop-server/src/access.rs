@@ -199,7 +199,12 @@ pub fn build(table: Vec<Route>, state: &AppState) -> Router<AppState> {
         if r.reach == Reach::ThisMachine {
             handler = handler.route_layer(middleware::from_fn(this_machine));
         }
-        if matches!(r.method, Method::POST | Method::PUT | Method::PATCH) {
+        // A key's routes take what a slicer sends: its upload is a form. The
+        // JSON rule is a defence against another site's forms riding a
+        // member's cookie; a key route answers only a request carrying the
+        // key in X-Api-Key, a header no other site's form can set, and no
+        // cookie stands in for it (`with_key`). So it is exempt, and only it.
+        if matches!(r.method, Method::POST | Method::PUT | Method::PATCH) && need != Need::Key {
             handler = handler.route_layer(middleware::from_fn(json_only));
         }
         router = router.route(r.path, handler);
