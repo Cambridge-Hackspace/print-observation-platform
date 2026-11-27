@@ -17,7 +17,7 @@ path = "src/main.rs"
 # HTTP client of its own; POP's reqwest makes its requests.
 openidconnect = { version = "=4.1.0", default-features = false }
 argon2 = { version = "0.5", features = ["std"] }
-axum = { version = "0.8", features = ["ws"] }
+axum = { version = "0.8", features = ["multipart", "ws"] }
 base64 = "0.22"
 chacha20poly1305 = "0.10"
 clap = { version = "4", features = ["derive", "env"] }

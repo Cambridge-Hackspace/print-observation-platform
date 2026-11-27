@@ -27,6 +27,7 @@ pub mod report;
 pub mod run;
 pub mod secrets;
 pub mod sign_in;
+pub mod slicer_upload;
 pub mod tower;
 pub mod training;
 pub mod updater;
@@ -455,6 +456,17 @@ pub fn routes() -> Vec<Route> {
             need: Need::Key,
             reach: Reach::Anywhere,
             handler: get(keys::version),
+        },
+        // The slicer's upload (#37): with a key, from anywhere, as a slicer
+        // at home sends it. Its body is the print, so it is bounded by
+        // [prints].max_file_mb as it streams, not by the default limit.
+        Route {
+            method: Method::POST,
+            path: "/api/files/local",
+            effect: Effect::Upload,
+            need: Need::Key,
+            reach: Reach::Anywhere,
+            handler: post(slicer_upload::upload).layer(axum::extract::DefaultBodyLimit::disable()),
         },
         Route {
             method: Method::GET,

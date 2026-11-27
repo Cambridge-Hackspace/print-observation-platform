@@ -166,6 +166,14 @@ fn problems(conf: &str) -> Vec<String> {
     if !at("/api/events").contains("proxy_buffering off") {
         out.push("the live stream is buffered, so screens see nothing until it fills".into());
     }
+    let upload = at("/api/files/local");
+    if !upload.contains("client_max_body_size 0;")
+        || !upload.contains("proxy_request_buffering off;")
+    {
+        out.push(
+            "the slicer's upload is held to nginx's body limit, or buffered whole, before POP's own limit".into(),
+        );
+    }
     if !at("/api/printers/x1/camera/mse").contains("Upgrade $http_upgrade") {
         out.push("the camera's WebSocket is not upgraded".into());
     }
@@ -235,6 +243,13 @@ fn the_check_fails_an_example_that_forwards_too_much_or_forges_nothing() {
     assert_ne!(stale, conf);
     let found = problems(&stale);
     assert!(found.iter().any(|p| p.contains("/api/gone")), "{found:#?}");
+    let limited = conf.replacen("        client_max_body_size 0;\n", "", 1);
+    assert_ne!(limited, conf);
+    let found = problems(&limited);
+    assert!(
+        found.iter().any(|p| p.contains("slicer's upload")),
+        "{found:#?}"
+    );
 }
 
 #[test]

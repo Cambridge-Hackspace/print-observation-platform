@@ -31,6 +31,11 @@ const WRITE_ROUTES: &[(&str, &str, &str)] = &[
         "tests/report.rs: a_report_tells_the_group_and_is_recorded",
     ),
     (
+        "POST",
+        "/api/files/local",
+        "tests/slicer_uploads.rs: each_slicers_upload_is_stored_as_its_owners_print",
+    ),
+    (
         "DELETE",
         "/api/prints/{id}",
         "tests/prints.rs: deleting_a_print_deletes_its_files_and_is_recorded",

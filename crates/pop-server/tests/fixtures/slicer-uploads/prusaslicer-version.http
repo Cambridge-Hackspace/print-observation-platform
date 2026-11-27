@@ -1,0 +1,6 @@
+GET /api/version HTTP/1.1
+Host: 127.0.0.1:18765
+User-Agent: PrusaSlicer/2.9.4
+Accept: */*
+X-Api-Key: CAPTURED-KEY
+
