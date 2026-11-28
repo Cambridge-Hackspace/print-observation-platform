@@ -17,8 +17,11 @@ Several decisions were settled before we chose a stack, and they constrain it.
    Spaces (CS:S), but it does not depend on it. A space without CS:S can run
    POP on its own.
 2. **Sign-in has interchangeable providers.** Local users come first, then
-   OAuth 2.0 / OpenID Connect and SAML. CS:S becomes one of the OIDC providers
-   once it can act as one; today it cannot.
+   OAuth 2.0 / OpenID Connect. CS:S becomes one of the OIDC providers
+   once it can act as one; today it cannot. SAML was planned too and was
+   dropped on 2026-11-28 (#15): it would have put libxml2 and xmlsec1 in every
+   build, and a SAML-only identity provider can reach POP through an
+   OIDC bridge such as Keycloak or SATOSA.
 3. **BAM! is required.** Printers and filament live in Boring Asset Manager.
    POP reads printers from a configured BAM! category and its fields, and reads
    and writes filament stock through BAM!. POP never keeps its own inventory,
@@ -204,7 +207,7 @@ Each outside system sits behind an adapter that is chosen in configuration.
 
 | Concern       | Adapters                                                                                    |
 | ------------- | ------------------------------------------------------------------------------------------- |
-| Sign-in       | Local users; OIDC; SAML; CS:S (as an OIDC provider, once CS:S supports it)                  |
+| Sign-in       | Local users; OIDC; CS:S (as an OIDC provider, once CS:S supports it)                        |
 | Card reader   | USB reader on the kiosk box; ToolGuard over MQTT when CS:S is present, with the member named in the scan reply (CS:S #228) |
 | Training      | Local flags on each user; identity-provider groups or claims; CS:S                          |
 | Group notices | A Discord webhook, directly, as BAM! does, whether or not CS:S is present |
